@@ -19,15 +19,6 @@ func (ut *userTraffic) add(userName string, traffic int64) int64 {
 	return ut.users[userName]
 }
 
-func (ut *userTraffic) getAndDelete(userName string) int64 {
-	ut.lock.Lock()
-	defer ut.lock.Unlock()
-
-	traffic := ut.users[userName]
-	defer delete(ut.users, userName)
-	return traffic
-}
-
 func (ut *userTraffic) snapshotAndClear() map[string]int64 {
 	ut.lock.Lock()
 	defer ut.lock.Unlock()

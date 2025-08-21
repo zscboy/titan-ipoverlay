@@ -94,10 +94,6 @@ func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*config.Pop, er
 		return nil, fmt.Errorf("getLocalInfo failed:%v", err)
 	}
 
-	if location.Province == "Hong Kong" {
-		location.Country = "HongKong"
-	}
-
 	for _, pop := range l.svcCtx.Config.Pops {
 		if pop.Area == location.Country {
 			count, err := model.NodeCountOfPop(l.svcCtx.Redis, pop.Id)
@@ -124,7 +120,7 @@ func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*config.Pop, er
 				logx.Errorf("allocatePop SetNodePop error %v", err)
 			}
 
-			logx.Debugf("new node %s with defaul area %v, allocate pop:%s", req.NodeId, l.svcCtx.Config.DefaultArea, pop.Id)
+			logx.Debugf("new node %s location %v not exit, allocate default area %v, allocate pop:%s", req.NodeId, location, l.svcCtx.Config.DefaultArea, pop.Id)
 			return &pop, nil
 		}
 	}
@@ -136,21 +132,6 @@ func (l *GetNodePopLogic) getPodServer(id string) *svc.Server {
 	for podID, pop := range l.svcCtx.Servers {
 		if podID == id {
 			return pop
-		}
-	}
-	return nil
-}
-
-func (l *GetNodePopLogic) getPodConfig(area string) *config.Pop {
-	for _, pop := range l.svcCtx.Config.Pops {
-		if pop.Area == area {
-			return &pop
-		}
-	}
-
-	for _, pop := range l.svcCtx.Config.Pops {
-		if pop.Area == l.svcCtx.Config.DefaultArea {
-			return &pop
 		}
 	}
 	return nil

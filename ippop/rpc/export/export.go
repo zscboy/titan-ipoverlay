@@ -20,7 +20,7 @@ import (
 
 type RPCServerConfig config.Config
 
-func AddRPCService(group *service.ServiceGroup, c RPCServerConfig) {
+func NewRPCServer(c RPCServerConfig) *zrpc.RpcServer {
 	ctx := svc.NewServiceContext(config.Config(c))
 
 	whitelist := make(map[string]bool)
@@ -28,7 +28,7 @@ func AddRPCService(group *service.ServiceGroup, c RPCServerConfig) {
 		whitelist[ip] = true
 	}
 
-	s := zrpc.MustNewServer(c.RpcServerConf, func(grpcServer *grpc.Server) {
+	rpcServer := zrpc.MustNewServer(c.RpcServerConf, func(grpcServer *grpc.Server) {
 		pb.RegisterServerAPIServer(grpcServer, server.NewServerAPIServer(ctx))
 
 		if c.Mode == service.DevMode || c.Mode == service.TestMode {
@@ -36,11 +36,8 @@ func AddRPCService(group *service.ServiceGroup, c RPCServerConfig) {
 		}
 	})
 
-	s.AddUnaryInterceptors(whitelistInterceptor(whitelist))
-
-	defer s.Stop()
-
-	group.Add(s)
+	rpcServer.AddUnaryInterceptors(whitelistInterceptor(whitelist))
+	return rpcServer
 }
 
 func whitelistInterceptor(whitelist map[string]bool) grpc.UnaryServerInterceptor {

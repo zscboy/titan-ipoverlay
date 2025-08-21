@@ -14,7 +14,7 @@ import (
 const (
 	defaultUDPTimeout = 120
 	defaultTCPTimeout = 3
-	version           = "0.0.1"
+	version           = "0.0.2"
 )
 
 // var globalCancel context.CancelFunc
@@ -23,7 +23,7 @@ var bootstrapMgr *bootstrap.BootstrapMgr
 
 func startTunnel(jsonParams string) *JSONCallResult {
 	if mytunnel != nil {
-		return &JSONCallResult{Code: -1, Msg: "IP service already running, no need to start again"}
+		return &JSONCallResult{Code: -2, Msg: "IP service already running, no need to start again"}
 	}
 
 	log.LogInfo("golib", "version: "+version)

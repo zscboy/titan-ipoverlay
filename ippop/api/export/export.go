@@ -15,7 +15,6 @@ type APIServerConfig config.Config
 func AddAPIService(group *service.ServiceGroup, c APIServerConfig) {
 	server := rest.MustNewServer(c.RestConf)
 	group.Add(server)
-	// defer server.Stop()
 
 	ctx := svc.NewServiceContext(config.Config(c))
 	handler.RegisterHandlers(server, ctx)
@@ -32,12 +31,7 @@ func AddAPIService(group *service.ServiceGroup, c APIServerConfig) {
 	if err != nil {
 		panic(err)
 	}
-	// defer socks5.Stop()
 
-	// socks5.Startup()
-
-	// group.Add(server)
 	group.Add(socks5)
-	// logx.Infof("API server start at %s:%d...", c.Host, c.Port)
-	// server.Start()
+
 }

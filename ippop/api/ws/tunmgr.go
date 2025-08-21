@@ -300,7 +300,7 @@ func (tm *TunnelManager) keepalive() {
 				return true
 			})
 
-			logx.Debugf("TunnelManager.keepalive tunnel count:%d, clost:%v", count, time.Since(now))
+			logx.Debugf("TunnelManager.keepalive tunnel count:%d, cost:%v", count, time.Since(now))
 		}
 	}
 }

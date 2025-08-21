@@ -28,7 +28,7 @@ func (proxy *TCPProxy) close() {
 	proxy.conn.Close()
 }
 
-func (proxy *TCPProxy) closeByCleint() {
+func (proxy *TCPProxy) closeByClient() {
 	proxy.isCloseByClient = true
 	proxy.close()
 }

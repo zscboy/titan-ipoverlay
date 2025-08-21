@@ -82,7 +82,7 @@ func (t *Tunnel) writePong(msg []byte) error {
 		return fmt.Errorf("writePong, t.conn == nil, id:%s", t.opts.Id)
 	}
 
-	t.conn.SetWriteDeadline(time.Now().Add(30 * time.Second))
+	// t.conn.SetWriteDeadline(time.Now().Add(30 * time.Second))
 	return t.conn.WriteMessage(websocket.PongMessage, msg)
 }
 
@@ -94,7 +94,7 @@ func (t *Tunnel) writePing(msg []byte) error {
 		return fmt.Errorf("writePong, t.conn == nil, id:%s", t.opts.Id)
 	}
 
-	t.conn.SetWriteDeadline(time.Now().Add(30 * time.Second))
+	// t.conn.SetWriteDeadline(time.Now().Add(30 * time.Second))
 	return t.conn.WriteMessage(websocket.PingMessage, msg)
 }
 
@@ -130,7 +130,7 @@ func (t *Tunnel) serve() {
 		_, message, err := t.readMessageWithLimitRate()
 		if err != nil {
 			logx.Error("Tunnel read failed:", err)
-			return
+			break
 		}
 
 		err = t.onMessage(message)
@@ -138,6 +138,10 @@ func (t *Tunnel) serve() {
 			logx.Error("Tunnel.serve onMessage failed:", err)
 		}
 	}
+
+	t.conn = nil
+	t.onClose()
+	logx.Infof("Tunnel %s %s close", t.opts.Id, t.opts.IP)
 }
 
 func (t *Tunnel) onMessage(data []byte) error {
@@ -192,7 +196,7 @@ func (t *Tunnel) onProxySessionClose(sessionID string) error {
 	}
 
 	session := v.(*TCPProxy)
-	session.closeByCleint()
+	session.closeByClient()
 
 	return nil
 }
@@ -426,7 +430,9 @@ func (t *Tunnel) close() {
 		<-t.waitLeaseCh
 		logx.Debugf("tunnel close")
 	}
+}
 
+func (t *Tunnel) onClose() {
 	t.clearProxys()
 }
 

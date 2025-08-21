@@ -61,8 +61,8 @@ type (
 		TrafficLimit *TrafficLimit `json:"traffic_limit,optional"`
 		// if Route is nil, will use manual mode
 		Route *Route `json:"route,optional"`
-		// default 10Mb/s, 0 unlimit
-		UploadRateLimit int64 `json:"upload_rate_limit,default=1310720"`
+		// default 1Mb/s, 0 unlimit
+		UploadRateLimit int64 `json:"upload_rate_limit,default=131072"`
 		// default 10Mb/s, 0 unlimit
 		DownloadRateLimit int64 `json:"download_rate_limit,default=1310720"`
 	}

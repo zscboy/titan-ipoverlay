@@ -439,12 +439,22 @@ func (t *Tunnel) onProxyUdpDataFromProxy(sessionID string, data []byte) {
 func (t *Tunnel) writePong(msg []byte) error {
 	t.writeLock.Lock()
 	defer t.writeLock.Unlock()
+
+	if t.conn == nil {
+		return fmt.Errorf(" t.conn == nil")
+	}
+
 	return t.conn.WriteMessage(websocket.PongMessage, msg)
 }
 
 func (t *Tunnel) writePing(msg []byte) error {
 	t.writeLock.Lock()
 	defer t.writeLock.Unlock()
+
+	if t.conn == nil {
+		return fmt.Errorf(" t.conn == nil")
+	}
+
 	return t.conn.WriteMessage(websocket.PingMessage, msg)
 }
 
@@ -455,6 +465,11 @@ func (t *Tunnel) onPong(_ []byte) {
 func (t *Tunnel) write(msg []byte) error {
 	t.writeLock.Lock()
 	defer t.writeLock.Unlock()
+
+	if t.conn == nil {
+		return fmt.Errorf(" t.conn == nil")
+	}
+
 	return t.conn.WriteMessage(websocket.BinaryMessage, msg)
 }
 

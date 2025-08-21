@@ -2,13 +2,13 @@ package main
 
 import (
 	"flag"
-	"fmt"
 
 	"titan-ipoverlay/manager/internal/config"
 	"titan-ipoverlay/manager/internal/handler"
 	"titan-ipoverlay/manager/internal/svc"
 
 	"github.com/zeromicro/go-zero/core/conf"
+	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/rest"
 )
 
@@ -26,6 +26,6 @@ func main() {
 	ctx := svc.NewServiceContext(c)
 	handler.RegisterHandlers(server, ctx)
 
-	fmt.Printf("Starting server at %s:%d...\n", c.Host, c.Port)
+	logx.Infof("Starting server at %s:%d...\n", c.Host, c.Port)
 	server.Start()
 }

@@ -25,14 +25,6 @@ type Node struct {
 	NetDelay   int64  `redis:"net_delay"`
 }
 
-func parseTimeFromString(timeStr string) (time.Time, error) {
-	t, err := time.Parse(TimeLayout, timeStr)
-	if err != nil {
-		return time.Time{}, err
-	}
-	return t, nil
-}
-
 func SetNodeAndZadd(ctx context.Context, redis *redis.Redis, node *Node) error {
 	hashKey := fmt.Sprintf(redisKeyNode, node.Id)
 	m, err := structToMap(node)
@@ -40,8 +32,7 @@ func SetNodeAndZadd(ctx context.Context, redis *redis.Redis, node *Node) error {
 		return err
 	}
 
-	layout := "2006-01-02 15:04:05 -0700 MST"
-	t, err := time.Parse(layout, node.RegisterAt)
+	t, err := time.Parse(TimeLayout, node.RegisterAt)
 	if err != nil {
 		return err
 	}
@@ -63,6 +54,11 @@ func SetNodeAndZadd(ctx context.Context, redis *redis.Redis, node *Node) error {
 }
 
 func SetNodeNetDelay(redis *redis.Redis, nodeID string, delay uint64) error {
+	node, _ := GetNode(redis, nodeID)
+	if node == nil {
+		return fmt.Errorf("node %s not exist", nodeID)
+	}
+
 	key := fmt.Sprintf(redisKeyNode, nodeID)
 	return redis.Hset(key, "net_delay", fmt.Sprintf("%d", delay))
 }
