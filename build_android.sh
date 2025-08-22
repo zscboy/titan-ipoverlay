@@ -12,6 +12,6 @@ TARGET=client
 # LDFLAGS='-s -w -extldflags -Wl,-soname,'"$TARGET"''
 
 
-GOOS=android GOARCH=arm64 CGO_ENABLED=1 CC=$CC_PATH/aarch64-linux-android34-clang go build -o $OUT_PATH/${TARGET}_arm64 ./client/
+GOOS=android GOARCH=arm64 CGO_ENABLED=1 CC=$CC_PATH/aarch64-linux-android34-clang go build -o $OUT_PATH/bin/${TARGET}_arm64 ./client/
 
-GOOS=android GOARCH=arm CGO_ENABLED=1 CC=$CC_PATH/armv7a-linux-androideabi34-clang go build -o $OUT_PATH/${TARGET}_arm ./client/
+GOOS=android GOARCH=arm CGO_ENABLED=1 CC=$CC_PATH/armv7a-linux-androideabi34-clang go build -o $OUT_PATH/bin/${TARGET}_arm ./client/
