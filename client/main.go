@@ -77,6 +77,7 @@ func main() {
 				TCPTimeout: tcpTimeout,
 				// BootstrapMgr: bootstrapMgr,
 				DirectURL: directURL,
+				Version:   cctx.App.Version,
 			}
 
 			if len(directURL) == 0 {

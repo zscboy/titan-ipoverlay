@@ -37,6 +37,7 @@ type TunnelOptions struct {
 	TCPTimeout   int
 	BootstrapMgr *bootstrap.BootstrapMgr
 	DirectURL    string
+	Version      string
 }
 
 type Tunnel struct {
@@ -57,6 +58,8 @@ type Tunnel struct {
 	tcpTimeout int
 	ctx        context.Context
 	ctxCancel  context.CancelFunc
+
+	version string
 }
 
 func NewTunnel(opts *TunnelOptions) (*Tunnel, error) {
@@ -68,6 +71,7 @@ func NewTunnel(opts *TunnelOptions) (*Tunnel, error) {
 		isDestroy:    false,
 		udpTimeout:   opts.UDPTimeout,
 		tcpTimeout:   opts.TCPTimeout,
+		version:      opts.Version,
 	}
 
 	return tun, nil
@@ -85,7 +89,7 @@ func (t *Tunnel) Connect() error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(t.tcpTimeout)*time.Second)
 	defer cancel()
 
-	url := fmt.Sprintf("%s?id=%s&os=%s", pop.URL, t.uuid, runtime.GOOS)
+	url := fmt.Sprintf("%s?id=%s&os=%s&version=%s", pop.URL, t.uuid, runtime.GOOS, t.version)
 	conn, resp, err := websocket.DefaultDialer.DialContext(ctx, url, header)
 	if err != nil {
 		var data []byte

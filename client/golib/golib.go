@@ -14,7 +14,7 @@ import (
 const (
 	defaultUDPTimeout = 120
 	defaultTCPTimeout = 3
-	version           = "0.0.2"
+	version           = "1.0.0"
 )
 
 // var globalCancel context.CancelFunc
@@ -72,6 +72,7 @@ func startTunnel(jsonParams string) *JSONCallResult {
 		UDPTimeout:   defaultUDPTimeout,
 		TCPTimeout:   defaultTCPTimeout,
 		BootstrapMgr: bootstrapMgr,
+		Version:      version,
 	}
 
 	tun, err := tunnel.NewTunnel(&opts)
