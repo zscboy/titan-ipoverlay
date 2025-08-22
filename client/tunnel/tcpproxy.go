@@ -13,6 +13,10 @@ type TCPProxy struct {
 	isCloseByServer bool
 }
 
+func (proxy *TCPProxy) destroy() {
+	proxy.closeByServer()
+}
+
 func (proxy *TCPProxy) close() {
 	if proxy.conn == nil {
 		logx.Errorf("session %s conn == nil", proxy.id)

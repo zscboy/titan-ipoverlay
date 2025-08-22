@@ -14,6 +14,13 @@ type UDPProxy struct {
 	timeout int
 }
 
+func (proxy *UDPProxy) destroy() {
+	if proxy.conn != nil {
+		proxy.conn.Close()
+		proxy.conn = nil
+	}
+}
+
 func (proxy *UDPProxy) write(data []byte) error {
 	if proxy.conn == nil {
 		return fmt.Errorf("session %s conn == nil", proxy.id)

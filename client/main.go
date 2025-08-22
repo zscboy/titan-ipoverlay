@@ -14,10 +14,13 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
+const version = "1.0.0"
+
 func main() {
 	app := &cli.App{
-		Name:  "titan-tunnelc",
-		Usage: "vms client",
+		Name:    "titan-ipoverlay-client",
+		Usage:   "vms client",
+		Version: version,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "app-dir",

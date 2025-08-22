@@ -210,9 +210,6 @@ func (t *Tunnel) IsDestroy() bool {
 
 func (t *Tunnel) Serve() error {
 	conn := t.conn
-	defer t.ctxCancel()
-	defer conn.Close()
-
 	for {
 		messageType, p, err := conn.ReadMessage()
 		if err != nil {
@@ -232,8 +229,13 @@ func (t *Tunnel) Serve() error {
 		logx.Debugf("handle msg cost time: %dms", time.Since(start).Milliseconds())
 	}
 
-	logx.Debugf("tunnel %s close", t.uuid)
+	t.conn.Close()
 	t.conn = nil
+
+	t.onClose()
+	t.ctxCancel()
+
+	logx.Debugf("tunnel %s close", t.uuid)
 	return nil
 }
 
@@ -471,6 +473,30 @@ func (t *Tunnel) write(msg []byte) error {
 	}
 
 	return t.conn.WriteMessage(websocket.BinaryMessage, msg)
+}
+
+func (t *Tunnel) onClose() {
+	t.clearProxys()
+}
+
+func (t *Tunnel) clearProxys() {
+	t.proxySessions.Range(func(key, value any) bool {
+		session, ok := value.(*TCPProxy)
+		if ok {
+			session.destroy()
+		}
+		return true
+	})
+	t.proxySessions.Clear()
+
+	t.proxyUDPs.Range(func(key, value any) bool {
+		udp, ok := value.(*UDPProxy)
+		if ok {
+			udp.destroy()
+		}
+		return true
+	})
+	t.proxyUDPs.Clear()
 }
 
 func (t *Tunnel) keepalive() {
