@@ -31,6 +31,7 @@ type Handle struct {
 func newHandler(tunManager *TunnelManager) *Handle {
 	h := &Handle{routes: make(map[string]http.HandlerFunc), tunMgr: tunManager, ipConnCount: make(map[string]int)}
 	h.routes["/ws/web"] = h.handleWS
+	h.routes["/web/crawler"] = h.handleWebCrawler
 	return h
 }
 
@@ -81,6 +82,11 @@ func (h *Handle) handleWS(w http.ResponseWriter, r *http.Request) {
 func (h *Handle) handleHttpProxy(w http.ResponseWriter, r *http.Request) {
 	httpProxy := newHttProxy(h.tunMgr)
 	httpProxy.HandleProxy(w, r)
+}
+
+func (h *Handle) handleWebCrawler(w http.ResponseWriter, r *http.Request) {
+	webCrawler := newWebCrawler(h.tunMgr)
+	webCrawler.HandleWebCrawler(w, r)
 }
 
 type Server struct {

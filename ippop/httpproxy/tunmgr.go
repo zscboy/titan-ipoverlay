@@ -139,11 +139,17 @@ func (tm *TunnelManager) keepalive() {
 
 		if tick == 30 {
 			tick = 0
+			count := 0
+			now := time.Now()
 			tm.tunnels.Range(func(key, value any) bool {
 				t := value.(*Tunnel)
 				t.keepalive()
+				count++
 				return true
 			})
+
+			logx.Debugf("TunnelManager.keepalive tunnel count:%d, cost:%v", count, time.Since(now))
+
 		}
 	}
 }
@@ -183,10 +189,10 @@ func (tm *TunnelManager) getTunnel(id string) *Tunnel {
 	return v.(*Tunnel)
 }
 
-func (tm *TunnelManager) traffic(userName string, traffic int64) {
-	tm.userTraffic.add(userName, traffic)
-}
+// func (tm *TunnelManager) traffic(userName string, traffic int64) {
+// 	tm.userTraffic.add(userName, traffic)
+// }
 
-func (tm *TunnelManager) getTrafficAndDelete(userName string) int64 {
-	return tm.userTraffic.getAndDelete(userName)
-}
+// func (tm *TunnelManager) getTrafficAndDelete(userName string) int64 {
+// 	return tm.userTraffic.getAndDelete(userName)
+// }

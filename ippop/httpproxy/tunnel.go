@@ -90,7 +90,7 @@ func (t *Tunnel) serve() {
 				logx.Error("Tunnel.serve onMessage failed:", err)
 			}
 		} else {
-			logx.Error("unsupport websocket message type:%d", messageType)
+			logx.Errorf("unsupport websocket message type:%d", messageType)
 		}
 	}
 }
