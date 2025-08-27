@@ -519,7 +519,7 @@ func (t *Tunnel) keepalive() {
 	for {
 		select {
 		case <-ticker.C:
-			// log.LogInfo("Tunnel", "keepalive tick")
+			log.LogInfo("Tunnel", "keepalive tick")
 			if t.conn == nil {
 				log.LogInfo("Tunnel", "keepalive t.conn == nil")
 				return
