@@ -58,12 +58,13 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 }
 
 func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, node *model.Node) {
-	logx.Debugf("TunnelManager:%s accept websocket ", node.Id)
 	v, ok := tm.tunnels.Load(node.Id)
 	if ok {
 		oldTun := v.(*Tunnel)
 		oldTun.close()
 	}
+
+	logx.Debugf("TunnelManager:%s accept websocket ", node.Id)
 
 	socksConfig := tm.config.Socks5
 	opts := &TunOptions{
@@ -116,8 +117,9 @@ func (tm *TunnelManager) handleNodeOffline(nodeID string) {
 	}
 
 	if len(node.BindUser) > 0 {
+		logx.Debugf("node %s offline, user %s trigger siwth node", node.Id, node.BindUser)
 		if err := tm.swithNodeForUser(node.BindUser); err != nil {
-			logx.Errorf("handleNodeOffline swithNodeForUser %v", err)
+			logx.Errorf("handleNodeOffline swithNodeForUser %s failed: %v", node.BindUser, err)
 		}
 	} else {
 		if err := model.RemoveFreeNode(tm.redis, nodeID); err != nil {
@@ -146,8 +148,8 @@ func (tm *TunnelManager) swithNodeForUser(userName string) error {
 	}
 
 	if err := model.SwitchNodeByUser(ctx, tm.redis, user, string(newNodeID)); err != nil {
-		if err := model.AddFreeNode(tm.redis, string(newNodeID)); err != nil {
-			logx.Errorf("swithNodeForUser AddFreeNode: %v", err)
+		if err2 := model.AddFreeNode(tm.redis, string(newNodeID)); err2 != nil {
+			logx.Errorf("swithNodeForUser AddFreeNode: %v", err2)
 		}
 		return err
 	}

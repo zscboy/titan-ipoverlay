@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"titan-ipoverlay/client/bootstrap"
+	"titan-ipoverlay/client/build"
 	"titan-ipoverlay/client/log"
 	"titan-ipoverlay/client/tunnel"
 
@@ -14,7 +15,6 @@ import (
 const (
 	defaultUDPTimeout = 120
 	defaultTCPTimeout = 3
-	version           = "1.0.0"
 )
 
 // var globalCancel context.CancelFunc
@@ -26,7 +26,7 @@ func startTunnel(jsonParams string) *JSONCallResult {
 		return &JSONCallResult{Code: -2, Msg: "IP service already running, no need to start again"}
 	}
 
-	log.LogInfo("golib", "version: "+version)
+	log.LogInfo("golib", "version: "+build.Version)
 	log.LogInfo("golib", "startTunnel: "+jsonParams)
 	var input = struct {
 		UUID   string `json:"uuid"`
@@ -72,7 +72,7 @@ func startTunnel(jsonParams string) *JSONCallResult {
 		UDPTimeout:   defaultUDPTimeout,
 		TCPTimeout:   defaultTCPTimeout,
 		BootstrapMgr: bootstrapMgr,
-		Version:      version,
+		Version:      build.Version,
 	}
 
 	tun, err := tunnel.NewTunnel(&opts)

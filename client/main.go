@@ -8,19 +8,18 @@ import (
 	"syscall"
 	"time"
 	"titan-ipoverlay/client/bootstrap"
+	"titan-ipoverlay/client/build"
 	"titan-ipoverlay/client/tunnel"
 
 	"github.com/urfave/cli/v2"
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
-const version = "1.0.1"
-
 func main() {
 	app := &cli.App{
 		Name:    "titan-ipoverlay-client",
 		Usage:   "vms client",
-		Version: version,
+		Version: build.Version,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "app-dir",

@@ -56,7 +56,7 @@ func SetNodeAndZadd(ctx context.Context, redis *redis.Redis, node *Node) error {
 func SetNodeNetDelay(redis *redis.Redis, nodeID string, delay uint64) error {
 	node, _ := GetNode(redis, nodeID)
 	if node == nil {
-		return fmt.Errorf("node %s not exist", nodeID)
+		return fmt.Errorf("SetNodeNetDelay node %s not exist", nodeID)
 	}
 
 	key := fmt.Sprintf(redisKeyNode, nodeID)

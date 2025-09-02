@@ -3,6 +3,7 @@ type (
 	NodeWSReq {
 		NodeId string `form:"id"`
 		OS     string `form:"os"`
+		Version string `form:"version"`
 	}
 	WebWSReq {
 		NodeId string `form:"id"`

@@ -48,7 +48,7 @@ func (l *SwitchUserRouteNodeLogic) SwitchUserRouteNode(in *pb.SwitchUserRouteNod
 	}
 
 	if err := model.SwitchNodeByUser(l.ctx, l.svcCtx.Redis, user, in.NodeId); err != nil {
-		if err := model.AddFreeNode(l.svcCtx.Redis, in.NodeId); err != nil {
+		if err2 := model.AddFreeNode(l.svcCtx.Redis, in.NodeId); err2 != nil {
 			logx.Errorf("SwitchUserRouteNode AddFreeNode %v", err.Error())
 		}
 		return &pb.UserOperationResp{ErrMsg: err.Error()}, nil
