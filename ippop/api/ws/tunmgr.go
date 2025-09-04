@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 	"titan-ipoverlay/ippop/api/internal/config"
+	"titan-ipoverlay/ippop/api/internal/types"
 	"titan-ipoverlay/ippop/api/model"
 	"titan-ipoverlay/ippop/api/socks5"
 
@@ -57,14 +58,29 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 	return tm
 }
 
-func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, node *model.Node) {
-	v, ok := tm.tunnels.Load(node.Id)
+func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *types.NodeWSReq, nodeIP string) {
+	v, ok := tm.tunnels.Load(req.NodeId)
 	if ok {
 		oldTun := v.(*Tunnel)
 		oldTun.close()
 	}
 
-	logx.Debugf("TunnelManager:%s accept websocket ", node.Id)
+	logx.Debugf("TunnelManager.acceptWebsocket node id %s", req.NodeId)
+
+	node, err := model.GetNode(tm.redis, req.NodeId)
+	if err != nil {
+		logx.Errorf("TunnelManager.acceptWebsocket, get node %s", err.Error())
+		return
+	}
+
+	if node == nil {
+		node = &model.Node{Id: req.NodeId, RegisterAt: time.Now().Format(model.TimeLayout)}
+	}
+
+	node.OS = req.OS
+	node.IP = nodeIP
+	node.Online = true
+	node.LoginAt = time.Now().Format(model.TimeLayout)
 
 	socksConfig := tm.config.Socks5
 	opts := &TunOptions{
@@ -117,8 +133,24 @@ func (tm *TunnelManager) handleNodeOffline(nodeID string) {
 	}
 
 	if len(node.BindUser) > 0 {
+		user, err := model.GetUser(tm.redis, node.BindUser)
+		if err != nil {
+			logx.Errorf("handleNodeOffline, get user %s for node %s faild:%v", node.BindUser, node.Id, err)
+			return
+		}
+
+		if user == nil {
+			logx.Errorf("handleNodeOffline, get user %s for node %s, but user not exist", node.BindUser, node.Id)
+			return
+		}
+
+		if user.RouteNodeID != node.Id {
+			logx.Errorf("handleNodeOffline, get user %s for node %s, but user.RouteNodeID[%s] != node.id", node.BindUser, node.Id, user.RouteNodeID)
+			return
+		}
+
 		logx.Debugf("node %s offline, user %s trigger siwth node", node.Id, node.BindUser)
-		if err := tm.swithNodeForUser(node.BindUser); err != nil {
+		if err := tm.swithNodeForUser(user); err != nil {
 			logx.Errorf("handleNodeOffline swithNodeForUser %s failed: %v", node.BindUser, err)
 		}
 	} else {
@@ -129,16 +161,7 @@ func (tm *TunnelManager) handleNodeOffline(nodeID string) {
 
 }
 
-func (tm *TunnelManager) swithNodeForUser(userName string) error {
-	user, err := model.GetUser(tm.redis, userName)
-	if err != nil {
-		return fmt.Errorf("swithNodeForUser  GetUser:%v", err)
-	}
-
-	if user == nil {
-		return fmt.Errorf("swithNodeForUser user %s not exist", userName)
-	}
-
+func (tm *TunnelManager) swithNodeForUser(user *model.User) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -154,7 +177,7 @@ func (tm *TunnelManager) swithNodeForUser(userName string) error {
 		return err
 	}
 
-	tm.DeleteUserFromCache(userName)
+	tm.DeleteUserFromCache(user.UserName)
 
 	return nil
 }

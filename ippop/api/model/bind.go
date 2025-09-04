@@ -148,7 +148,7 @@ func SwitchNodeByUser(ctx context.Context, redis *redis.Redis, user *User, toNod
 		return err
 	}
 
-	logx.Debugf("fromM:%v", fromM)
+	logx.Debugf("fromNodekey:%s, fromM:%v", fromNodekey, fromM)
 
 	toNode.BindUser = user.UserName
 	toNodekey := fmt.Sprintf(redisKeyNode, toNode.Id)

@@ -25,8 +25,9 @@ type GetNodePopResp struct {
 }
 
 type NodeWSReq struct {
-	NodeId string `form:"id"`
-	OS     string `form:"os"`
+	NodeId  string `form:"id"`
+	OS      string `form:"os"`
+	Version string `form:"version,optional"`
 }
 
 type ServerInfo struct {

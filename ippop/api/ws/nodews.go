@@ -4,9 +4,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
-	"time"
 	"titan-ipoverlay/ippop/api/internal/types"
-	"titan-ipoverlay/ippop/api/model"
 
 	"github.com/gorilla/websocket"
 	"github.com/zeromicro/go-zero/core/logx"
@@ -32,28 +30,13 @@ func (ws *NodeWS) ServeWS(w http.ResponseWriter, r *http.Request, req *types.Nod
 		return err
 	}
 
-	node, err := model.GetNode(ws.tunMgr.redis, req.NodeId)
-	if err != nil {
-		logx.Errorf("ServeWS, get node %s", err.Error())
-		return err
-	}
-
-	if node == nil {
-		node = &model.Node{Id: req.NodeId, RegisterAt: time.Now().Format(model.TimeLayout)}
-	}
-
-	node.OS = req.OS
-	node.IP = ip
-	node.Online = true
-	node.LoginAt = time.Now().Format(model.TimeLayout)
-
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return err
 	}
 	defer c.Close()
 
-	ws.tunMgr.acceptWebsocket(c, node)
+	ws.tunMgr.acceptWebsocket(c, req, ip)
 
 	return nil
 }

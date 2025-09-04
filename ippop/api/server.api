@@ -1,9 +1,9 @@
 // server.api
 type (
 	NodeWSReq {
-		NodeId string `form:"id"`
-		OS     string `form:"os"`
-		Version string `form:"version"`
+		NodeId  string `form:"id"`
+		OS      string `form:"os"`
+		Version string `form:"version,optional"`
 	}
 	WebWSReq {
 		NodeId string `form:"id"`
