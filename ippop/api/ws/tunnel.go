@@ -214,7 +214,7 @@ func (t *Tunnel) onProxySessionDataFromTunnel(sessionID string, data []byte) err
 }
 
 func (t *Tunnel) onProxyTCPConnClose(sessionID string) {
-	logx.Debugf("Tunnel.onProxyConnClose, session id: %s", sessionID)
+	logx.Debugf("Tunnel.onProxyTCPConnClose, session id: %s", sessionID)
 	msg := &pb.Message{}
 	msg.Type = pb.MessageType_PROXY_SESSION_CLOSE
 	msg.SessionId = sessionID

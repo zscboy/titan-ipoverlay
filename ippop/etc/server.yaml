@@ -28,7 +28,7 @@ Redis:
   Host: 127.0.0.1:6379
 HTTPProxy: 0.0.0.0:8001
 Log:
-  Mode: file
+  #Mode: file
   stat: false
-  level: debug   
+  level: debug 
 
