@@ -101,7 +101,7 @@ func main() {
 			}
 			defer tun.Destroy()
 
-			logx.Debugf("Start ip overlay success")
+			logx.Info("Start ip overlay success")
 			ctx, cancel := context.WithCancel(cctx.Context)
 			go tunServe(tun, cancel)
 
@@ -136,6 +136,7 @@ func tunServe(tun *tunnel.Tunnel, cancel context.CancelFunc) {
 		for {
 			err = tun.Connect()
 			if err == nil {
+				logx.Info("tun connect success")
 				break
 			}
 

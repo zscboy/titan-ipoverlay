@@ -115,7 +115,8 @@ func (t *Tunnel) Connect() error {
 
 	go t.keepalive()
 
-	log.LogInfo("Tunnel", fmt.Sprintf("new tun %s", url))
+	logx.Infof("Tunnel.Connect, new tun %s", url)
+	// log.LogInfo("Tunnel", fmt.Sprintf("new tun %s", url))
 	return nil
 }
 
@@ -519,14 +520,14 @@ func (t *Tunnel) keepalive() {
 	for {
 		select {
 		case <-ticker.C:
-			log.LogInfo("Tunnel", "keepalive tick")
+			logx.Debug("keepalive tick")
 			if t.conn == nil {
-				log.LogInfo("Tunnel", "keepalive t.conn == nil")
+				logx.Info("keepalive t.conn == nil")
 				return
 			}
 
 			if t.waitpone > waitPongTimeout {
-				log.LogInfo("Tunnel", "keepalive timeout, close connect")
+				logx.Info("keepalive timeout, close connect")
 				t.conn.Close()
 			} else {
 				t.waitpone++
