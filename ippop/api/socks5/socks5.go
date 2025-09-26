@@ -283,13 +283,10 @@ func (socks5Server *Socks5Server) handleSocks5Request(r *request) error {
 
 // NOTE: if error occurs, conn of the 'req' object must be closed in outer
 func (socks5Server *Socks5Server) handleSocks5Connect(req *request) error {
-	tcpAddr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:%d", req.destAddr.fqdn, req.destAddr.port))
-	if err != nil {
-		return err
-	}
-
-	if tcpAddr.IP.IsLoopback() || tcpAddr.IP.IsPrivate() || tcpAddr.IP.IsMulticast() || tcpAddr.IP.IsLinkLocalMulticast() {
-		return fmt.Errorf("Socks5Server.handleSocks5Connect not support ip %s", tcpAddr.IP.String())
+	if ip := net.ParseIP(req.destAddr.fqdn); ip != nil {
+		if ip.IsLoopback() || ip.IsPrivate() || ip.IsMulticast() || ip.IsLinkLocalMulticast() {
+			return fmt.Errorf("Socks5Server.handleSocks5Connect not support ip %s", ip.String())
+		}
 	}
 
 	var extraBytes []byte

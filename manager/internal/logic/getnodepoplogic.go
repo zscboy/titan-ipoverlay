@@ -72,24 +72,32 @@ func (l *GetNodePopLogic) GetNodePop(req *types.GetNodePopReq) (resp *types.GetN
 }
 
 func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*config.Pop, error) {
-	popIDBytes, err := model.GetNodePop(l.svcCtx.Redis, req.NodeId)
+	ipValue := l.ctx.Value("Remote-IP")
+	ip := ipValue.(string)
+	if len(ip) == 0 {
+		return nil, fmt.Errorf("can not get remote ip")
+	}
+
+	popID, nodeIP, err := model.GetNodePopIP(l.svcCtx.Redis, req.NodeId)
 	if err != nil {
 		return nil, err
 	}
 
-	if popIDBytes != nil {
-		popID := string(popIDBytes)
+	if len(popID) > 0 {
 		for _, pop := range l.svcCtx.Config.Pops {
-			if pop.Id == popID {
-				logx.Debugf("node %s already exist pop %s", req.NodeId, pop.Id)
-				return &pop, nil
+			if pop.Id == string(popID) {
+				if ip == string(nodeIP) {
+					logx.Debugf("node %s ip %s already exist pop %s", req.NodeId, nodeIP, pop.Id)
+					return &pop, nil
+				}
+
+				logx.Debugf("node %s change ip %s to %s, old pop:%s, will check location info", req.NodeId, string(nodeIP), ip, popID)
+				break
 			}
 		}
-		return nil, fmt.Errorf("pop %s not found", string(popIDBytes))
 	}
 
-	remoteIP := l.ctx.Value("Remote-IP")
-	location, err := l.getLocalInfo(remoteIP.(string))
+	location, err := l.getLocalInfo(ip)
 	if err != nil {
 		return nil, fmt.Errorf("getLocalInfo failed:%v", err)
 	}
@@ -105,7 +113,7 @@ func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*config.Pop, er
 				continue
 			}
 
-			if err := model.SetNodePop(l.svcCtx.Redis, req.NodeId, pop.Id); err != nil {
+			if err := model.SetNodePopIP(l.svcCtx.Redis, req.NodeId, pop.Id, ip); err != nil {
 				logx.Errorf("allocatePop SetNodePop error %v", err)
 			}
 
@@ -116,7 +124,7 @@ func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*config.Pop, er
 
 	for _, pop := range l.svcCtx.Config.Pops {
 		if pop.Area == l.svcCtx.Config.DefaultArea {
-			if err := model.SetNodePop(l.svcCtx.Redis, req.NodeId, pop.Id); err != nil {
+			if err := model.SetNodePopIP(l.svcCtx.Redis, req.NodeId, pop.Id, ip); err != nil {
 				logx.Errorf("allocatePop SetNodePop error %v", err)
 			}
 
