@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 	"titan-ipoverlay/client/bootstrap"
-	"titan-ipoverlay/client/log"
 	"titan-ipoverlay/ippop/api/ws/pb"
 
 	"github.com/gorilla/websocket"
@@ -135,14 +134,14 @@ func (t *Tunnel) getPop() (*Pop, error) {
 		serverURL := fmt.Sprintf("%s?nodeid=%s", acaccessPoint, t.uuid)
 		bytes, err := t.httGet(serverURL)
 		if err != nil {
-			log.LogInfo("Tunnel", fmt.Sprintf("Tunnel.getPop httpGet %v, url:%s", err, serverURL))
+			logx.Errorf("Tunnel.getPop httpGet %v, url:%s", err, serverURL)
 			continue
 		}
 
 		pop := &Pop{}
 		err = json.Unmarshal(bytes, pop)
 		if err != nil {
-			log.LogInfo("Tunnel", fmt.Sprintf("Tunnel.getPop httpGet %v", err))
+			logx.Errorf("Tunnel", fmt.Sprintf("Tunnel.getPop Unmarshal error:%v", err))
 			continue
 		}
 
@@ -156,7 +155,7 @@ func (t *Tunnel) getAccessPoint() []string {
 	for _, bootstrapURL := range t.bootstrapMgr.Bootstraps() {
 		bytes, err := t.httGet(bootstrapURL)
 		if err != nil {
-			log.LogInfo("Tunnel", fmt.Sprintf("Tunnel.getAccessPoint httpGet %v, url:%s", err, bootstrapURL))
+			logx.Errorf("Tunnel.getAccessPoint httpGet %v, url:%s", err, bootstrapURL)
 			continue
 		}
 
@@ -167,7 +166,8 @@ func (t *Tunnel) getAccessPoint() []string {
 		cfg := &Config{}
 		err = json.Unmarshal(bytes, cfg)
 		if err != nil {
-			log.LogInfo("Tunnel", fmt.Sprintf("Tunnel.getAccessPoint Unmarshal %v", err))
+			logx.Errorf("Tunnel.getAccessPoint Unmarshal %v", err)
+
 			continue
 		}
 
