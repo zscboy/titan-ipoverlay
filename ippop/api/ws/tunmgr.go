@@ -38,6 +38,7 @@ type TunnelManager struct {
 	userTraffic *userTraffic
 	userCache   gcache.Cache
 	userTunLock sync.Mutex
+	filterRules *Rules
 }
 
 func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
@@ -51,7 +52,9 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 		userTraffic: newUserTraffic(),
 		userCache:   gcache.New(userCacheSize).LRU().Build(),
 		userTunLock: sync.Mutex{},
+		filterRules: &Rules{rules: RulesToMap(config.FilterRules.Rules), defaultAction: config.FilterRules.DefaultAction},
 	}
+
 	go tm.keepalive()
 	go tm.setNodeOnlineDataExpire()
 	go tm.startUserTrafficTimer()
@@ -250,6 +253,10 @@ func (tm *TunnelManager) getTunnelByUser(userName string) (*Tunnel, error) {
 
 func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks5.SocksTargetInfo) error {
 	logx.Debugf("HandleSocks5TCP, user %s, DomainName %s, port %d", targetInfo.UserName, targetInfo.DomainName, targetInfo.Port)
+	if tm.filterRules.isDeny(targetInfo.DomainName, fmt.Sprintf("%d", targetInfo.Port)) {
+		return fmt.Errorf("tcp: target %s:%d have been deny", targetInfo.DomainName, targetInfo.Port)
+	}
+
 	tun, err := tm.getTunnelByUser(targetInfo.UserName)
 	if err != nil {
 		return err
@@ -262,6 +269,15 @@ func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks
 }
 
 func (tm *TunnelManager) HandleSocks5UDP(udpConn socks5.UDPConn, udpInfo *socks5.Socks5UDPInfo, data []byte) error {
+	host, port, err := net.SplitHostPort(udpInfo.Dest)
+	if err != nil {
+		return err
+	}
+
+	if tm.filterRules.isDeny(host, port) {
+		return fmt.Errorf("udp: target %s have been deny", udpInfo.Dest)
+	}
+
 	tun, err := tm.getTunnelByUser(udpInfo.UserName)
 	if err != nil {
 		return err
