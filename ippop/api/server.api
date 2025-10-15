@@ -32,16 +32,16 @@ type (
 		AccessToken string `json:"access_token"`
 	}
 	AddBlackListReq {
-		NodeID string `json:"nodeid"`
+		NodeID string `json:"node_id"`
 	}
 	GetBlackListResp {
-		NodeIDs []string `json:"node_ids"`
+		Nodes []string `json:"nodes"`
 	}
 	RemoveBlackListReq {
-		NodeID string `json:"nodeid"`
+		NodeID string `json:"node_id"`
 	}
 	KickNodeReq {
-		NodeID string `json:"nodeid"`
+		NodeID string `form:"nodeid"`
 	}
 )
 

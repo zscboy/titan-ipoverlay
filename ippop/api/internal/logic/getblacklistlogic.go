@@ -30,5 +30,5 @@ func (l *GetBlackListLogic) GetBlackList() (resp *types.GetBlackListResp, err er
 		return nil, err
 	}
 
-	return &types.GetBlackListResp{NodeIDs: nodes}, nil
+	return &types.GetBlackListResp{Nodes: nodes}, nil
 }

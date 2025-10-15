@@ -38,7 +38,7 @@ func (l *RemoveBlacklistLogic) removeBlacklist(nodeId string) (*pb.UserOperation
 	url := fmt.Sprintf("http://%s/node/blacklist/remove", l.svcCtx.Config.APIServer)
 
 	removeBlacklistReq := struct {
-		NodeID string `json:"nodeid"`
+		NodeID string `json:"node_id"`
 	}{
 		NodeID: nodeId,
 	}

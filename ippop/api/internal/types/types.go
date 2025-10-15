@@ -12,7 +12,7 @@ type AccessTokenResp struct {
 }
 
 type AddBlackListReq struct {
-	NodeID string `json:"nodeid"`
+	NodeID string `json:"node_id"`
 }
 
 type DeleteUserCache struct {
@@ -20,7 +20,7 @@ type DeleteUserCache struct {
 }
 
 type GetBlackListResp struct {
-	NodeIDs []string `json:"node_ids"`
+	Nodes []string `json:"nodes"`
 }
 
 type GetNodePopReq struct {
@@ -33,7 +33,7 @@ type GetNodePopResp struct {
 }
 
 type KickNodeReq struct {
-	NodeID string `json:"nodeid"`
+	NodeID string `form:"nodeid"`
 }
 
 type NodeWSReq struct {
@@ -43,7 +43,7 @@ type NodeWSReq struct {
 }
 
 type RemoveBlackListReq struct {
-	NodeID string `json:"nodeid"`
+	NodeID string `json:"node_id"`
 }
 
 type ServerInfo struct {

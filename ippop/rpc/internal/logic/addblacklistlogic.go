@@ -36,7 +36,7 @@ func (l *AddBlacklistLogic) addBlacklist(nodeId string) (*pb.UserOperationResp, 
 	url := fmt.Sprintf("http://%s/node/blacklist/add", l.svcCtx.Config.APIServer)
 
 	addBlacklistReq := struct {
-		NodeID string `json:"nodeid"`
+		NodeID string `json:"node_id"`
 	}{
 		NodeID: nodeId,
 	}

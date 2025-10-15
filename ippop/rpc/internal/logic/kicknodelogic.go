@@ -1,9 +1,7 @@
 package logic
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -33,20 +31,9 @@ func (l *KickNodeLogic) KickNode(in *pb.KickNodeReq) (*pb.UserOperationResp, err
 }
 
 func (l *KickNodeLogic) kickNode(nodeId string) (*pb.UserOperationResp, error) {
-	url := fmt.Sprintf("http://%s/node/kick", l.svcCtx.Config.APIServer)
+	url := fmt.Sprintf("http://%s/node/kick?nodeid=%s", l.svcCtx.Config.APIServer, nodeId)
 
-	kickNodeReq := struct {
-		NodeID string `json:"nodeid"`
-	}{
-		NodeID: nodeId,
-	}
-
-	jsonData, err := json.Marshal(kickNodeReq)
-	if err != nil {
-		return &pb.UserOperationResp{ErrMsg: err.Error()}, nil
-	}
-
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
 		return &pb.UserOperationResp{ErrMsg: err.Error()}, nil
 	}

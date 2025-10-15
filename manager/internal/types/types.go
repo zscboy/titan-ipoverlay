@@ -4,7 +4,7 @@
 package types
 
 type AddBlackListReq struct {
-	NodeID string `json:"node_id" form:"nodeid"`
+	NodeID string `json:"node_id"`
 }
 
 type CreateUserReq struct {
@@ -34,7 +34,7 @@ type GetAuthTokenResp struct {
 }
 
 type GetBlackListReq struct {
-	PodID string `json:"pod_id" form:"popid"`
+	PodID string `form:"popid"`
 }
 
 type GetBlackListResp struct {
@@ -64,7 +64,7 @@ type GetUserResp struct {
 }
 
 type KickNodeReq struct {
-	NodeID string `json:"node_id" form:"nodeid"`
+	NodeID string `form:"nodeid"`
 }
 
 type ListNodeReq struct {
@@ -117,7 +117,7 @@ type Pop struct {
 }
 
 type RemoveBlackListReq struct {
-	NodeID string `json:"node_id" form:"nodeid"`
+	NodeID string `json:"node_id"`
 }
 
 type Route struct {

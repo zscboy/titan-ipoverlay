@@ -134,19 +134,19 @@ type (
 		Total int     `json:"total"`
 	}
 	AddBlackListReq {
-		NodeID string `json:"node_id" form:"nodeid"`
+		NodeID string `json:"node_id"`
 	}
 	RemoveBlackListReq {
-		NodeID string `json:"node_id" form:"nodeid"`
+		NodeID string `json:"node_id"`
 	}
 	GetBlackListReq {
-		PodID string `json:"pod_id" form:"popid"`
+		PodID string `form:"popid"`
 	}
 	GetBlackListResp {
 		Nodes []string `json:"nodes"`
 	}
 	KickNodeReq {
-		NodeID string `json:"node_id" form:"nodeid"`
+		NodeID string `form:"nodeid"`
 	}
 )
 
