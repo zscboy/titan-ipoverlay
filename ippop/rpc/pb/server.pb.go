@@ -1071,6 +1071,8 @@ type GetServerInfoResp struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Socks5Addr    string                 `protobuf:"bytes,1,opt,name=socks5_addr,json=socks5Addr,proto3" json:"socks5_addr,omitempty"`
 	WsServerUrl   string                 `protobuf:"bytes,2,opt,name=ws_server_url,json=wsServerUrl,proto3" json:"ws_server_url,omitempty"`
+	AccessSecret  string                 `protobuf:"bytes,3,opt,name=access_secret,json=accessSecret,proto3" json:"access_secret,omitempty"`
+	AccessExpire  int64                  `protobuf:"varint,4,opt,name=access_expire,json=accessExpire,proto3" json:"access_expire,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1117,6 +1119,20 @@ func (x *GetServerInfoResp) GetWsServerUrl() string {
 		return x.WsServerUrl
 	}
 	return ""
+}
+
+func (x *GetServerInfoResp) GetAccessSecret() string {
+	if x != nil {
+		return x.AccessSecret
+	}
+	return ""
+}
+
+func (x *GetServerInfoResp) GetAccessExpire() int64 {
+	if x != nil {
+		return x.AccessExpire
+	}
+	return 0
 }
 
 type GetNodeAccessTokenReq struct {
@@ -1207,6 +1223,182 @@ func (x *GetNodeAccessTokenResp) GetToken() string {
 	return ""
 }
 
+type AddBlacklistReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	NodeId        string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddBlacklistReq) Reset() {
+	*x = AddBlacklistReq{}
+	mi := &file_server_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddBlacklistReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddBlacklistReq) ProtoMessage() {}
+
+func (x *AddBlacklistReq) ProtoReflect() protoreflect.Message {
+	mi := &file_server_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddBlacklistReq.ProtoReflect.Descriptor instead.
+func (*AddBlacklistReq) Descriptor() ([]byte, []int) {
+	return file_server_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *AddBlacklistReq) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+type RemoveBlacklistReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	NodeId        string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveBlacklistReq) Reset() {
+	*x = RemoveBlacklistReq{}
+	mi := &file_server_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveBlacklistReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveBlacklistReq) ProtoMessage() {}
+
+func (x *RemoveBlacklistReq) ProtoReflect() protoreflect.Message {
+	mi := &file_server_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveBlacklistReq.ProtoReflect.Descriptor instead.
+func (*RemoveBlacklistReq) Descriptor() ([]byte, []int) {
+	return file_server_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *RemoveBlacklistReq) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+type GetBlacklistResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Nodes         []string               `protobuf:"bytes,1,rep,name=nodes,proto3" json:"nodes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetBlacklistResp) Reset() {
+	*x = GetBlacklistResp{}
+	mi := &file_server_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetBlacklistResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetBlacklistResp) ProtoMessage() {}
+
+func (x *GetBlacklistResp) ProtoReflect() protoreflect.Message {
+	mi := &file_server_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetBlacklistResp.ProtoReflect.Descriptor instead.
+func (*GetBlacklistResp) Descriptor() ([]byte, []int) {
+	return file_server_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *GetBlacklistResp) GetNodes() []string {
+	if x != nil {
+		return x.Nodes
+	}
+	return nil
+}
+
+type KickNodeReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	NodeId        string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *KickNodeReq) Reset() {
+	*x = KickNodeReq{}
+	mi := &file_server_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KickNodeReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KickNodeReq) ProtoMessage() {}
+
+func (x *KickNodeReq) ProtoReflect() protoreflect.Message {
+	mi := &file_server_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KickNodeReq.ProtoReflect.Descriptor instead.
+func (*KickNodeReq) Descriptor() ([]byte, []int) {
+	return file_server_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *KickNodeReq) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
 type Empty struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -1215,7 +1407,7 @@ type Empty struct {
 
 func (x *Empty) Reset() {
 	*x = Empty{}
-	mi := &file_server_proto_msgTypes[20]
+	mi := &file_server_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1227,7 +1419,7 @@ func (x *Empty) String() string {
 func (*Empty) ProtoMessage() {}
 
 func (x *Empty) ProtoReflect() protoreflect.Message {
-	mi := &file_server_proto_msgTypes[20]
+	mi := &file_server_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1240,7 +1432,7 @@ func (x *Empty) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Empty.ProtoReflect.Descriptor instead.
 func (*Empty) Descriptor() ([]byte, []int) {
-	return file_server_proto_rawDescGZIP(), []int{20}
+	return file_server_proto_rawDescGZIP(), []int{24}
 }
 
 var File_server_proto protoreflect.FileDescriptor
@@ -1321,16 +1513,26 @@ const file_server_proto_rawDesc = "" +
 	"\x03end\x18\x02 \x01(\x05R\x03end\"H\n" +
 	"\fListUserResp\x12\"\n" +
 	"\x05users\x18\x01 \x03(\v2\f.server.UserR\x05users\x12\x14\n" +
-	"\x05total\x18\x02 \x01(\x05R\x05total\"X\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total\"\xa2\x01\n" +
 	"\x11GetServerInfoResp\x12\x1f\n" +
 	"\vsocks5_addr\x18\x01 \x01(\tR\n" +
 	"socks5Addr\x12\"\n" +
-	"\rws_server_url\x18\x02 \x01(\tR\vwsServerUrl\"0\n" +
+	"\rws_server_url\x18\x02 \x01(\tR\vwsServerUrl\x12#\n" +
+	"\raccess_secret\x18\x03 \x01(\tR\faccessSecret\x12#\n" +
+	"\raccess_expire\x18\x04 \x01(\x03R\faccessExpire\"0\n" +
 	"\x15GetNodeAccessTokenReq\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\".\n" +
 	"\x16GetNodeAccessTokenResp\x12\x14\n" +
-	"\x05token\x18\x01 \x01(\tR\x05token\"\a\n" +
-	"\x05Empty2\xdf\x05\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token\"*\n" +
+	"\x0fAddBlacklistReq\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\"-\n" +
+	"\x12RemoveBlacklistReq\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\"(\n" +
+	"\x10GetBlacklistResp\x12\x14\n" +
+	"\x05nodes\x18\x01 \x03(\tR\x05nodes\"&\n" +
+	"\vKickNodeReq\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\"\a\n" +
+	"\x05Empty2\xe2\a\n" +
 	"\tServerAPI\x125\n" +
 	"\bListNode\x12\x13.server.ListNodeReq\x1a\x14.server.ListNodeResp\x12;\n" +
 	"\n" +
@@ -1345,7 +1547,11 @@ const file_server_proto_rawDesc = "" +
 	"\x13SwitchUserRouteNode\x12\x1e.server.SwitchUserRouteNodeReq\x1a\x19.server.UserOperationResp\x12H\n" +
 	"\x0fStartOrStopUser\x12\x1a.server.StartOrStopUserReq\x1a\x19.server.UserOperationResp\x129\n" +
 	"\rGetServerInfo\x12\r.server.Empty\x1a\x19.server.GetServerInfoResp\x12S\n" +
-	"\x12GetNodeAccessToken\x12\x1d.server.GetNodeAccessTokenReq\x1a\x1e.server.GetNodeAccessTokenRespB\x06Z\x04./pbb\x06proto3"
+	"\x12GetNodeAccessToken\x12\x1d.server.GetNodeAccessTokenReq\x1a\x1e.server.GetNodeAccessTokenResp\x12B\n" +
+	"\fAddBlacklist\x12\x17.server.AddBlacklistReq\x1a\x19.server.UserOperationResp\x12H\n" +
+	"\x0fRemoveBlacklist\x12\x1a.server.RemoveBlacklistReq\x1a\x19.server.UserOperationResp\x127\n" +
+	"\fGetBlacklist\x12\r.server.Empty\x1a\x18.server.GetBlacklistResp\x12:\n" +
+	"\bKickNode\x12\x13.server.KickNodeReq\x1a\x19.server.UserOperationRespB\x06Z\x04./pbb\x06proto3"
 
 var (
 	file_server_proto_rawDescOnce sync.Once
@@ -1359,7 +1565,7 @@ func file_server_proto_rawDescGZIP() []byte {
 	return file_server_proto_rawDescData
 }
 
-var file_server_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
+var file_server_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
 var file_server_proto_goTypes = []any{
 	(*ListNodeReq)(nil),            // 0: server.ListNodeReq
 	(*Node)(nil),                   // 1: server.Node
@@ -1381,7 +1587,11 @@ var file_server_proto_goTypes = []any{
 	(*GetServerInfoResp)(nil),      // 17: server.GetServerInfoResp
 	(*GetNodeAccessTokenReq)(nil),  // 18: server.GetNodeAccessTokenReq
 	(*GetNodeAccessTokenResp)(nil), // 19: server.GetNodeAccessTokenResp
-	(*Empty)(nil),                  // 20: server.Empty
+	(*AddBlacklistReq)(nil),        // 20: server.AddBlacklistReq
+	(*RemoveBlacklistReq)(nil),     // 21: server.RemoveBlacklistReq
+	(*GetBlacklistResp)(nil),       // 22: server.GetBlacklistResp
+	(*KickNodeReq)(nil),            // 23: server.KickNodeReq
+	(*Empty)(nil),                  // 24: server.Empty
 }
 var file_server_proto_depIdxs = []int32{
 	1,  // 0: server.ListNodeResp.nodes:type_name -> server.Node
@@ -1403,21 +1613,29 @@ var file_server_proto_depIdxs = []int32{
 	12, // 16: server.ServerAPI.DeleteUser:input_type -> server.DeleteUserReq
 	11, // 17: server.ServerAPI.SwitchUserRouteNode:input_type -> server.SwitchUserRouteNodeReq
 	13, // 18: server.ServerAPI.StartOrStopUser:input_type -> server.StartOrStopUserReq
-	20, // 19: server.ServerAPI.GetServerInfo:input_type -> server.Empty
+	24, // 19: server.ServerAPI.GetServerInfo:input_type -> server.Empty
 	18, // 20: server.ServerAPI.GetNodeAccessToken:input_type -> server.GetNodeAccessTokenReq
-	2,  // 21: server.ServerAPI.ListNode:output_type -> server.ListNodeResp
-	6,  // 22: server.ServerAPI.CreateUser:output_type -> server.CreateUserResp
-	16, // 23: server.ServerAPI.ListUser:output_type -> server.ListUserResp
-	7,  // 24: server.ServerAPI.ModifyUserPassword:output_type -> server.UserOperationResp
-	7,  // 25: server.ServerAPI.ModifyUser:output_type -> server.UserOperationResp
-	14, // 26: server.ServerAPI.GetUser:output_type -> server.User
-	7,  // 27: server.ServerAPI.DeleteUser:output_type -> server.UserOperationResp
-	7,  // 28: server.ServerAPI.SwitchUserRouteNode:output_type -> server.UserOperationResp
-	7,  // 29: server.ServerAPI.StartOrStopUser:output_type -> server.UserOperationResp
-	17, // 30: server.ServerAPI.GetServerInfo:output_type -> server.GetServerInfoResp
-	19, // 31: server.ServerAPI.GetNodeAccessToken:output_type -> server.GetNodeAccessTokenResp
-	21, // [21:32] is the sub-list for method output_type
-	10, // [10:21] is the sub-list for method input_type
+	20, // 21: server.ServerAPI.AddBlacklist:input_type -> server.AddBlacklistReq
+	21, // 22: server.ServerAPI.RemoveBlacklist:input_type -> server.RemoveBlacklistReq
+	24, // 23: server.ServerAPI.GetBlacklist:input_type -> server.Empty
+	23, // 24: server.ServerAPI.KickNode:input_type -> server.KickNodeReq
+	2,  // 25: server.ServerAPI.ListNode:output_type -> server.ListNodeResp
+	6,  // 26: server.ServerAPI.CreateUser:output_type -> server.CreateUserResp
+	16, // 27: server.ServerAPI.ListUser:output_type -> server.ListUserResp
+	7,  // 28: server.ServerAPI.ModifyUserPassword:output_type -> server.UserOperationResp
+	7,  // 29: server.ServerAPI.ModifyUser:output_type -> server.UserOperationResp
+	14, // 30: server.ServerAPI.GetUser:output_type -> server.User
+	7,  // 31: server.ServerAPI.DeleteUser:output_type -> server.UserOperationResp
+	7,  // 32: server.ServerAPI.SwitchUserRouteNode:output_type -> server.UserOperationResp
+	7,  // 33: server.ServerAPI.StartOrStopUser:output_type -> server.UserOperationResp
+	17, // 34: server.ServerAPI.GetServerInfo:output_type -> server.GetServerInfoResp
+	19, // 35: server.ServerAPI.GetNodeAccessToken:output_type -> server.GetNodeAccessTokenResp
+	7,  // 36: server.ServerAPI.AddBlacklist:output_type -> server.UserOperationResp
+	7,  // 37: server.ServerAPI.RemoveBlacklist:output_type -> server.UserOperationResp
+	22, // 38: server.ServerAPI.GetBlacklist:output_type -> server.GetBlacklistResp
+	7,  // 39: server.ServerAPI.KickNode:output_type -> server.UserOperationResp
+	25, // [25:40] is the sub-list for method output_type
+	10, // [10:25] is the sub-list for method input_type
 	10, // [10:10] is the sub-list for extension type_name
 	10, // [10:10] is the sub-list for extension extendee
 	0,  // [0:10] is the sub-list for field type_name
@@ -1434,7 +1652,7 @@ func file_server_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_server_proto_rawDesc), len(file_server_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   21,
+			NumMessages:   25,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

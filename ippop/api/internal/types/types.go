@@ -11,8 +11,16 @@ type AccessTokenResp struct {
 	Token string `json:"token"`
 }
 
+type AddBlackListReq struct {
+	NodeID string `json:"nodeid"`
+}
+
 type DeleteUserCache struct {
 	UserName string `json:"user_name"`
+}
+
+type GetBlackListResp struct {
+	NodeIDs []string `json:"node_ids"`
 }
 
 type GetNodePopReq struct {
@@ -24,15 +32,25 @@ type GetNodePopResp struct {
 	AccessToken string `json:"access_token"`
 }
 
+type KickNodeReq struct {
+	NodeID string `json:"nodeid"`
+}
+
 type NodeWSReq struct {
 	NodeId  string `form:"id"`
 	OS      string `form:"os"`
 	Version string `form:"version,optional"`
 }
 
+type RemoveBlackListReq struct {
+	NodeID string `json:"nodeid"`
+}
+
 type ServerInfo struct {
-	Socks5Addr  string `json:"socks5_addr"`
-	WSServerURL string `json:"ws_server_url"`
+	Socks5Addr   string `json:"socks5_addr"`
+	WSServerURL  string `json:"ws_server_url"`
+	AccessSecret string `json:"access_secret"`
+	AccessExpire int64  `json:"access_expire"`
 }
 
 type WebWSReq struct {

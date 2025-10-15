@@ -77,3 +77,23 @@ func (s *ServerAPIServer) GetNodeAccessToken(ctx context.Context, in *pb.GetNode
 	l := logic.NewGetNodeAccessTokenLogic(ctx, s.svcCtx)
 	return l.GetNodeAccessToken(in)
 }
+
+func (s *ServerAPIServer) AddBlacklist(ctx context.Context, in *pb.AddBlacklistReq) (*pb.UserOperationResp, error) {
+	l := logic.NewAddBlacklistLogic(ctx, s.svcCtx)
+	return l.AddBlacklist(in)
+}
+
+func (s *ServerAPIServer) RemoveBlacklist(ctx context.Context, in *pb.RemoveBlacklistReq) (*pb.UserOperationResp, error) {
+	l := logic.NewRemoveBlacklistLogic(ctx, s.svcCtx)
+	return l.RemoveBlacklist(in)
+}
+
+func (s *ServerAPIServer) GetBlacklist(ctx context.Context, in *pb.Empty) (*pb.GetBlacklistResp, error) {
+	l := logic.NewGetBlacklistLogic(ctx, s.svcCtx)
+	return l.GetBlacklist(in)
+}
+
+func (s *ServerAPIServer) KickNode(ctx context.Context, in *pb.KickNodeReq) (*pb.UserOperationResp, error) {
+	l := logic.NewKickNodeLogic(ctx, s.svcCtx)
+	return l.KickNode(in)
+}

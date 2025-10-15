@@ -16,6 +16,9 @@ type (
 		ServerURL   string `json:"server_url"`
 		AccessToken string `json:"access_token"`
 	}
+	GetAuthTokenResp {
+		Token string `json:"token"`
+	}
 	ListNodeReq {
 		PopID string `form:"popid"`
 		// 1.all, 2.unbind, 3.bind
@@ -130,6 +133,21 @@ type (
 		Users []*User `json:"users"`
 		Total int     `json:"total"`
 	}
+	AddBlackListReq {
+		NodeID string `json:"node_id" form:"nodeid"`
+	}
+	RemoveBlackListReq {
+		NodeID string `json:"node_id" form:"nodeid"`
+	}
+	GetBlackListReq {
+		PodID string `json:"pod_id" form:"popid"`
+	}
+	GetBlackListResp {
+		Nodes []string `json:"nodes"`
+	}
+	KickNodeReq {
+		NodeID string `json:"node_id" form:"nodeid"`
+	}
 )
 
 service server-api {
@@ -137,7 +155,7 @@ service server-api {
 	get /node/pop (GetNodePopReq) returns (GetNodePopResp)
 
 	@handler getAuthToken
-	get /auth/token returns (string)
+	get /auth/token returns (GetAuthTokenResp)
 }
 
 @server (
@@ -174,5 +192,17 @@ service server-api {
 
 	@handler startOrStopUser
 	post /user/startorstop (StartOrStopUserReq) returns (UserOperationResp)
+
+	@handler addBlackList
+	post /node/blacklist/add (AddBlackListReq) returns (UserOperationResp)
+
+	@handler removeBlackList
+	post /node/blacklist/remove (RemoveBlackListReq) returns (UserOperationResp)
+
+	@handler getBlackList
+	post /node/blacklist/get (GetBlackListReq) returns (GetBlackListResp)
+
+	@handler KickNode
+	post /node/kick (KickNodeReq) returns (UserOperationResp)
 }
 

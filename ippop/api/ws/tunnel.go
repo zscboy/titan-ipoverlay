@@ -423,7 +423,7 @@ func (t *Tunnel) writeMessageWithLimitRate(messageType int, data []byte) error {
 	return t.conn.WriteMessage(messageType, data)
 }
 
-func (t *Tunnel) close() {
+func (t *Tunnel) waitClose() {
 	if t.conn != nil {
 		t.waitLeaseCh = make(chan bool)
 		t.conn.Close()

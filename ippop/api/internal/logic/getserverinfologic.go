@@ -26,7 +26,6 @@ func NewGetServerInfoLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Get
 }
 
 func (l *GetServerInfoLogic) GetServerInfo() (resp *types.ServerInfo, err error) {
-	// todo: add your logic here and delete this line
 	_, port, err := net.SplitHostPort(l.svcCtx.Config.Socks5.Addr)
 	if err != nil {
 		return nil, err
@@ -39,5 +38,10 @@ func (l *GetServerInfoLogic) GetServerInfo() (resp *types.ServerInfo, err error)
 	}
 	wsServerURl := fmt.Sprintf("ws://%s:%d/ws/node", domain, l.svcCtx.Config.Port)
 
-	return &types.ServerInfo{Socks5Addr: socks5Addr, WSServerURL: wsServerURl}, nil
+	return &types.ServerInfo{
+		Socks5Addr:   socks5Addr,
+		WSServerURL:  wsServerURl,
+		AccessSecret: l.svcCtx.Config.JwtAuth.AccessSecret,
+		AccessExpire: l.svcCtx.Config.JwtAuth.AccessExpire,
+	}, nil
 }

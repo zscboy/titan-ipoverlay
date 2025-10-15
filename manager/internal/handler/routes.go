@@ -30,6 +30,26 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 	server.AddRoutes(
 		[]rest.Route{
 			{
+				Method:  http.MethodPost,
+				Path:    "/node/blacklist/add",
+				Handler: addBlackListHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/node/blacklist/get",
+				Handler: getBlackListHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/node/blacklist/remove",
+				Handler: removeBlackListHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/node/kick",
+				Handler: KickNodeHandler(serverCtx),
+			},
+			{
 				Method:  http.MethodGet,
 				Path:    "/node/list",
 				Handler: listNodeHandler(serverCtx),

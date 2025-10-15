@@ -30,6 +30,10 @@ const (
 	ServerAPI_StartOrStopUser_FullMethodName     = "/server.ServerAPI/StartOrStopUser"
 	ServerAPI_GetServerInfo_FullMethodName       = "/server.ServerAPI/GetServerInfo"
 	ServerAPI_GetNodeAccessToken_FullMethodName  = "/server.ServerAPI/GetNodeAccessToken"
+	ServerAPI_AddBlacklist_FullMethodName        = "/server.ServerAPI/AddBlacklist"
+	ServerAPI_RemoveBlacklist_FullMethodName     = "/server.ServerAPI/RemoveBlacklist"
+	ServerAPI_GetBlacklist_FullMethodName        = "/server.ServerAPI/GetBlacklist"
+	ServerAPI_KickNode_FullMethodName            = "/server.ServerAPI/KickNode"
 )
 
 // ServerAPIClient is the client API for ServerAPI service.
@@ -47,6 +51,10 @@ type ServerAPIClient interface {
 	StartOrStopUser(ctx context.Context, in *StartOrStopUserReq, opts ...grpc.CallOption) (*UserOperationResp, error)
 	GetServerInfo(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetServerInfoResp, error)
 	GetNodeAccessToken(ctx context.Context, in *GetNodeAccessTokenReq, opts ...grpc.CallOption) (*GetNodeAccessTokenResp, error)
+	AddBlacklist(ctx context.Context, in *AddBlacklistReq, opts ...grpc.CallOption) (*UserOperationResp, error)
+	RemoveBlacklist(ctx context.Context, in *RemoveBlacklistReq, opts ...grpc.CallOption) (*UserOperationResp, error)
+	GetBlacklist(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetBlacklistResp, error)
+	KickNode(ctx context.Context, in *KickNodeReq, opts ...grpc.CallOption) (*UserOperationResp, error)
 }
 
 type serverAPIClient struct {
@@ -167,6 +175,46 @@ func (c *serverAPIClient) GetNodeAccessToken(ctx context.Context, in *GetNodeAcc
 	return out, nil
 }
 
+func (c *serverAPIClient) AddBlacklist(ctx context.Context, in *AddBlacklistReq, opts ...grpc.CallOption) (*UserOperationResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UserOperationResp)
+	err := c.cc.Invoke(ctx, ServerAPI_AddBlacklist_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *serverAPIClient) RemoveBlacklist(ctx context.Context, in *RemoveBlacklistReq, opts ...grpc.CallOption) (*UserOperationResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UserOperationResp)
+	err := c.cc.Invoke(ctx, ServerAPI_RemoveBlacklist_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *serverAPIClient) GetBlacklist(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetBlacklistResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetBlacklistResp)
+	err := c.cc.Invoke(ctx, ServerAPI_GetBlacklist_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *serverAPIClient) KickNode(ctx context.Context, in *KickNodeReq, opts ...grpc.CallOption) (*UserOperationResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UserOperationResp)
+	err := c.cc.Invoke(ctx, ServerAPI_KickNode_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ServerAPIServer is the server API for ServerAPI service.
 // All implementations must embed UnimplementedServerAPIServer
 // for forward compatibility.
@@ -182,6 +230,10 @@ type ServerAPIServer interface {
 	StartOrStopUser(context.Context, *StartOrStopUserReq) (*UserOperationResp, error)
 	GetServerInfo(context.Context, *Empty) (*GetServerInfoResp, error)
 	GetNodeAccessToken(context.Context, *GetNodeAccessTokenReq) (*GetNodeAccessTokenResp, error)
+	AddBlacklist(context.Context, *AddBlacklistReq) (*UserOperationResp, error)
+	RemoveBlacklist(context.Context, *RemoveBlacklistReq) (*UserOperationResp, error)
+	GetBlacklist(context.Context, *Empty) (*GetBlacklistResp, error)
+	KickNode(context.Context, *KickNodeReq) (*UserOperationResp, error)
 	mustEmbedUnimplementedServerAPIServer()
 }
 
@@ -224,6 +276,18 @@ func (UnimplementedServerAPIServer) GetServerInfo(context.Context, *Empty) (*Get
 }
 func (UnimplementedServerAPIServer) GetNodeAccessToken(context.Context, *GetNodeAccessTokenReq) (*GetNodeAccessTokenResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetNodeAccessToken not implemented")
+}
+func (UnimplementedServerAPIServer) AddBlacklist(context.Context, *AddBlacklistReq) (*UserOperationResp, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddBlacklist not implemented")
+}
+func (UnimplementedServerAPIServer) RemoveBlacklist(context.Context, *RemoveBlacklistReq) (*UserOperationResp, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RemoveBlacklist not implemented")
+}
+func (UnimplementedServerAPIServer) GetBlacklist(context.Context, *Empty) (*GetBlacklistResp, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetBlacklist not implemented")
+}
+func (UnimplementedServerAPIServer) KickNode(context.Context, *KickNodeReq) (*UserOperationResp, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method KickNode not implemented")
 }
 func (UnimplementedServerAPIServer) mustEmbedUnimplementedServerAPIServer() {}
 func (UnimplementedServerAPIServer) testEmbeddedByValue()                   {}
@@ -444,6 +508,78 @@ func _ServerAPI_GetNodeAccessToken_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ServerAPI_AddBlacklist_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddBlacklistReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ServerAPIServer).AddBlacklist(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ServerAPI_AddBlacklist_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerAPIServer).AddBlacklist(ctx, req.(*AddBlacklistReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ServerAPI_RemoveBlacklist_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveBlacklistReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ServerAPIServer).RemoveBlacklist(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ServerAPI_RemoveBlacklist_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerAPIServer).RemoveBlacklist(ctx, req.(*RemoveBlacklistReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ServerAPI_GetBlacklist_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ServerAPIServer).GetBlacklist(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ServerAPI_GetBlacklist_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerAPIServer).GetBlacklist(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ServerAPI_KickNode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(KickNodeReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ServerAPIServer).KickNode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ServerAPI_KickNode_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerAPIServer).KickNode(ctx, req.(*KickNodeReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ServerAPI_ServiceDesc is the grpc.ServiceDesc for ServerAPI service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -494,6 +630,22 @@ var ServerAPI_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetNodeAccessToken",
 			Handler:    _ServerAPI_GetNodeAccessToken_Handler,
+		},
+		{
+			MethodName: "AddBlacklist",
+			Handler:    _ServerAPI_AddBlacklist_Handler,
+		},
+		{
+			MethodName: "RemoveBlacklist",
+			Handler:    _ServerAPI_RemoveBlacklist_Handler,
+		},
+		{
+			MethodName: "GetBlacklist",
+			Handler:    _ServerAPI_GetBlacklist_Handler,
+		},
+		{
+			MethodName: "KickNode",
+			Handler:    _ServerAPI_KickNode_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

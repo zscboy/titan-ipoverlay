@@ -51,8 +51,10 @@ func (l *GetServerInfoLogic) getServerInfo() (*pb.GetServerInfoResp, error) {
 	}
 
 	serverInfo := struct {
-		Socks5Addr  string `json:"socks5_addr"`
-		WSServerURL string `json:"ws_server_url"`
+		Socks5Addr   string `json:"socks5_addr"`
+		WSServerURL  string `json:"ws_server_url"`
+		AccessSecret string `json:"access_secret"`
+		AccessExpire int64  `json:"access_expire"`
 	}{}
 
 	err = json.Unmarshal(body, &serverInfo)
@@ -60,5 +62,10 @@ func (l *GetServerInfoLogic) getServerInfo() (*pb.GetServerInfoResp, error) {
 		return nil, err
 	}
 
-	return &pb.GetServerInfoResp{Socks5Addr: serverInfo.Socks5Addr, WsServerUrl: serverInfo.WSServerURL}, nil
+	return &pb.GetServerInfoResp{
+		Socks5Addr:   serverInfo.Socks5Addr,
+		WsServerUrl:  serverInfo.WSServerURL,
+		AccessSecret: serverInfo.AccessSecret,
+		AccessExpire: serverInfo.AccessExpire,
+	}, nil
 }

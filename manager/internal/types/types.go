@@ -3,13 +3,17 @@
 
 package types
 
+type AddBlackListReq struct {
+	NodeID string `json:"node_id" form:"nodeid"`
+}
+
 type CreateUserReq struct {
 	UserName          string        `json:"user_name"`
 	Password          string        `json:"password"`
 	PopId             string        `json:"pop_id"`
 	TrafficLimit      *TrafficLimit `json:"traffic_limit,optional"`
 	Route             *Route        `json:"route,optional"`
-	UploadRateLimit   int64         `json:"upload_rate_limit,default=1310720"`
+	UploadRateLimit   int64         `json:"upload_rate_limit,default=131072"`
 	DownloadRateLimit int64         `json:"download_rate_limit,default=1310720"`
 }
 
@@ -23,6 +27,18 @@ type CreateUserResp struct {
 
 type DeleteUserReq struct {
 	UserName string `json:"user_name"`
+}
+
+type GetAuthTokenResp struct {
+	Token string `json:"token"`
+}
+
+type GetBlackListReq struct {
+	PodID string `json:"pod_id" form:"popid"`
+}
+
+type GetBlackListResp struct {
+	Nodes []string `json:"nodes"`
 }
 
 type GetNodePopReq struct {
@@ -45,6 +61,10 @@ type GetUserReq struct {
 type GetUserResp struct {
 	User
 	PopId string `json:"pop_id"`
+}
+
+type KickNodeReq struct {
+	NodeID string `json:"node_id" form:"nodeid"`
 }
 
 type ListNodeReq struct {
@@ -94,6 +114,10 @@ type Pop struct {
 	Area       string `json:"area"`
 	Socks5Addr string `json:"socks5_addr"`
 	TotalNode  int    `json:"total_node"`
+}
+
+type RemoveBlackListReq struct {
+	NodeID string `json:"node_id" form:"nodeid"`
 }
 
 type Route struct {

@@ -14,14 +14,17 @@ import (
 )
 
 type (
+	AddBlacklistReq        = pb.AddBlacklistReq
 	CreateUserReq          = pb.CreateUserReq
 	CreateUserResp         = pb.CreateUserResp
 	DeleteUserReq          = pb.DeleteUserReq
 	Empty                  = pb.Empty
+	GetBlacklistResp       = pb.GetBlacklistResp
 	GetNodeAccessTokenReq  = pb.GetNodeAccessTokenReq
 	GetNodeAccessTokenResp = pb.GetNodeAccessTokenResp
 	GetServerInfoResp      = pb.GetServerInfoResp
 	GetUserReq             = pb.GetUserReq
+	KickNodeReq            = pb.KickNodeReq
 	ListNodeReq            = pb.ListNodeReq
 	ListNodeResp           = pb.ListNodeResp
 	ListUserReq            = pb.ListUserReq
@@ -29,6 +32,7 @@ type (
 	ModifyUserPasswordReq  = pb.ModifyUserPasswordReq
 	ModifyUserReq          = pb.ModifyUserReq
 	Node                   = pb.Node
+	RemoveBlacklistReq     = pb.RemoveBlacklistReq
 	Route                  = pb.Route
 	StartOrStopUserReq     = pb.StartOrStopUserReq
 	SwitchUserRouteNodeReq = pb.SwitchUserRouteNodeReq
@@ -48,6 +52,10 @@ type (
 		StartOrStopUser(ctx context.Context, in *StartOrStopUserReq, opts ...grpc.CallOption) (*UserOperationResp, error)
 		GetServerInfo(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetServerInfoResp, error)
 		GetNodeAccessToken(ctx context.Context, in *GetNodeAccessTokenReq, opts ...grpc.CallOption) (*GetNodeAccessTokenResp, error)
+		AddBlacklist(ctx context.Context, in *AddBlacklistReq, opts ...grpc.CallOption) (*UserOperationResp, error)
+		RemoveBlacklist(ctx context.Context, in *RemoveBlacklistReq, opts ...grpc.CallOption) (*UserOperationResp, error)
+		GetBlacklist(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetBlacklistResp, error)
+		KickNode(ctx context.Context, in *KickNodeReq, opts ...grpc.CallOption) (*UserOperationResp, error)
 	}
 
 	defaultServerAPI struct {
@@ -114,4 +122,24 @@ func (m *defaultServerAPI) GetServerInfo(ctx context.Context, in *Empty, opts ..
 func (m *defaultServerAPI) GetNodeAccessToken(ctx context.Context, in *GetNodeAccessTokenReq, opts ...grpc.CallOption) (*GetNodeAccessTokenResp, error) {
 	client := pb.NewServerAPIClient(m.cli.Conn())
 	return client.GetNodeAccessToken(ctx, in, opts...)
+}
+
+func (m *defaultServerAPI) AddBlacklist(ctx context.Context, in *AddBlacklistReq, opts ...grpc.CallOption) (*UserOperationResp, error) {
+	client := pb.NewServerAPIClient(m.cli.Conn())
+	return client.AddBlacklist(ctx, in, opts...)
+}
+
+func (m *defaultServerAPI) RemoveBlacklist(ctx context.Context, in *RemoveBlacklistReq, opts ...grpc.CallOption) (*UserOperationResp, error) {
+	client := pb.NewServerAPIClient(m.cli.Conn())
+	return client.RemoveBlacklist(ctx, in, opts...)
+}
+
+func (m *defaultServerAPI) GetBlacklist(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetBlacklistResp, error) {
+	client := pb.NewServerAPIClient(m.cli.Conn())
+	return client.GetBlacklist(ctx, in, opts...)
+}
+
+func (m *defaultServerAPI) KickNode(ctx context.Context, in *KickNodeReq, opts ...grpc.CallOption) (*UserOperationResp, error) {
+	client := pb.NewServerAPIClient(m.cli.Conn())
+	return client.KickNode(ctx, in, opts...)
 }

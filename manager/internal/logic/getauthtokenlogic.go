@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"titan-ipoverlay/manager/internal/svc"
+	"titan-ipoverlay/manager/internal/types"
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/zeromicro/go-zero/core/logx"
@@ -28,22 +29,22 @@ func NewGetAuthTokenLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetA
 	}
 }
 
-func (l *GetAuthTokenLogic) GetAuthToken() (resp string, err error) {
+func (l *GetAuthTokenLogic) GetAuthToken() (resp *types.GetAuthTokenResp, err error) {
 	remoteIP := l.ctx.Value("Remote-IP")
 	ip := net.ParseIP(remoteIP.(string))
 	if ip == nil {
-		return "", fmt.Errorf("can not get ip")
+		return nil, fmt.Errorf("can not get ip")
 	}
 
 	if !ip.IsLoopback() && !ip.IsPrivate() {
-		return "", fmt.Errorf("ip %s not permission access", ip)
+		return nil, fmt.Errorf("ip %s not permission access", ip)
 	}
 
 	token, err := l.generateJwtToken(l.svcCtx.Config.JwtAuth.AccessSecret, l.svcCtx.Config.JwtAuth.AccessExpire, userAdmin)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return string(token), nil
+	return &types.GetAuthTokenResp{Token: string(token)}, nil
 }
 
 func (l *GetAuthTokenLogic) generateJwtToken(secret string, expire int64, nodeId string) ([]byte, error) {

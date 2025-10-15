@@ -114,6 +114,8 @@ message ListUserResp {
 message GetServerInfoResp {
   string socks5_addr = 1;
   string ws_server_url = 2;
+  string access_secret = 3;
+  int64 access_expire = 4;
 }
 
 message GetNodeAccessTokenReq {
@@ -124,7 +126,23 @@ message GetNodeAccessTokenResp {
   string token = 1;
 }
 
- message Empty {}
+message AddBlacklistReq {
+  string node_id = 1;
+}
+
+message RemoveBlacklistReq {
+  string node_id = 1;
+}
+
+message GetBlacklistResp {
+  repeated string nodes = 1;
+}
+
+message KickNodeReq {
+  string node_id = 1;
+}
+
+message Empty {}
 
 // ---- Service Definition ----
 
@@ -140,4 +158,9 @@ service ServerAPI {
   rpc StartOrStopUser(StartOrStopUserReq) returns (UserOperationResp);
   rpc GetServerInfo (Empty) returns (GetServerInfoResp);
   rpc GetNodeAccessToken(GetNodeAccessTokenReq) returns (GetNodeAccessTokenResp);
+  rpc AddBlacklist(AddBlacklistReq) returns (UserOperationResp);
+  rpc RemoveBlacklist(RemoveBlacklistReq) returns (UserOperationResp);
+  rpc GetBlacklist(Empty) returns (GetBlacklistResp);
+  rpc KickNode(KickNodeReq) returns (UserOperationResp);
+
 }

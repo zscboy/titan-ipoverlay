@@ -11,7 +11,8 @@ const (
 	// sort set,
 	redisKeyNodeBind = "titan:node:bind"
 	// sort set, free = unbind + online
-	redisKeyNodeFree = "titan:node:free"
+	redisKeyNodeFree      = "titan:node:free"
+	redisKeyNodeBlacklist = "titan:node:blacklist"
 
 	// redisKeyBrowser       = "titan:browser:%s"
 	// redisKeyBrowserZset   = "titan:browser:zset"

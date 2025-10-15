@@ -13,8 +13,10 @@ type (
 		UserName string `json:"user_name"`
 	}
 	ServerInfo {
-		Socks5Addr  string `json:"socks5_addr"`
-		WSServerURL string `json:"ws_server_url"`
+		Socks5Addr   string `json:"socks5_addr"`
+		WSServerURL  string `json:"ws_server_url"`
+		AccessSecret string `json:"access_secret"`
+		AccessExpire int64  `json:"access_expire"`
 	}
 	AccessTokenReq {
 		NodeId string `form:"nodeid"`
@@ -28,6 +30,18 @@ type (
 	GetNodePopResp {
 		ServerURL   string `json:"server_url"`
 		AccessToken string `json:"access_token"`
+	}
+	AddBlackListReq {
+		NodeID string `json:"nodeid"`
+	}
+	GetBlackListResp {
+		NodeIDs []string `json:"node_ids"`
+	}
+	RemoveBlackListReq {
+		NodeID string `json:"nodeid"`
+	}
+	KickNodeReq {
+		NodeID string `json:"nodeid"`
 	}
 )
 
@@ -46,6 +60,15 @@ service server-api {
 
 	@handler getNodeAccessToken
 	get /node/access/token (AccessTokenReq) returns (AccessTokenResp)
+
+	@handler addBlackList
+	post /node/blacklist/add (AddBlackListReq)
+
+	@handler removeBlackList
+	post /node/blacklist/remove (RemoveBlackListReq)
+
+	@handler KickNode
+	post /node/kick (KickNodeReq)
 }
 
 // TODO: will remove next version

@@ -28,7 +28,232 @@
           "200": {
             "description": "",
             "schema": {
-              "type": "string"
+              "type": "object",
+              "properties": {
+                "token": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/node/blacklist/add": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "addBlackList",
+        "operationId": "addBlackList",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "nodeid",
+            "in": "formData",
+            "required": true
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "node_id"
+              ],
+              "properties": {
+                "node_id": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "err_msg": {
+                  "type": "string"
+                },
+                "success": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/node/blacklist/get": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "getBlackList",
+        "operationId": "getBlackList",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "popid",
+            "in": "formData",
+            "required": true
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "pod_id"
+              ],
+              "properties": {
+                "pod_id": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "nodes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/node/blacklist/remove": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "removeBlackList",
+        "operationId": "removeBlackList",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "nodeid",
+            "in": "formData",
+            "required": true
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "node_id"
+              ],
+              "properties": {
+                "node_id": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "err_msg": {
+                  "type": "string"
+                },
+                "success": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/node/kick": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "KickNode",
+        "operationId": "kickNode",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "nodeid",
+            "in": "formData",
+            "required": true
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "node_id"
+              ],
+              "properties": {
+                "node_id": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "err_msg": {
+                  "type": "string"
+                },
+                "success": {
+                  "type": "boolean"
+                }
+              }
             }
           }
         }
@@ -222,9 +447,16 @@
               "required": [
                 "user_name",
                 "password",
-                "pop_id"
+                "pop_id",
+                "upload_rate_limit",
+                "download_rate_limit"
               ],
               "properties": {
+                "download_rate_limit": {
+                  "type": "integer",
+                  "default": 1310720,
+                  "example": 1310720
+                },
                 "password": {
                   "type": "string"
                 },
@@ -263,6 +495,11 @@
                       "type": "integer"
                     }
                   }
+                },
+                "upload_rate_limit": {
+                  "type": "integer",
+                  "default": 131072,
+                  "example": 131072
                 },
                 "user_name": {
                   "type": "string"
@@ -401,6 +638,9 @@
                 "current_traffic": {
                   "type": "integer"
                 },
+                "download_rate_limit": {
+                  "type": "integer"
+                },
                 "node_ip": {
                   "type": "string"
                 },
@@ -445,6 +685,9 @@
                       "type": "integer"
                     }
                   }
+                },
+                "upload_rate_limit": {
+                  "type": "integer"
                 },
                 "user_name": {
                   "type": "string"
@@ -505,10 +748,15 @@
                       "node_ip",
                       "node_online",
                       "current_traffic",
-                      "off"
+                      "off",
+                      "upload_rate_limit",
+                      "download_rate_limit"
                     ],
                     "properties": {
                       "current_traffic": {
+                        "type": "integer"
+                      },
+                      "download_rate_limit": {
                         "type": "integer"
                       },
                       "node_ip": {
@@ -552,6 +800,9 @@
                             "type": "integer"
                           }
                         }
+                      },
+                      "upload_rate_limit": {
+                        "type": "integer"
                       },
                       "user_name": {
                         "type": "string"
@@ -809,7 +1060,7 @@
       }
     }
   },
-  "x-date": "2025-08-01 13:09:19",
+  "x-date": "2025-10-15 11:01:56",
   "x-description": "This is a goctl generated swagger file.",
   "x-github": "https://github.com/zeromicro/go-zero",
   "x-go-zero-doc": "https://go-zero.dev/",

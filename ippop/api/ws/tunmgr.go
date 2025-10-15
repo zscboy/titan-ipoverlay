@@ -65,7 +65,7 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *types.NodeWS
 	v, ok := tm.tunnels.Load(req.NodeId)
 	if ok {
 		oldTun := v.(*Tunnel)
-		oldTun.close()
+		oldTun.waitClose()
 	}
 
 	logx.Debugf("TunnelManager.acceptWebsocket node id %s", req.NodeId)
@@ -110,7 +110,7 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *types.NodeWS
 		return
 	}
 
-	if len(node.BindUser) == 0 {
+	if len(node.BindUser) == 0 && !node.IsBlacklisted {
 		model.AddFreeNode(tm.redis, node.Id)
 	}
 
@@ -211,6 +211,17 @@ func (tm *TunnelManager) getUserFromCache(userName string) (*model.User, error) 
 
 func (tm *TunnelManager) DeleteUserFromCache(userName string) {
 	tm.userCache.Remove(userName)
+}
+
+func (tm *TunnelManager) KickNode(nodeID string) error {
+	v, ok := tm.tunnels.Load(nodeID)
+	if ok {
+		tun := v.(*Tunnel)
+		tun.waitClose()
+		return nil
+	}
+
+	return fmt.Errorf("node %s already offline", nodeID)
 }
 
 func (tm *TunnelManager) getTunnelByUser(userName string) (*Tunnel, error) {

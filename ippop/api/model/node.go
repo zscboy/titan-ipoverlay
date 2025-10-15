@@ -15,14 +15,15 @@ const (
 )
 
 type Node struct {
-	Id         string
-	OS         string `redis:"os"`
-	LoginAt    string `redis:"login_at"`
-	RegisterAt string `redis:"register_at"`
-	Online     bool
-	IP         string `redis:"ip"`
-	BindUser   string `redis:"bind_user"`
-	NetDelay   int64  `redis:"net_delay"`
+	Id            string
+	OS            string `redis:"os"`
+	LoginAt       string `redis:"login_at"`
+	RegisterAt    string `redis:"register_at"`
+	Online        bool
+	IP            string `redis:"ip"`
+	BindUser      string `redis:"bind_user"`
+	NetDelay      int64  `redis:"net_delay"`
+	IsBlacklisted bool
 }
 
 func SetNodeAndZadd(ctx context.Context, redis *redis.Redis, node *Node) error {
@@ -98,8 +99,14 @@ func GetNode(redis *redis.Redis, id string) (*Node, error) {
 		return nil, err
 	}
 
+	isBlacklisted, err := IsBlacklisted(redis, id)
+	if err != nil {
+		return nil, err
+	}
+
 	node.Id = id
 	node.Online = online
+	node.IsBlacklisted = isBlacklisted
 	return node, nil
 }
 
@@ -122,6 +129,11 @@ func listNode(ctx context.Context, redis *redis.Redis, keyOfnodeSortSet string, 
 	}
 
 	onlines, err := getNodesOnlineStatus(ctx, redis, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	blacklistStatus, err := getNodesBlacklistStatus(ctx, redis, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +162,7 @@ func listNode(ctx context.Context, redis *redis.Redis, keyOfnodeSortSet string, 
 		}
 
 		id := ids[i]
-		node := Node{Id: id, Online: onlines[id]}
+		node := Node{Id: id, Online: onlines[id], IsBlacklisted: blacklistStatus[id]}
 		err = mapToStruct(result, &node)
 		if err != nil {
 			logx.Errorf("ListNode mapToStruct error:%s", err.Error())
@@ -216,6 +228,33 @@ func getNodesOnlineStatus(ctx context.Context, redis *redis.Redis, nodeIds []str
 		onlines[nodeIds[i]] = exist
 	}
 	return onlines, nil
+}
+
+func getNodesBlacklistStatus(ctx context.Context, redis *redis.Redis, nodeIds []string) (map[string]bool, error) {
+	pipe, err := redis.TxPipeline()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, id := range nodeIds {
+		pipe.SIsMember(ctx, redisKeyNodeBlacklist, id)
+	}
+
+	results, err := pipe.Exec(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	blacklistStatus := make(map[string]bool)
+	for i, result := range results {
+		exist, err := result.(*goredis.BoolCmd).Result()
+		if err != nil {
+			logx.Errorf("ListNode parse result failed:%s", err.Error())
+			continue
+		}
+		blacklistStatus[nodeIds[i]] = exist
+	}
+	return blacklistStatus, nil
 }
 
 func DeleteNodeOnlineData(redis *redis.Redis) error {

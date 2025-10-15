@@ -2,6 +2,29 @@
 
 1. route definition
 
+- Url: /auth/token
+- Method: GET
+- Request: `-`
+- Response: `GetAuthTokenResp`
+
+2. request definition
+
+
+
+3. response definition
+
+
+
+```golang
+type GetAuthTokenResp struct {
+	Token string `json:"token"`
+}
+```
+
+### 2. N/A
+
+1. route definition
+
 - Url: /node/pop
 - Method: GET
 - Request: `GetNodePopReq`
@@ -29,7 +52,130 @@ type GetNodePopResp struct {
 }
 ```
 
-### 2. N/A
+### 3. N/A
+
+1. route definition
+
+- Url: /node/blacklist/add
+- Method: POST
+- Request: `AddBlackListReq`
+- Response: `UserOperationResp`
+
+2. request definition
+
+
+
+```golang
+type AddBlackListReq struct {
+	NodeID string `json:"node_id" form:"nodeid"`
+}
+```
+
+
+3. response definition
+
+
+
+```golang
+type UserOperationResp struct {
+	Success bool `json:"success"`
+	ErrMsg string `json:"err_msg"`
+}
+```
+
+### 4. N/A
+
+1. route definition
+
+- Url: /node/blacklist/get
+- Method: POST
+- Request: `GetBlackListReq`
+- Response: `GetBlackListResp`
+
+2. request definition
+
+
+
+```golang
+type GetBlackListReq struct {
+	PodID string `json:"pod_id" form:"popid"`
+}
+```
+
+
+3. response definition
+
+
+
+```golang
+type GetBlackListResp struct {
+	Nodes []string `json:"nodes"`
+}
+```
+
+### 5. N/A
+
+1. route definition
+
+- Url: /node/blacklist/remove
+- Method: POST
+- Request: `RemoveBlackListReq`
+- Response: `UserOperationResp`
+
+2. request definition
+
+
+
+```golang
+type RemoveBlackListReq struct {
+	NodeID string `json:"node_id" form:"nodeid"`
+}
+```
+
+
+3. response definition
+
+
+
+```golang
+type UserOperationResp struct {
+	Success bool `json:"success"`
+	ErrMsg string `json:"err_msg"`
+}
+```
+
+### 6. N/A
+
+1. route definition
+
+- Url: /node/kick
+- Method: POST
+- Request: `KickNodeReq`
+- Response: `UserOperationResp`
+
+2. request definition
+
+
+
+```golang
+type KickNodeReq struct {
+	NodeID string `json:"node_id" form:"nodeid"`
+}
+```
+
+
+3. response definition
+
+
+
+```golang
+type UserOperationResp struct {
+	Success bool `json:"success"`
+	ErrMsg string `json:"err_msg"`
+}
+```
+
+### 7. N/A
 
 1. route definition
 
@@ -63,7 +209,7 @@ type ListNodeResp struct {
 }
 ```
 
-### 3. N/A
+### 8. N/A
 
 1. route definition
 
@@ -86,7 +232,7 @@ type GetPopsResp struct {
 }
 ```
 
-### 4. N/A
+### 9. N/A
 
 1. route definition
 
@@ -106,6 +252,8 @@ type CreateUserReq struct {
 	PopId string `json:"pop_id"`
 	TrafficLimit *TrafficLimit `json:"traffic_limit,optional"`
 	Route *Route `json:"route,optional"`
+	UploadRateLimit int64 `json:"upload_rate_limit,default=131072"`
+	DownloadRateLimit int64 `json:"download_rate_limit,default=1310720"`
 }
 ```
 
@@ -124,7 +272,7 @@ type CreateUserResp struct {
 }
 ```
 
-### 5. N/A
+### 10. N/A
 
 1. route definition
 
@@ -155,7 +303,7 @@ type UserOperationResp struct {
 }
 ```
 
-### 6. N/A
+### 11. N/A
 
 1. route definition
 
@@ -182,17 +330,31 @@ type GetUserReq struct {
 ```golang
 type GetUserResp struct {
 	UserName string `json:"user_name"`
-	PopId string `json:"pop_id"`
 	TrafficLimit *TrafficLimit `json:"traffic_limit"`
 	Route *Route `json:"route"`
 	NodeIP string `json:"node_ip"`
 	NodeOnline bool `json:"node_online"`
 	CurrentTraffic int64 `json:"current_traffic"`
 	Off bool `json:"off"`
+	UploadRateLimit int64 `json:"upload_rate_limit"`
+	DownloadRateLimit int64 `json:"download_rate_limit"`
+	PopId string `json:"pop_id"`
+}
+
+type User struct {
+	UserName string `json:"user_name"`
+	TrafficLimit *TrafficLimit `json:"traffic_limit"`
+	Route *Route `json:"route"`
+	NodeIP string `json:"node_ip"`
+	NodeOnline bool `json:"node_online"`
+	CurrentTraffic int64 `json:"current_traffic"`
+	Off bool `json:"off"`
+	UploadRateLimit int64 `json:"upload_rate_limit"`
+	DownloadRateLimit int64 `json:"download_rate_limit"`
 }
 ```
 
-### 7. N/A
+### 12. N/A
 
 1. route definition
 
@@ -225,7 +387,7 @@ type ListUserResp struct {
 }
 ```
 
-### 8. N/A
+### 13. N/A
 
 1. route definition
 
@@ -241,7 +403,7 @@ type ListUserResp struct {
 ```golang
 type ModifyUserReq struct {
 	UserName string `json:"user_name"`
-	TrafficLimit *TrafficLimit `json:"total_traffic"`
+	TrafficLimit *TrafficLimit `json:"traffic_limit"`
 	Route *Route `json:"route"`
 }
 ```
@@ -258,7 +420,7 @@ type UserOperationResp struct {
 }
 ```
 
-### 9. N/A
+### 14. N/A
 
 1. route definition
 
@@ -290,7 +452,7 @@ type UserOperationResp struct {
 }
 ```
 
-### 10. N/A
+### 15. N/A
 
 1. route definition
 
@@ -322,7 +484,7 @@ type UserOperationResp struct {
 }
 ```
 
-### 11. N/A
+### 16. N/A
 
 1. route definition
 
