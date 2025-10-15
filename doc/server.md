@@ -67,7 +67,7 @@ type GetNodePopResp struct {
 
 ```golang
 type AddBlackListReq struct {
-	NodeID string `json:"node_id" form:"nodeid"`
+	NodeID string `json:"node_id"`
 }
 ```
 
@@ -98,7 +98,7 @@ type UserOperationResp struct {
 
 ```golang
 type GetBlackListReq struct {
-	PodID string `json:"pod_id" form:"popid"`
+	PodID string `form:"popid"`
 }
 ```
 
@@ -128,7 +128,7 @@ type GetBlackListResp struct {
 
 ```golang
 type RemoveBlackListReq struct {
-	NodeID string `json:"node_id" form:"nodeid"`
+	NodeID string `json:"node_id"`
 }
 ```
 
@@ -159,7 +159,7 @@ type UserOperationResp struct {
 
 ```golang
 type KickNodeReq struct {
-	NodeID string `json:"node_id" form:"nodeid"`
+	NodeID string `form:"nodeid"`
 }
 ```
 

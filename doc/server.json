@@ -54,12 +54,6 @@
         "operationId": "addBlackList",
         "parameters": [
           {
-            "type": "string",
-            "name": "nodeid",
-            "in": "formData",
-            "required": true
-          },
-          {
             "name": "body",
             "in": "body",
             "required": true,
@@ -97,7 +91,7 @@
     "/node/blacklist/get": {
       "post": {
         "consumes": [
-          "application/json"
+          "application/x-www-form-urlencoded"
         ],
         "produces": [
           "application/json"
@@ -113,22 +107,6 @@
             "name": "popid",
             "in": "formData",
             "required": true
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "type": "object",
-              "required": [
-                "pod_id"
-              ],
-              "properties": {
-                "pod_id": {
-                  "type": "string"
-                }
-              }
-            }
           }
         ],
         "responses": {
@@ -163,12 +141,6 @@
         "summary": "removeBlackList",
         "operationId": "removeBlackList",
         "parameters": [
-          {
-            "type": "string",
-            "name": "nodeid",
-            "in": "formData",
-            "required": true
-          },
           {
             "name": "body",
             "in": "body",
@@ -207,7 +179,7 @@
     "/node/kick": {
       "post": {
         "consumes": [
-          "application/json"
+          "application/x-www-form-urlencoded"
         ],
         "produces": [
           "application/json"
@@ -223,22 +195,6 @@
             "name": "nodeid",
             "in": "formData",
             "required": true
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "type": "object",
-              "required": [
-                "node_id"
-              ],
-              "properties": {
-                "node_id": {
-                  "type": "string"
-                }
-              }
-            }
           }
         ],
         "responses": {
@@ -1060,7 +1016,7 @@
       }
     }
   },
-  "x-date": "2025-10-15 11:01:56",
+  "x-date": "2025-10-15 14:44:22",
   "x-description": "This is a goctl generated swagger file.",
   "x-github": "https://github.com/zeromicro/go-zero",
   "x-go-zero-doc": "https://go-zero.dev/",
