@@ -50,15 +50,16 @@ func (l *GetUserLogic) GetUser(req *types.GetUserReq) (resp *types.GetUserResp, 
 	route := toRouteResp(getUserResp.Route)
 
 	user := types.User{
-		UserName:          getUserResp.UserName,
-		NodeIP:            getUserResp.NodeIp,
-		NodeOnline:        getUserResp.NodeOnline,
-		CurrentTraffic:    getUserResp.CurrentTraffic,
-		Off:               getUserResp.Off,
-		TrafficLimit:      traffic,
-		Route:             route,
-		UploadRateLimit:   getUserResp.UploadRateLimite,
-		DownloadRateLimit: getUserResp.DownloadRateLimit,
+		UserName:            getUserResp.UserName,
+		NodeIP:              getUserResp.NodeIp,
+		NodeOnline:          getUserResp.NodeOnline,
+		CurrentTraffic:      getUserResp.CurrentTraffic,
+		Off:                 getUserResp.Off,
+		TrafficLimit:        traffic,
+		Route:               route,
+		UploadRateLimit:     getUserResp.UploadRateLimite,
+		DownloadRateLimit:   getUserResp.DownloadRateLimit,
+		LastRouteSwitchTime: getUserResp.LastRouteSwitchTime,
 	}
 	return &types.GetUserResp{
 		PopId: popID,

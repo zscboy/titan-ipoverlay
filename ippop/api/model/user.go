@@ -10,11 +10,26 @@ import (
 	"github.com/zeromicro/go-zero/core/stores/redis"
 )
 
+type RouteMode int
+
 const (
-	RouteModelManual = 1
-	RouteModelAuto   = 2
-	RouteModelTimed  = 3
+	RouteModeAuto RouteMode = iota + 1
+	RouteModeManual
+	RouteModeTimed
 )
+
+func (m RouteMode) String() string {
+	switch m {
+	case RouteModeAuto:
+		return "auto"
+	case RouteModeManual:
+		return "manual"
+	case RouteModeTimed:
+		return "timed"
+	default:
+		return fmt.Sprintf("unknown(%d)", int(m))
+	}
+}
 
 type User struct {
 	UserName    string `redis:"user_name"`
@@ -33,13 +48,18 @@ type User struct {
 	RouteMode int `redis:"route_mode"`
 	// if NodeID is empty, will auto allocate a node for user
 	RouteNodeID string `redis:"route_node_id"`
-	// only work with RouteMode==3
-	UpdateRouteIntervals int `redis:"update_route_intervals"`
-	// timestamp only work with RouteMode==3
-	UpdateRouteTime   int64 `redis:"update_route_time"`
-	Off               bool  `redis:"off"`
-	UploadRateLimit   int64 `redis:"upload_rate_limit"`
-	DownloadRateLimit int64 `redis:"download_rate_limit"`
+	// RouteMode=Timed
+	// If >0, switch every N minutes
+	UpdateRouteIntervalMinutes int `redis:"update_route_interval_minutes"`
+	// RouteMode=Timed
+	// If IntervalMinutes=0, trigger at specific UTC minutes of day
+	// example: utc+8 10:30=(10-8)*60+30
+	UpdateRouteUtcMinuteOfDay int `redis:"update_route_utc_minute_of_day"`
+	// Unix timestamp of last route switch
+	LastRouteSwitchTime int64 `redis:"last_route_switch_time"`
+	Off                 bool  `redis:"off"`
+	UploadRateLimit     int64 `redis:"upload_rate_limit"`
+	DownloadRateLimit   int64 `redis:"download_rate_limit"`
 }
 
 func SaveUser(redis *redis.Redis, user *User) error {
@@ -96,6 +116,10 @@ func ListUser(ctx context.Context, redis *redis.Redis, start, end int) ([]*User,
 		return nil, err
 	}
 
+	return ListUserWithNames(ctx, redis, userNames)
+}
+
+func ListUserWithNames(ctx context.Context, redis *redis.Redis, userNames []string) ([]*User, error) {
 	pipe, err := redis.TxPipeline()
 	if err != nil {
 		return nil, err

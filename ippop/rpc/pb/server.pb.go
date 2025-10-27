@@ -212,12 +212,18 @@ func (x *ListNodeResp) GetTotal() int32 {
 }
 
 type Route struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Mode          int32                  `protobuf:"varint,1,opt,name=mode,proto3" json:"mode,omitempty"`
-	NodeId        string                 `protobuf:"bytes,2,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
-	Intervals     int32                  `protobuf:"varint,3,opt,name=intervals,proto3" json:"intervals,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 1. auto mode, 2. manual mode, 3. Timed switching点击并应用
+	Mode   int32  `protobuf:"varint,1,opt,name=mode,proto3" json:"mode,omitempty"`
+	NodeId string `protobuf:"bytes,2,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	// mode=Timed
+	// If >0, switch every N minutes
+	IntervalMinutes int32 `protobuf:"varint,3,opt,name=interval_minutes,json=intervalMinutes,proto3" json:"interval_minutes,omitempty"`
+	// mode=Timed
+	// If interval_minutes=0, trigger at specific UTC minutes of day
+	UtcMinuteOfDay int32 `protobuf:"varint,4,opt,name=utc_minute_of_day,json=utcMinuteOfDay,proto3" json:"utc_minute_of_day,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Route) Reset() {
@@ -264,9 +270,16 @@ func (x *Route) GetNodeId() string {
 	return ""
 }
 
-func (x *Route) GetIntervals() int32 {
+func (x *Route) GetIntervalMinutes() int32 {
 	if x != nil {
-		return x.Intervals
+		return x.IntervalMinutes
+	}
+	return 0
+}
+
+func (x *Route) GetUtcMinuteOfDay() int32 {
+	if x != nil {
+		return x.UtcMinuteOfDay
 	}
 	return 0
 }
@@ -856,18 +869,19 @@ func (x *StartOrStopUserReq) GetAction() string {
 }
 
 type User struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	UserName          string                 `protobuf:"bytes,1,opt,name=user_name,json=userName,proto3" json:"user_name,omitempty"`
-	TrafficLimit      *TrafficLimit          `protobuf:"bytes,2,opt,name=traffic_limit,json=trafficLimit,proto3" json:"traffic_limit,omitempty"`
-	Route             *Route                 `protobuf:"bytes,3,opt,name=route,proto3" json:"route,omitempty"`
-	NodeIp            string                 `protobuf:"bytes,4,opt,name=node_ip,json=nodeIp,proto3" json:"node_ip,omitempty"`
-	NodeOnline        bool                   `protobuf:"varint,5,opt,name=node_online,json=nodeOnline,proto3" json:"node_online,omitempty"`
-	CurrentTraffic    int64                  `protobuf:"varint,6,opt,name=current_traffic,json=currentTraffic,proto3" json:"current_traffic,omitempty"`
-	Off               bool                   `protobuf:"varint,7,opt,name=off,proto3" json:"off,omitempty"`
-	UploadRateLimite  int64                  `protobuf:"varint,8,opt,name=upload_rate_limite,json=uploadRateLimite,proto3" json:"upload_rate_limite,omitempty"`
-	DownloadRateLimit int64                  `protobuf:"varint,9,opt,name=download_rate_limit,json=downloadRateLimit,proto3" json:"download_rate_limit,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	UserName            string                 `protobuf:"bytes,1,opt,name=user_name,json=userName,proto3" json:"user_name,omitempty"`
+	TrafficLimit        *TrafficLimit          `protobuf:"bytes,2,opt,name=traffic_limit,json=trafficLimit,proto3" json:"traffic_limit,omitempty"`
+	Route               *Route                 `protobuf:"bytes,3,opt,name=route,proto3" json:"route,omitempty"`
+	NodeIp              string                 `protobuf:"bytes,4,opt,name=node_ip,json=nodeIp,proto3" json:"node_ip,omitempty"`
+	NodeOnline          bool                   `protobuf:"varint,5,opt,name=node_online,json=nodeOnline,proto3" json:"node_online,omitempty"`
+	CurrentTraffic      int64                  `protobuf:"varint,6,opt,name=current_traffic,json=currentTraffic,proto3" json:"current_traffic,omitempty"`
+	Off                 bool                   `protobuf:"varint,7,opt,name=off,proto3" json:"off,omitempty"`
+	UploadRateLimite    int64                  `protobuf:"varint,8,opt,name=upload_rate_limite,json=uploadRateLimite,proto3" json:"upload_rate_limite,omitempty"`
+	DownloadRateLimit   int64                  `protobuf:"varint,9,opt,name=download_rate_limit,json=downloadRateLimit,proto3" json:"download_rate_limit,omitempty"`
+	LastRouteSwitchTime int64                  `protobuf:"varint,10,opt,name=last_route_switch_time,json=lastRouteSwitchTime,proto3" json:"last_route_switch_time,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *User) Reset() {
@@ -959,6 +973,13 @@ func (x *User) GetUploadRateLimite() int64 {
 func (x *User) GetDownloadRateLimit() int64 {
 	if x != nil {
 		return x.DownloadRateLimit
+	}
+	return 0
+}
+
+func (x *User) GetLastRouteSwitchTime() int64 {
+	if x != nil {
+		return x.LastRouteSwitchTime
 	}
 	return 0
 }
@@ -1452,11 +1473,12 @@ const file_server_proto_rawDesc = "" +
 	"\x06online\x18\x05 \x01(\bR\x06online\"H\n" +
 	"\fListNodeResp\x12\"\n" +
 	"\x05nodes\x18\x01 \x03(\v2\f.server.NodeR\x05nodes\x12\x14\n" +
-	"\x05total\x18\x02 \x01(\x05R\x05total\"R\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total\"\x8a\x01\n" +
 	"\x05Route\x12\x12\n" +
 	"\x04mode\x18\x01 \x01(\x05R\x04mode\x12\x17\n" +
-	"\anode_id\x18\x02 \x01(\tR\x06nodeId\x12\x1c\n" +
-	"\tintervals\x18\x03 \x01(\x05R\tintervals\"m\n" +
+	"\anode_id\x18\x02 \x01(\tR\x06nodeId\x12)\n" +
+	"\x10interval_minutes\x18\x03 \x01(\x05R\x0fintervalMinutes\x12)\n" +
+	"\x11utc_minute_of_day\x18\x04 \x01(\x05R\x0eutcMinuteOfDay\"m\n" +
 	"\fTrafficLimit\x12\x1d\n" +
 	"\n" +
 	"start_time\x18\x01 \x01(\x03R\tstartTime\x12\x19\n" +
@@ -1496,7 +1518,7 @@ const file_server_proto_rawDesc = "" +
 	"\tuser_name\x18\x01 \x01(\tR\buserName\"I\n" +
 	"\x12StartOrStopUserReq\x12\x1b\n" +
 	"\tuser_name\x18\x01 \x01(\tR\buserName\x12\x16\n" +
-	"\x06action\x18\x02 \x01(\tR\x06action\"\xd6\x02\n" +
+	"\x06action\x18\x02 \x01(\tR\x06action\"\x8b\x03\n" +
 	"\x04User\x12\x1b\n" +
 	"\tuser_name\x18\x01 \x01(\tR\buserName\x129\n" +
 	"\rtraffic_limit\x18\x02 \x01(\v2\x14.server.TrafficLimitR\ftrafficLimit\x12#\n" +
@@ -1507,7 +1529,9 @@ const file_server_proto_rawDesc = "" +
 	"\x0fcurrent_traffic\x18\x06 \x01(\x03R\x0ecurrentTraffic\x12\x10\n" +
 	"\x03off\x18\a \x01(\bR\x03off\x12,\n" +
 	"\x12upload_rate_limite\x18\b \x01(\x03R\x10uploadRateLimite\x12.\n" +
-	"\x13download_rate_limit\x18\t \x01(\x03R\x11downloadRateLimit\"5\n" +
+	"\x13download_rate_limit\x18\t \x01(\x03R\x11downloadRateLimit\x123\n" +
+	"\x16last_route_switch_time\x18\n" +
+	" \x01(\x03R\x13lastRouteSwitchTime\"5\n" +
 	"\vListUserReq\x12\x14\n" +
 	"\x05start\x18\x01 \x01(\x05R\x05start\x12\x10\n" +
 	"\x03end\x18\x02 \x01(\x05R\x03end\"H\n" +

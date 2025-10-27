@@ -39,12 +39,16 @@ type (
 		Total int     `json:"total"`
 	}
 	Route {
-		// 1. manual mode, 2. auto mode, 3. Timed switching点击并应用
-		Mode int
+		// 1. auto mode, 2. manual mode, 3. Timed switching点击并应用
+		Mode int `json:"mode"`
 		// if NodeID is empty, will auto allocate a node for user
-		NodeID string
-		// only work with Timed
-		Intervals int
+		NodeID string `json:"node_id,optional"`
+		// Mode=Timed
+		// If >0, switch every N minutes
+		IntervalMinutes int `json:"interval_minutes,optional"`
+		// Mode=Timed
+		// If IntervalMinutes=0, trigger at specific UTC minutes of day
+		UtcMinuteOfDay int `json:"utc_minute_of_day,optional"`
 	}
 	TrafficLimit {
 		// start time timestamp
@@ -52,8 +56,8 @@ type (
 		// end time timestamp
 		EndTime int64 `json:"end_time"`
 		// Total traffic allowed to the user
-		// unit GB
-		TotalTraffic int64 `json:"total_traffic"`
+		// unit Bytes
+		TotalTraffic int64 `json:"total_traffic,default=1073741824000"`
 	}
 	CreateUserReq {
 		UserName string `json:"user_name"`
@@ -64,8 +68,8 @@ type (
 		TrafficLimit *TrafficLimit `json:"traffic_limit,optional"`
 		// if Route is nil, will use manual mode
 		Route *Route `json:"route,optional"`
-		// default 1Mb/s, 0 unlimit
-		UploadRateLimit int64 `json:"upload_rate_limit,default=131072"`
+		// default 5Mb/s, 0 unlimit
+		UploadRateLimit int64 `json:"upload_rate_limit,default=655360"`
 		// default 10Mb/s, 0 unlimit
 		DownloadRateLimit int64 `json:"download_rate_limit,default=1310720"`
 	}
@@ -123,6 +127,8 @@ type (
 		Off               bool   `json:"off"`
 		UploadRateLimit   int64  `json:"upload_rate_limit"`
 		DownloadRateLimit int64  `json:"download_rate_limit"`
+		// Unix timestamp of last route switch
+		LastRouteSwitchTime int64 `json:"last_route_switch_time"`
 	}
 	ListUserReq {
 		PopID string `form:"popid"`

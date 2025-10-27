@@ -54,9 +54,10 @@ func toRouteResp(in *serverapi.Route) *types.Route {
 	}
 
 	route := types.Route{
-		Mode:      int(in.Mode),
-		NodeID:    in.NodeId,
-		Intervals: int(in.Intervals),
+		Mode:            int(in.Mode),
+		NodeID:          in.NodeId,
+		IntervalMinutes: int(in.IntervalMinutes),
+		UtcMinuteOfDay:  int(in.UtcMinuteOfDay),
 	}
 	return &route
 }
@@ -67,9 +68,10 @@ func toRouteReq(in *types.Route) *serverapi.Route {
 	}
 
 	route := serverapi.Route{
-		Mode:      int32(in.Mode),
-		NodeId:    in.NodeID,
-		Intervals: int32(in.Intervals),
+		Mode:            int32(in.Mode),
+		NodeId:          in.NodeID,
+		IntervalMinutes: int32(in.IntervalMinutes),
+		UtcMinuteOfDay:  int32(in.UtcMinuteOfDay),
 	}
 	return &route
 }

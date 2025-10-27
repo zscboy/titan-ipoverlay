@@ -33,14 +33,15 @@ func (l *ListUserLogic) ListUser(in *pb.ListUserReq) (*pb.ListUserResp, error) {
 	us := make([]*pb.User, 0, len(users))
 	for _, user := range users {
 		trafficLimit := pb.TrafficLimit{StartTime: user.StartTime, EndTime: user.EndTime, TotalTraffic: user.TotalTraffic}
-		route := pb.Route{Mode: int32(user.RouteMode), NodeId: user.RouteNodeID, Intervals: int32(user.UpdateRouteIntervals)}
+		route := pb.Route{Mode: int32(user.RouteMode), NodeId: user.RouteNodeID, IntervalMinutes: int32(user.UpdateRouteIntervalMinutes), UtcMinuteOfDay: int32(user.UpdateRouteUtcMinuteOfDay)}
 		u := &pb.User{
 			UserName:     user.UserName,
 			TrafficLimit: &trafficLimit,
 			Route:        &route, CurrentTraffic: user.CurrentTraffic,
-			Off:               user.Off,
-			DownloadRateLimit: user.DownloadRateLimit,
-			UploadRateLimite:  user.UploadRateLimit,
+			Off:                 user.Off,
+			DownloadRateLimit:   user.DownloadRateLimit,
+			UploadRateLimite:    user.UploadRateLimit,
+			LastRouteSwitchTime: user.LastRouteSwitchTime,
 		}
 		us = append(us, u)
 	}

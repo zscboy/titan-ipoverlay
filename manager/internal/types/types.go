@@ -121,9 +121,10 @@ type RemoveBlackListReq struct {
 }
 
 type Route struct {
-	Mode      int
-	NodeID    string
-	Intervals int
+	Mode            int    `json:"mode"`
+	NodeID          string `json:"node_id,optional"`
+	IntervalMinutes int    `json:"interval_minutes,optional"`
+	UtcMinuteOfDay  int    `json:"utc_minute_of_day,optional"`
 }
 
 type StartOrStopUserReq struct {
@@ -139,19 +140,20 @@ type SwitchUserRouteNodeReq struct {
 type TrafficLimit struct {
 	StartTime    int64 `json:"start_time"`
 	EndTime      int64 `json:"end_time"`
-	TotalTraffic int64 `json:"total_traffic"`
+	TotalTraffic int64 `json:"total_traffic,default=1073741824000"`
 }
 
 type User struct {
-	UserName          string        `json:"user_name"`
-	TrafficLimit      *TrafficLimit `json:"traffic_limit"`
-	Route             *Route        `json:"route"`
-	NodeIP            string        `json:"node_ip"`
-	NodeOnline        bool          `json:"node_online"`
-	CurrentTraffic    int64         `json:"current_traffic"`
-	Off               bool          `json:"off"`
-	UploadRateLimit   int64         `json:"upload_rate_limit"`
-	DownloadRateLimit int64         `json:"download_rate_limit"`
+	UserName            string        `json:"user_name"`
+	TrafficLimit        *TrafficLimit `json:"traffic_limit"`
+	Route               *Route        `json:"route"`
+	NodeIP              string        `json:"node_ip"`
+	NodeOnline          bool          `json:"node_online"`
+	CurrentTraffic      int64         `json:"current_traffic"`
+	Off                 bool          `json:"off"`
+	UploadRateLimit     int64         `json:"upload_rate_limit"`
+	DownloadRateLimit   int64         `json:"download_rate_limit"`
+	LastRouteSwitchTime int64         `json:"last_route_switch_time"`
 }
 
 type UserOperationResp struct {

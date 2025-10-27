@@ -11,8 +11,8 @@ import (
 
 const (
 	routeModeType = iota
-	routeModeTypeManual
 	routeModeTypeAuto
+	routeModeTypeManual
 	routeModeTypeTimed
 )
 
@@ -45,10 +45,10 @@ func checkRoute(redis *redis.Redis, route *pb.Route) error {
 
 func isInvalidRouteMode(mode int32) bool {
 	if mode != routeModeTypeManual && mode != routeModeTypeAuto && mode != routeModeTypeTimed {
-		return false
+		return true
 	}
 
-	return true
+	return false
 }
 
 func checkTraffic(trafficLimit *pb.TrafficLimit) error {

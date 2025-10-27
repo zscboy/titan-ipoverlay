@@ -55,14 +55,31 @@ func (l *ModifyUserLogic) ModifyUser(in *pb.ModifyUserReq) (*pb.UserOperationRes
 		return &pb.UserOperationResp{ErrMsg: fmt.Sprintf("user %s already bind node %s", in.UserName, user.RouteNodeID)}, nil
 	}
 
+	oldRouteModel := user.RouteMode
+
 	user.StartTime = in.TrafficLimit.StartTime
 	user.EndTime = in.TrafficLimit.EndTime
 	user.TotalTraffic = in.TrafficLimit.TotalTraffic
 	user.RouteMode = int(in.Route.Mode)
-	user.UpdateRouteIntervals = int(in.Route.Intervals)
+	user.UpdateRouteIntervalMinutes = int(in.Route.IntervalMinutes)
+	user.UpdateRouteUtcMinuteOfDay = int(in.Route.UtcMinuteOfDay)
 
 	if err := model.SwitchNodeByUser(l.ctx, l.svcCtx.Redis, user, in.Route.NodeId); err != nil {
 		return &pb.UserOperationResp{ErrMsg: err.Error()}, nil
+	}
+
+	// add user to scheduler list
+	if oldRouteModel != int(model.RouteModeTimed) && user.RouteMode == int(model.RouteModeTimed) {
+		if err := model.AddUserToSchedulerList(l.svcCtx.Redis, user.UserName); err != nil {
+			return &pb.UserOperationResp{ErrMsg: err.Error()}, nil
+		}
+	}
+
+	// remove user from scheduler list
+	if oldRouteModel == int(model.RouteModeTimed) && user.RouteMode != int(model.RouteModeTimed) {
+		if err := model.RemoveUserFromSchedulerList(l.svcCtx.Redis, user.UserName); err != nil {
+			return &pb.UserOperationResp{ErrMsg: err.Error()}, nil
+		}
 	}
 
 	deleteUserCacheLogic := NewDeleteUserCache(l.ctx, l.svcCtx)

@@ -44,15 +44,16 @@ func (l *ListUserLogic) ListUser(req *types.ListUserReq) (resp *types.ListUserRe
 	users := make([]*types.User, 0, len(listUserResp.Users))
 	for _, user := range listUserResp.Users {
 		u := &types.User{
-			UserName:          user.UserName,
-			NodeIP:            user.NodeIp,
-			NodeOnline:        user.NodeOnline,
-			CurrentTraffic:    user.CurrentTraffic,
-			Off:               user.Off,
-			TrafficLimit:      toTrafficLimitResp(user.TrafficLimit),
-			Route:             toRouteResp(user.Route),
-			UploadRateLimit:   user.UploadRateLimite,
-			DownloadRateLimit: user.DownloadRateLimit,
+			UserName:            user.UserName,
+			NodeIP:              user.NodeIp,
+			NodeOnline:          user.NodeOnline,
+			CurrentTraffic:      user.CurrentTraffic,
+			Off:                 user.Off,
+			TrafficLimit:        toTrafficLimitResp(user.TrafficLimit),
+			Route:               toRouteResp(user.Route),
+			UploadRateLimit:     user.UploadRateLimite,
+			DownloadRateLimit:   user.DownloadRateLimit,
+			LastRouteSwitchTime: user.LastRouteSwitchTime,
 		}
 		users = append(users, u)
 	}

@@ -421,15 +421,21 @@
                 },
                 "route": {
                   "type": "object",
+                  "required": [
+                    "mode"
+                  ],
                   "properties": {
-                    "Intervals": {
+                    "interval_minutes": {
                       "type": "integer"
                     },
-                    "Mode": {
+                    "mode": {
                       "type": "integer"
                     },
-                    "NodeID": {
+                    "node_id": {
                       "type": "string"
+                    },
+                    "utc_minute_of_day": {
+                      "type": "integer"
                     }
                   }
                 },
@@ -448,14 +454,16 @@
                       "type": "integer"
                     },
                     "total_traffic": {
-                      "type": "integer"
+                      "type": "integer",
+                      "default": 1073741824000,
+                      "example": 1073741824000
                     }
                   }
                 },
                 "upload_rate_limit": {
                   "type": "integer",
-                  "default": 131072,
-                  "example": 131072
+                  "default": 655360,
+                  "example": 655360
                 },
                 "user_name": {
                   "type": "string"
@@ -478,15 +486,21 @@
                 },
                 "route": {
                   "type": "object",
+                  "required": [
+                    "mode"
+                  ],
                   "properties": {
-                    "Intervals": {
+                    "interval_minutes": {
                       "type": "integer"
                     },
-                    "Mode": {
+                    "mode": {
                       "type": "integer"
                     },
-                    "NodeID": {
+                    "node_id": {
                       "type": "string"
+                    },
+                    "utc_minute_of_day": {
+                      "type": "integer"
                     }
                   }
                 },
@@ -505,7 +519,9 @@
                       "type": "integer"
                     },
                     "total_traffic": {
-                      "type": "integer"
+                      "type": "integer",
+                      "default": 1073741824000,
+                      "example": 1073741824000
                     }
                   }
                 },
@@ -597,6 +613,9 @@
                 "download_rate_limit": {
                   "type": "integer"
                 },
+                "last_route_switch_time": {
+                  "type": "integer"
+                },
                 "node_ip": {
                   "type": "string"
                 },
@@ -611,15 +630,21 @@
                 },
                 "route": {
                   "type": "object",
+                  "required": [
+                    "mode"
+                  ],
                   "properties": {
-                    "Intervals": {
+                    "interval_minutes": {
                       "type": "integer"
                     },
-                    "Mode": {
+                    "mode": {
                       "type": "integer"
                     },
-                    "NodeID": {
+                    "node_id": {
                       "type": "string"
+                    },
+                    "utc_minute_of_day": {
+                      "type": "integer"
                     }
                   }
                 },
@@ -638,7 +663,9 @@
                       "type": "integer"
                     },
                     "total_traffic": {
-                      "type": "integer"
+                      "type": "integer",
+                      "default": 1073741824000,
+                      "example": 1073741824000
                     }
                   }
                 },
@@ -706,13 +733,17 @@
                       "current_traffic",
                       "off",
                       "upload_rate_limit",
-                      "download_rate_limit"
+                      "download_rate_limit",
+                      "last_route_switch_time"
                     ],
                     "properties": {
                       "current_traffic": {
                         "type": "integer"
                       },
                       "download_rate_limit": {
+                        "type": "integer"
+                      },
+                      "last_route_switch_time": {
                         "type": "integer"
                       },
                       "node_ip": {
@@ -726,15 +757,21 @@
                       },
                       "route": {
                         "type": "object",
+                        "required": [
+                          "mode"
+                        ],
                         "properties": {
-                          "Intervals": {
+                          "interval_minutes": {
                             "type": "integer"
                           },
-                          "Mode": {
+                          "mode": {
                             "type": "integer"
                           },
-                          "NodeID": {
+                          "node_id": {
                             "type": "string"
+                          },
+                          "utc_minute_of_day": {
+                            "type": "integer"
                           }
                         }
                       },
@@ -753,7 +790,9 @@
                             "type": "integer"
                           },
                           "total_traffic": {
-                            "type": "integer"
+                            "type": "integer",
+                            "default": 1073741824000,
+                            "example": 1073741824000
                           }
                         }
                       },
@@ -800,15 +839,21 @@
               "properties": {
                 "route": {
                   "type": "object",
+                  "required": [
+                    "mode"
+                  ],
                   "properties": {
-                    "Intervals": {
+                    "interval_minutes": {
                       "type": "integer"
                     },
-                    "Mode": {
+                    "mode": {
                       "type": "integer"
                     },
-                    "NodeID": {
+                    "node_id": {
                       "type": "string"
+                    },
+                    "utc_minute_of_day": {
+                      "type": "integer"
                     }
                   }
                 },
@@ -827,7 +872,9 @@
                       "type": "integer"
                     },
                     "total_traffic": {
-                      "type": "integer"
+                      "type": "integer",
+                      "default": 1073741824000,
+                      "example": 1073741824000
                     }
                   }
                 },
@@ -1016,7 +1063,7 @@
       }
     }
   },
-  "x-date": "2025-10-15 14:44:22",
+  "x-date": "2025-10-27 14:47:12",
   "x-description": "This is a goctl generated swagger file.",
   "x-github": "https://github.com/zeromicro/go-zero",
   "x-go-zero-doc": "https://go-zero.dev/",

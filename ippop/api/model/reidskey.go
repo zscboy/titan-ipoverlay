@@ -1,8 +1,9 @@
 package model
 
 const (
-	redisKeyUser     = "titan:user:%s"
-	redisKeyUserZset = "titan:user:zset"
+	redisKeyUser               = "titan:user:%s"
+	redisKeyUserZset           = "titan:user:zset"
+	redisKeyUserRouteScheduler = "titan:user:routescheduler"
 
 	redisKeyNode     = "titan:node:%s"
 	redisKeyNodeZset = "titan:node:zset"
@@ -13,10 +14,4 @@ const (
 	// sort set, free = unbind + online
 	redisKeyNodeFree      = "titan:node:free"
 	redisKeyNodeBlacklist = "titan:node:blacklist"
-
-	// redisKeyBrowser       = "titan:browser:%s"
-	// redisKeyBrowserZset   = "titan:browser:zset"
-	// redisKeyBrowserOnline = "titan:browser:online:%s"
-	// redisKeyBrowserBind   = "titan:browser:bind"
-	// redisKeyBrowserUnbind = "titan:browser:unbind"
 )

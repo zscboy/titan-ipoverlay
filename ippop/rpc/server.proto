@@ -26,9 +26,15 @@ message ListNodeResp {
 }
 
 message Route {
+  // 1. auto mode, 2. manual mode, 3. Timed switching点击并应用
   int32 mode = 1;
   string node_id = 2;
-  int32 intervals = 3;
+  // mode=Timed
+	// If >0, switch every N minutes
+  int32 interval_minutes = 3;
+  // mode=Timed
+	// If interval_minutes=0, trigger at specific UTC minutes of day
+  int32 utc_minute_of_day =4;
 }
 
 message TrafficLimit {
@@ -99,6 +105,7 @@ message User {
   bool off = 7;
   int64 upload_rate_limite = 8;
   int64 download_rate_limit = 9;
+  int64 last_route_switch_time = 10;
 }
 
 message ListUserReq {

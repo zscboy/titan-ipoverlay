@@ -55,9 +55,12 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 		filterRules: &Rules{rules: RulesToMap(config.FilterRules.Rules), defaultAction: config.FilterRules.DefaultAction},
 	}
 
+	routeScheduler := newUserRouteScheduler(tm)
+
 	go tm.keepalive()
 	go tm.setNodeOnlineDataExpire()
 	go tm.startUserTrafficTimer()
+	go routeScheduler.start()
 	return tm
 }
 
@@ -144,6 +147,11 @@ func (tm *TunnelManager) handleNodeOffline(nodeID string) {
 
 		if user == nil {
 			logx.Errorf("handleNodeOffline, get user %s for node %s, but user not exist", node.BindUser, node.Id)
+			return
+		}
+
+		if user.RouteMode != int(model.RouteModeAuto) {
+			logx.Alert(fmt.Sprintf("handleNodeOffline, node %s is offline, but bind by user %s with mode=%s", node.Id, user.UserName, model.RouteMode(user.RouteMode)))
 			return
 		}
 

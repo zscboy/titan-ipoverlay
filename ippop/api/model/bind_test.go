@@ -14,15 +14,15 @@ func TestBind(t *testing.T) {
 	id := "95e66ae2-5bca-11f0-9654-00163e0ced7c"
 
 	user := &User{
-		UserName:             "abc",
-		PasswordMD5:          "abc",
-		StartTime:            time.Now().Unix(),
-		EndTime:              time.Now().Unix(),
-		TotalTraffic:         100000000,
-		RouteMode:            1,
-		RouteNodeID:          id,
-		UpdateRouteIntervals: 0,
-		UpdateRouteTime:      0,
+		UserName:                   "abc",
+		PasswordMD5:                "abc",
+		StartTime:                  time.Now().Unix(),
+		EndTime:                    time.Now().Unix(),
+		TotalTraffic:               100000000,
+		RouteMode:                  1,
+		RouteNodeID:                id,
+		UpdateRouteIntervalMinutes: 0,
+		LastRouteSwitchTime:        0,
 	}
 	if err := BindNodeWithNewUser(context.TODO(), rd, id, user); err != nil {
 		t.Log(err.Error())

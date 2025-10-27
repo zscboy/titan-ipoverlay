@@ -16,8 +16,7 @@ import (
 
 const (
 	// 1000 GB
-	defaultTotalTraffic = 1000
-	trafficUnit         = 1024 * 1024 * 1024
+	defaultTotalTraffic = 1000 * 1024 * 1024 * 1024
 )
 
 type CreateUserLogic struct {
@@ -67,7 +66,7 @@ func (l *CreateUserLogic) CreateUser(in *pb.CreateUserReq) (*pb.CreateUserResp, 
 	route := in.Route
 	if route == nil {
 		// add default route
-		route = &pb.Route{Mode: routeModeTypeManual, Intervals: 0}
+		route = &pb.Route{Mode: routeModeTypeAuto}
 	}
 
 	if len(route.NodeId) == 0 {
@@ -93,22 +92,30 @@ func (l *CreateUserLogic) CreateUser(in *pb.CreateUserReq) (*pb.CreateUserResp, 
 	}
 
 	user = &model.User{
-		UserName:             in.UserName,
-		PasswordMD5:          passwordMD5,
-		StartTime:            trafficLimit.StartTime,
-		EndTime:              trafficLimit.EndTime,
-		TotalTraffic:         trafficLimit.TotalTraffic * trafficUnit,
-		RouteMode:            int(route.Mode),
-		RouteNodeID:          route.NodeId,
-		UpdateRouteIntervals: int(route.Intervals),
-		UpdateRouteTime:      0,
-		UploadRateLimit:      in.UploadRateLimite,
-		DownloadRateLimit:    in.DownloadRateLimit,
+		UserName:                   in.UserName,
+		PasswordMD5:                passwordMD5,
+		StartTime:                  trafficLimit.StartTime,
+		EndTime:                    trafficLimit.EndTime,
+		TotalTraffic:               trafficLimit.TotalTraffic,
+		RouteMode:                  int(route.Mode),
+		RouteNodeID:                route.NodeId,
+		UpdateRouteIntervalMinutes: int(route.IntervalMinutes),
+		UpdateRouteUtcMinuteOfDay:  int(route.UtcMinuteOfDay),
+		LastRouteSwitchTime:        time.Now().Unix(),
+		UploadRateLimit:            in.UploadRateLimite,
+		DownloadRateLimit:          in.DownloadRateLimit,
 	}
 
 	err = model.BindNodeWithNewUser(l.ctx, l.svcCtx.Redis, route.NodeId, user)
 	if err != nil {
 		return nil, err
+	}
+
+	// add user to scheduler list
+	if user.RouteMode == int(model.RouteModeTimed) {
+		if err = model.AddUserToSchedulerList(l.svcCtx.Redis, user.UserName); err != nil {
+			return nil, err
+		}
 	}
 
 	createUserResp := &pb.CreateUserResp{

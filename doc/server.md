@@ -252,7 +252,7 @@ type CreateUserReq struct {
 	PopId string `json:"pop_id"`
 	TrafficLimit *TrafficLimit `json:"traffic_limit,optional"`
 	Route *Route `json:"route,optional"`
-	UploadRateLimit int64 `json:"upload_rate_limit,default=131072"`
+	UploadRateLimit int64 `json:"upload_rate_limit,default=655360"`
 	DownloadRateLimit int64 `json:"download_rate_limit,default=1310720"`
 }
 ```
@@ -338,6 +338,7 @@ type GetUserResp struct {
 	Off bool `json:"off"`
 	UploadRateLimit int64 `json:"upload_rate_limit"`
 	DownloadRateLimit int64 `json:"download_rate_limit"`
+	LastRouteSwitchTime int64 `json:"last_route_switch_time"`
 	PopId string `json:"pop_id"`
 }
 
@@ -351,6 +352,7 @@ type User struct {
 	Off bool `json:"off"`
 	UploadRateLimit int64 `json:"upload_rate_limit"`
 	DownloadRateLimit int64 `json:"download_rate_limit"`
+	LastRouteSwitchTime int64 `json:"last_route_switch_time"`
 }
 ```
 

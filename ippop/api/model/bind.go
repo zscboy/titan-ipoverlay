@@ -160,6 +160,7 @@ func SwitchNodeByUser(ctx context.Context, redis *redis.Redis, user *User, toNod
 	logx.Debugf("toM:%v", toM)
 
 	user.RouteNodeID = toNode.Id
+	user.LastRouteSwitchTime = time.Now().Unix()
 	userKey := fmt.Sprintf(redisKeyUser, user.UserName)
 	userMap, err := structToMap(user)
 	if err != nil {
