@@ -161,8 +161,8 @@ func (tm *TunnelManager) handleNodeOffline(nodeID string) {
 		}
 
 		logx.Debugf("node %s offline, user %s trigger siwth node", node.Id, node.BindUser)
-		if err := tm.swithNodeForUser(user); err != nil {
-			logx.Errorf("handleNodeOffline swithNodeForUser %s failed: %v", node.BindUser, err)
+		if err := tm.switchNodeForUser(user); err != nil {
+			logx.Errorf("handleNodeOffline switchNodeForUser %s failed: %v", node.BindUser, err)
 		}
 	} else {
 		if err := model.RemoveFreeNode(tm.redis, nodeID); err != nil {
@@ -172,7 +172,7 @@ func (tm *TunnelManager) handleNodeOffline(nodeID string) {
 
 }
 
-func (tm *TunnelManager) swithNodeForUser(user *model.User) error {
+func (tm *TunnelManager) switchNodeForUser(user *model.User) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -183,7 +183,7 @@ func (tm *TunnelManager) swithNodeForUser(user *model.User) error {
 
 	if err := model.SwitchNodeByUser(ctx, tm.redis, user, string(newNodeID)); err != nil {
 		if err2 := model.AddFreeNode(tm.redis, string(newNodeID)); err2 != nil {
-			logx.Errorf("swithNodeForUser AddFreeNode: %v", err2)
+			logx.Errorf("switchNodeForUser AddFreeNode: %v", err2)
 		}
 		return err
 	}

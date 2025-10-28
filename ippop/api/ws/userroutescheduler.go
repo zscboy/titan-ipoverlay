@@ -31,6 +31,8 @@ func (scheduler *UserRouteScheduler) start() {
 	// Start the route switch worker
 	go scheduler.routeSwitchWorker()
 
+	logx.Info("UserRouteScheduler.start")
+
 	// Periodically scan users
 	ticker := time.NewTicker(userRouteSchedulerInterval * time.Second)
 	defer ticker.Stop()
@@ -75,13 +77,15 @@ func (scheduler *UserRouteScheduler) checkUsers() {
 // Worker goroutine that actually performs user route switches
 func (scheduler *UserRouteScheduler) routeSwitchWorker() {
 	for user := range scheduler.userChan {
-		scheduler.swithUserRoute(user)
+		if err := scheduler.switchUserRoute(user); err != nil {
+			logx.Errorf("user %s switch route failed:%v", user.UserName, err)
+		}
 	}
 }
 
 func (scheduler *UserRouteScheduler) listUser() ([]*model.User, error) {
 	start := 0
-	count := 100
+	count := 20
 	users := make([]*model.User, 0)
 	for {
 		userNames, err := model.ListUserFromSchedulerList(scheduler.tm.redis, start, start+count-1)
@@ -129,6 +133,6 @@ func (scheduler *UserRouteScheduler) isUserNeedToSwithRoute(user *model.User) bo
 	return false
 }
 
-func (scheduler *UserRouteScheduler) swithUserRoute(user *model.User) error {
-	return scheduler.tm.swithNodeForUser(user)
+func (scheduler *UserRouteScheduler) switchUserRoute(user *model.User) error {
+	return scheduler.tm.switchNodeForUser(user)
 }
