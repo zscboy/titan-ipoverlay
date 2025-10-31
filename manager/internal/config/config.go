@@ -32,5 +32,5 @@ type Config struct {
 	Pops        []Pop
 	DefaultArea string
 	Geo         Geo
-	Whitelist   []string
+	Whitelist   []string `json:",optional"`
 }
