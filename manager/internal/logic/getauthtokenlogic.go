@@ -36,7 +36,7 @@ func (l *GetAuthTokenLogic) GetAuthToken() (resp *types.GetAuthTokenResp, err er
 		return nil, fmt.Errorf("can not get ip")
 	}
 
-	if !ip.IsLoopback() && !ip.IsPrivate() {
+	if !ip.IsLoopback() && !l.isWhitelisted(remoteIP.(string)) {
 		return nil, fmt.Errorf("ip %s not permission access", ip)
 	}
 
@@ -45,6 +45,15 @@ func (l *GetAuthTokenLogic) GetAuthToken() (resp *types.GetAuthTokenResp, err er
 		return nil, err
 	}
 	return &types.GetAuthTokenResp{Token: string(token)}, nil
+}
+
+func (l *GetAuthTokenLogic) isWhitelisted(remoteIP string) bool {
+	for _, ip := range l.svcCtx.Config.Whitelist {
+		if ip == remoteIP {
+			return true
+		}
+	}
+	return false
 }
 
 func (l *GetAuthTokenLogic) generateJwtToken(secret string, expire int64, nodeId string) ([]byte, error) {

@@ -103,6 +103,8 @@ func (scheduler *UserRouteScheduler) listUser() ([]*model.User, error) {
 		if len(userNames) < count {
 			break
 		}
+
+		start = start + count
 	}
 
 	return users, nil
