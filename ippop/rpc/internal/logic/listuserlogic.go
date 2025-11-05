@@ -30,6 +30,7 @@ func (l *ListUserLogic) ListUser(in *pb.ListUserReq) (*pb.ListUserResp, error) {
 		return nil, err
 	}
 
+	nodeIDs := make([]string, 0, len(users))
 	us := make([]*pb.User, 0, len(users))
 	for _, user := range users {
 		trafficLimit := pb.TrafficLimit{StartTime: user.StartTime, EndTime: user.EndTime, TotalTraffic: user.TotalTraffic}
@@ -44,21 +45,28 @@ func (l *ListUserLogic) ListUser(in *pb.ListUserReq) (*pb.ListUserResp, error) {
 			LastRouteSwitchTime: user.LastRouteSwitchTime,
 		}
 		us = append(us, u)
+
+		if len(user.RouteNodeID) > 0 {
+			nodeIDs = append(nodeIDs, user.RouteNodeID)
+		}
 	}
 
-	// TODO: use redis transactions to get all node
+	nodes, err := model.ListNodeWithIDs(l.ctx, l.svcCtx.Redis, nodeIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	nodeMap := make(map[string]*model.Node)
+	for _, node := range nodes {
+		nodeMap[node.Id] = node
+	}
+
 	for _, user := range us {
 		if user.Route == nil {
 			continue
 		}
-		route := user.Route
 
-		node, err := model.GetNode(l.svcCtx.Redis, route.NodeId)
-		if err != nil {
-			logx.Errorf("get node %v", err)
-			continue
-		}
-
+		node := nodeMap[user.Route.NodeId]
 		if node == nil {
 			continue
 		}

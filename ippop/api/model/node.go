@@ -128,12 +128,16 @@ func listNode(ctx context.Context, redis *redis.Redis, keyOfnodeSortSet string, 
 		return nil, err
 	}
 
-	onlines, err := getNodesOnlineStatus(ctx, redis, ids)
+	return ListNodeWithIDs(ctx, redis, ids)
+}
+
+func ListNodeWithIDs(ctx context.Context, redis *redis.Redis, nodeIDs []string) ([]*Node, error) {
+	onlines, err := getNodesOnlineStatus(ctx, redis, nodeIDs)
 	if err != nil {
 		return nil, err
 	}
 
-	blacklistStatus, err := getNodesBlacklistStatus(ctx, redis, ids)
+	blacklistStatus, err := getNodesBlacklistStatus(ctx, redis, nodeIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +147,7 @@ func listNode(ctx context.Context, redis *redis.Redis, keyOfnodeSortSet string, 
 		return nil, err
 	}
 
-	for _, id := range ids {
+	for _, id := range nodeIDs {
 		key := fmt.Sprintf(redisKeyNode, id)
 		pipe.HGetAll(ctx, key)
 	}
@@ -161,7 +165,7 @@ func listNode(ctx context.Context, redis *redis.Redis, keyOfnodeSortSet string, 
 			continue
 		}
 
-		id := ids[i]
+		id := nodeIDs[i]
 		node := Node{Id: id, Online: onlines[id], IsBlacklisted: blacklistStatus[id]}
 		err = mapToStruct(result, &node)
 		if err != nil {
