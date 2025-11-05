@@ -4,6 +4,7 @@ const (
 	redisKeyUser               = "titan:user:%s"
 	redisKeyUserZset           = "titan:user:zset"
 	redisKeyUserRouteScheduler = "titan:user:routescheduler"
+	redisKeyUserTraffic        = "titan:traffic:%s"
 
 	redisKeyNode     = "titan:node:%s"
 	redisKeyNodeZset = "titan:node:zset"

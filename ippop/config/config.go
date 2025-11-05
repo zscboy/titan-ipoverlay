@@ -14,6 +14,7 @@ type Config struct {
 	Redis     redis.RedisConf
 	Log       logx.LogConf
 	HTTPProxy string `json:",optional"`
+	Pprof     bool   `json:",optional"`
 	// TLSKeyPair TLSKeyPair
 }
 

@@ -7,7 +7,6 @@ import (
 	"net"
 	"sync"
 	"time"
-	"titan-ipoverlay/ippop/api/model"
 	"titan-ipoverlay/ippop/api/socks5"
 	"titan-ipoverlay/ippop/api/ws/pb"
 
@@ -103,24 +102,24 @@ func (t *Tunnel) onPong(data []byte) {
 		logx.Error("Invalid pong data")
 		return
 	}
+	// TODO: Mass update
+	// timestamp := int64(binary.LittleEndian.Uint64(data))
+	// rtt := time.Since(time.UnixMicro(timestamp))
 
-	timestamp := int64(binary.LittleEndian.Uint64(data))
-	rtt := time.Since(time.UnixMicro(timestamp))
+	// if t.netDelays == nil {
+	// 	t.netDelays = make([]uint64, 0, netDelayCount)
+	// }
 
-	if t.netDelays == nil {
-		t.netDelays = make([]uint64, 0, netDelayCount)
-	}
-
-	t.netDelays = append(t.netDelays, uint64(rtt.Milliseconds()))
-	if len(t.netDelays) >= netDelayCount {
-		var delays = uint64(0)
-		for _, delay := range t.netDelays {
-			delays += delay
-		}
-		delay := delays / uint64(len(t.netDelays))
-		model.SetNodeNetDelay(t.tunMgr.redis, t.opts.Id, delay)
-		t.netDelays = make([]uint64, 0, netDelayCount)
-	}
+	// t.netDelays = append(t.netDelays, uint64(rtt.Milliseconds()))
+	// if len(t.netDelays) >= netDelayCount {
+	// 	var delays = uint64(0)
+	// 	for _, delay := range t.netDelays {
+	// 		delays += delay
+	// 	}
+	// 	delay := delays / uint64(len(t.netDelays))
+	// 	model.SetNodeNetDelay(t.tunMgr.redis, t.opts.Id, delay)
+	// 	t.netDelays = make([]uint64, 0, netDelayCount)
+	// }
 
 	t.waitPong = 0
 }

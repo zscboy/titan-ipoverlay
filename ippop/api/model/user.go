@@ -159,3 +159,29 @@ func ListUserWithNames(ctx context.Context, redis *redis.Redis, userNames []stri
 func GetUserLen(redis *redis.Redis) (int, error) {
 	return redis.Zcard(redisKeyUserZset)
 }
+
+func AddUserTotalTraffic(redis *redis.Redis, userName string, traffic int) error {
+	key := fmt.Sprintf(redisKeyUser, userName)
+	_, err := redis.Hincrby(key, "current_traffic", traffic)
+	return err
+}
+
+func AddUsersTotalTraffic(ctx context.Context, redis *redis.Redis, users map[string]int64) error {
+	pipe, err := redis.TxPipeline()
+	if err != nil {
+		return err
+	}
+
+	for userName, traffic := range users {
+		if traffic <= 0 {
+			continue
+		}
+
+		key := fmt.Sprintf(redisKeyUser, userName)
+		pipe.HIncrBy(ctx, key, "current_traffic", traffic)
+
+	}
+
+	_, err = pipe.Exec(ctx)
+	return err
+}

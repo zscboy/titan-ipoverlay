@@ -310,7 +310,7 @@ func (tm *TunnelManager) HandleSocks5UDP(udpConn socks5.UDPConn, udpInfo *socks5
 
 func (tm *TunnelManager) HandleUserAuth(userName, password string) error {
 	logx.Debugf("HandleUserAuth userName %s password %s", userName, password)
-	user, err := model.GetUser(tm.redis, userName)
+	user, err := tm.getUserFromCache(userName)
 	if err != nil {
 		return fmt.Errorf("get user from redis error %v", err)
 	}
@@ -382,23 +382,14 @@ func (tm *TunnelManager) startUserTrafficTimer() {
 	for {
 		<-ticker.C
 		trafficMap := tm.userTraffic.snapshotAndClear()
-		for userName, traffic := range trafficMap {
-			if traffic > 0 {
-				user, err := model.GetUser(tm.redis, userName)
-				if err != nil {
-					logx.Errorf("get user %v", err)
-					continue
-				}
-
-				if user == nil {
-					logx.Errorf("user %s not exist", userName)
-					continue
-				}
-
-				user.CurrentTraffic += traffic
-				model.SaveUser(tm.redis, user)
-			}
+		if err := model.AddUsersDayTraffic(context.TODO(), tm.redis, trafficMap); err != nil {
+			logx.Errorf("AddUsersDayTraffic failed:%v", err)
 		}
+
+		if err := model.AddUsersTotalTraffic(context.TODO(), tm.redis, trafficMap); err != nil {
+			logx.Errorf("AddUsersTotalTraffic failed:%v", err)
+		}
+
 	}
 }
 

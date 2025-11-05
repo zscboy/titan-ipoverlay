@@ -3,6 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net/http"
+	_ "net/http/pprof"
 	api "titan-ipoverlay/ippop/api/export"
 	"titan-ipoverlay/ippop/config"
 	"titan-ipoverlay/ippop/httpproxy"
@@ -16,6 +18,16 @@ import (
 
 var configFile = flag.String("f", "etc/server.yaml", "the config file")
 
+func initPprof() {
+	go func() {
+		addr := "0.0.0.0:6060" // 监听所有网卡
+		logx.Info("pprof listening on ", addr)
+		if err := http.ListenAndServe(addr, nil); err != nil {
+			logx.Error(err)
+		}
+	}()
+}
+
 func main() {
 	flag.Parse()
 
@@ -23,6 +35,10 @@ func main() {
 	conf.MustLoad(*configFile, &c)
 
 	logx.MustSetup(c.Log)
+
+	if c.Pprof {
+		initPprof()
+	}
 	// Override Redis and APIServer
 	c.RPCServer.Redis = redis.RedisKeyConf{RedisConf: c.Redis}
 	c.RPCServer.APIServer = fmt.Sprintf("localhost:%d", c.APIServer.Port)
