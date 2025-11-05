@@ -18,11 +18,10 @@ import (
 
 var configFile = flag.String("f", "etc/server.yaml", "the config file")
 
-func initPprof() {
+func initPprof(listenAddr string) {
 	go func() {
-		addr := "0.0.0.0:6060" // 监听所有网卡
-		logx.Info("pprof listening on ", addr)
-		if err := http.ListenAndServe(addr, nil); err != nil {
+		logx.Info("pprof listening on ", listenAddr)
+		if err := http.ListenAndServe(listenAddr, nil); err != nil {
 			logx.Error(err)
 		}
 	}()
@@ -36,8 +35,8 @@ func main() {
 
 	logx.MustSetup(c.Log)
 
-	if c.Pprof {
-		initPprof()
+	if c.Pprof.Enable {
+		initPprof(c.Pprof.ListenAddr)
 	}
 	// Override Redis and APIServer
 	c.RPCServer.Redis = redis.RedisKeyConf{RedisConf: c.Redis}
