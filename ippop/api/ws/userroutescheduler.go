@@ -93,6 +93,10 @@ func (scheduler *UserRouteScheduler) listUser() ([]*model.User, error) {
 			return nil, err
 		}
 
+		if len(userNames) <= 0 {
+			break
+		}
+
 		us, err := model.ListUserWithNames(context.Background(), scheduler.tm.redis, userNames)
 		if err != nil {
 			return nil, err

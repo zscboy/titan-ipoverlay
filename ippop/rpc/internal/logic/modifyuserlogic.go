@@ -34,7 +34,7 @@ func (l *ModifyUserLogic) ModifyUser(in *pb.ModifyUserReq) (*pb.UserOperationRes
 		return nil, fmt.Errorf("route not allow")
 	}
 
-	if err := checkRoute(l.svcCtx.Redis, in.Route); err != nil {
+	if err := checkRoute(l.ctx, l.svcCtx.Redis, in.Route); err != nil {
 		return nil, err
 	}
 

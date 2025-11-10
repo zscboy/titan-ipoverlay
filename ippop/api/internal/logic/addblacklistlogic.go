@@ -26,7 +26,7 @@ func NewAddBlackListLogic(ctx context.Context, svcCtx *svc.ServiceContext) *AddB
 }
 
 func (l *AddBlackListLogic) AddBlackList(req *types.AddBlackListReq) error {
-	node, err := model.GetNode(l.svcCtx.Redis, req.NodeID)
+	node, err := model.GetNode(l.ctx, l.svcCtx.Redis, req.NodeID)
 	if err != nil {
 		return err
 	}

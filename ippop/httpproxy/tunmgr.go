@@ -49,19 +49,19 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, node *model.Node)
 	tm.tunnels.Store(node.Id, tun)
 	defer tm.tunnels.Delete(node.Id)
 
-	if err := model.SetNodeAndZadd(context.Background(), tm.redis, node); err != nil {
+	if err := model.HandleNodeOnline(context.Background(), tm.redis, node); err != nil {
 		logx.Errorf("SetNode failed:%s", err.Error())
 		return
 	}
 
-	if err := model.SetNodeOnline(tm.redis, node.Id); err != nil {
-		logx.Errorf("SetNodeOnline failed:%s", err.Error())
-		return
-	}
+	// if err := model.SetNodeOnline(tm.redis, node.Id); err != nil {
+	// 	logx.Errorf("SetNodeOnline failed:%s", err.Error())
+	// 	return
+	// }
 
-	if len(node.BindUser) == 0 {
-		model.AddFreeNode(tm.redis, node.Id)
-	}
+	// if len(node.BindUser) == 0 {
+	// 	model.AddFreeNode(tm.redis, node.Id)
+	// }
 
 	defer model.SetNodeOffline(tm.redis, node.Id)
 

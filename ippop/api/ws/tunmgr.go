@@ -24,9 +24,10 @@ import (
 const (
 	userCacheSize = 512
 	// 30 seconds
-	keepaliveInterval       = 30
-	userTrafficSaveInterval = 300
-	onlineTableExpireTime   = 6 * keepaliveInterval
+	keepaliveInterval        = 30
+	userTrafficSaveInterval  = 300
+	setOnlineTableExpireTick = 90
+	onlineTableExpireTime    = 2 * setOnlineTableExpireTick
 	// userCacheExpire = 60
 )
 
@@ -42,7 +43,7 @@ type TunnelManager struct {
 }
 
 func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
-	if err := model.DeleteNodeOnlineData(redis); err != nil {
+	if err := model.DeleteNodeOnlineData(context.TODO(), redis); err != nil {
 		panic(err)
 	}
 
@@ -73,7 +74,7 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *types.NodeWS
 
 	logx.Debugf("TunnelManager.acceptWebsocket node id %s", req.NodeId)
 
-	node, err := model.GetNode(tm.redis, req.NodeId)
+	node, err := model.GetNode(context.TODO(), tm.redis, req.NodeId)
 	if err != nil {
 		logx.Errorf("TunnelManager.acceptWebsocket, get node %s", err.Error())
 		return
@@ -103,18 +104,9 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *types.NodeWS
 	tm.tunnels.Store(node.Id, tun)
 	defer tm.tunnels.Delete(node.Id)
 
-	if err := model.SetNodeAndZadd(context.Background(), tm.redis, node); err != nil {
-		logx.Errorf("SetNode failed:%s", err.Error())
+	if err := model.HandleNodeOnline(context.Background(), tm.redis, node); err != nil {
+		logx.Errorf("HandleNodeOnline:%s", err.Error())
 		return
-	}
-
-	if err := model.SetNodeOnline(tm.redis, node.Id); err != nil {
-		logx.Errorf("SetNodeOnline failed:%s", err.Error())
-		return
-	}
-
-	if len(node.BindUser) == 0 && !node.IsBlacklisted {
-		model.AddFreeNode(tm.redis, node.Id)
 	}
 
 	defer tm.handleNodeOffline(node.Id)
@@ -127,7 +119,7 @@ func (tm *TunnelManager) handleNodeOffline(nodeID string) {
 		logx.Errorf("handleNodeOffline SetNodeOffline %v", err)
 	}
 
-	node, err := model.GetNode(tm.redis, nodeID)
+	node, err := model.GetNode(context.TODO(), tm.redis, nodeID)
 	if err != nil {
 		logx.Errorf("handleNodeOffline GetNode %v", err)
 		return
@@ -366,12 +358,12 @@ func (tm *TunnelManager) keepalive() {
 }
 
 func (tm *TunnelManager) setNodeOnlineDataExpire() {
-	ticker := time.NewTicker(keepaliveInterval * time.Second)
+	ticker := time.NewTicker(setOnlineTableExpireTick * time.Second)
 	defer ticker.Stop()
 
 	for {
 		<-ticker.C
-		model.SetNodeOnlineDataExpire(tm.redis, onlineTableExpireTime)
+		model.SetNodeOnlineDataExpire(context.TODO(), tm.redis, onlineTableExpireTime)
 	}
 }
 

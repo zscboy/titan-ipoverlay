@@ -29,7 +29,7 @@ func BindNodeWithNewUser(ctx context.Context, redis *redis.Redis, nodeID string,
 		}
 	}()
 
-	node, err := GetNode(redis, nodeID)
+	node, err := GetNode(ctx, redis, nodeID)
 	if err != nil {
 		return err
 	}
@@ -78,7 +78,7 @@ func BindNodeWithNewUser(ctx context.Context, redis *redis.Redis, nodeID string,
 }
 
 func UnbindNode(ctx context.Context, redis *redis.Redis, nodeID string) error {
-	node, err := GetNode(redis, nodeID)
+	node, err := GetNode(ctx, redis, nodeID)
 	if err != nil {
 		return err
 	}
@@ -119,7 +119,7 @@ func UnbindNode(ctx context.Context, redis *redis.Redis, nodeID string) error {
 // if return err, need to add toNodeID to free node
 func SwitchNodeByUser(ctx context.Context, redis *redis.Redis, user *User, toNodeID string) error {
 	fromNodeID := user.RouteNodeID
-	fromNode, err := GetNode(redis, fromNodeID)
+	fromNode, err := GetNode(ctx, redis, fromNodeID)
 	if err != nil {
 		return err
 	}
@@ -128,7 +128,7 @@ func SwitchNodeByUser(ctx context.Context, redis *redis.Redis, user *User, toNod
 		return fmt.Errorf("node %s not exist", fromNodeID)
 	}
 
-	toNode, err := GetNode(redis, toNodeID)
+	toNode, err := GetNode(ctx, redis, toNodeID)
 	if err != nil {
 		return err
 	}

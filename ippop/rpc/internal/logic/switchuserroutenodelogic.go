@@ -63,7 +63,7 @@ func (l *SwitchUserRouteNodeLogic) SwitchUserRouteNode(in *pb.SwitchUserRouteNod
 }
 
 func (l *SwitchUserRouteNodeLogic) checkNode(nodeID string) error {
-	node, err := model.GetNode(l.svcCtx.Redis, nodeID)
+	node, err := model.GetNode(l.ctx, l.svcCtx.Redis, nodeID)
 	if err != nil {
 		return err
 	}

@@ -17,7 +17,7 @@ func RemoveUserFromSchedulerList(redis *redis.Redis, userName string) error {
 }
 
 func ListUserFromSchedulerList(redis *redis.Redis, start, end int) ([]string, error) {
-	userNames, err := redis.Zrevrange(redisKeyUserRouteScheduler, int64(start), int64(end))
+	userNames, err := redis.Zrange(redisKeyUserRouteScheduler, int64(start), int64(end))
 	if err != nil {
 		return nil, err
 	}

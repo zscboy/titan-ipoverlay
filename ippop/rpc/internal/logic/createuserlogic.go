@@ -44,7 +44,7 @@ func (l *CreateUserLogic) CreateUser(in *pb.CreateUserReq) (*pb.CreateUserResp, 
 	}
 
 	if in.Route != nil {
-		if err := checkRoute(l.svcCtx.Redis, in.Route); err != nil {
+		if err := checkRoute(l.ctx, l.svcCtx.Redis, in.Route); err != nil {
 			return nil, err
 		}
 	}
@@ -82,7 +82,7 @@ func (l *CreateUserLogic) CreateUser(in *pb.CreateUserReq) (*pb.CreateUserResp, 
 		return nil, fmt.Errorf("no enough node for user")
 	}
 
-	node, err := model.GetNode(l.svcCtx.Redis, route.NodeId)
+	node, err := model.GetNode(l.ctx, l.svcCtx.Redis, route.NodeId)
 	if err != nil {
 		return nil, err
 	}

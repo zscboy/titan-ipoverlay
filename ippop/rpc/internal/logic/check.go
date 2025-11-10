@@ -1,6 +1,7 @@
 package logic
 
 import (
+	"context"
 	"fmt"
 	"time"
 	"titan-ipoverlay/ippop/api/model"
@@ -16,7 +17,7 @@ const (
 	routeModeTypeTimed
 )
 
-func checkRoute(redis *redis.Redis, route *pb.Route) error {
+func checkRoute(ctx context.Context, redis *redis.Redis, route *pb.Route) error {
 	if route == nil {
 		return fmt.Errorf("route is empty")
 	}
@@ -26,7 +27,7 @@ func checkRoute(redis *redis.Redis, route *pb.Route) error {
 
 	// check node if exist or used by other user
 	if len(route.NodeId) != 0 {
-		node, err := model.GetNode(redis, route.NodeId)
+		node, err := model.GetNode(ctx, redis, route.NodeId)
 		if err != nil {
 			return err
 		}

@@ -1,6 +1,7 @@
 package httpproxy
 
 import (
+	"context"
 	"net/http"
 	"time"
 	"titan-ipoverlay/ippop/api/model"
@@ -50,7 +51,7 @@ func (ws *BrowserWS) ServeWS(w http.ResponseWriter, r *http.Request) error {
 
 	logx.Infof("WebWS.ServeWS %s, ip: %s", r.URL.Path, ip)
 
-	node, err := model.GetNode(ws.tunMgr.redis, req.NodeId)
+	node, err := model.GetNode(context.TODO(), ws.tunMgr.redis, req.NodeId)
 	if err != nil {
 		logx.Errorf("ServeWS, get node %s", err.Error())
 		return err

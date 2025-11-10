@@ -26,7 +26,7 @@ type Node struct {
 	IsBlacklisted bool
 }
 
-func SetNodeAndZadd(ctx context.Context, redis *redis.Redis, node *Node) error {
+func HandleNodeOnline(ctx context.Context, redis *redis.Redis, node *Node) error {
 	hashKey := fmt.Sprintf(redisKeyNode, node.Id)
 	m, err := structToMap(node)
 	if err != nil {
@@ -45,6 +45,11 @@ func SetNodeAndZadd(ctx context.Context, redis *redis.Redis, node *Node) error {
 
 	pipe.HMSet(ctx, hashKey, m)
 	pipe.ZAdd(ctx, redisKeyNodeZset, goredis.Z{Score: float64(t.Unix()), Member: node.Id})
+	pipe.SAdd(ctx, redisKeyNodeOnline, node.Id)
+
+	if len(node.BindUser) == 0 && !node.IsBlacklisted {
+		pipe.ZAdd(ctx, redisKeyNodeFree, goredis.Z{Score: float64(time.Now().Unix()), Member: node.Id})
+	}
 
 	_, err = pipe.Exec(ctx)
 	if err != nil {
@@ -55,7 +60,7 @@ func SetNodeAndZadd(ctx context.Context, redis *redis.Redis, node *Node) error {
 }
 
 func SetNodeNetDelay(redis *redis.Redis, nodeID string, delay uint64) error {
-	node, _ := GetNode(redis, nodeID)
+	node, _ := GetNode(context.TODO(), redis, nodeID)
 	if node == nil {
 		return fmt.Errorf("SetNodeNetDelay node %s not exist", nodeID)
 	}
@@ -64,49 +69,42 @@ func SetNodeNetDelay(redis *redis.Redis, nodeID string, delay uint64) error {
 	return redis.Hset(key, "net_delay", fmt.Sprintf("%d", delay))
 }
 
-func SaveNode(redis *redis.Redis, node *Node) error {
-	key := fmt.Sprintf(redisKeyNode, node.Id)
-	m, err := structToMap(node)
-	if err != nil {
-		return err
-	}
-
-	logx.Infof("m:%v", m)
-	return redis.Hmset(key, m)
-}
-
 // GetNode if node not exist, return nil
 // need to check node if nil
-func GetNode(redis *redis.Redis, id string) (*Node, error) {
+func GetNode(ctx context.Context, redis *redis.Redis, id string) (*Node, error) {
 	key := fmt.Sprintf(redisKeyNode, id)
-	m, err := redis.Hgetall(key)
+
+	pipe, err := redis.TxPipeline()
 	if err != nil {
 		return nil, err
 	}
 
+	hgetallCmd := pipe.HGetAll(ctx, key)
+	onlineCmd := pipe.SIsMember(ctx, redisKeyNodeOnline, id)
+	blacklistCmd := pipe.SIsMember(ctx, redisKeyNodeBlacklist, id)
+
+	_, err = pipe.Exec(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	m, err := hgetallCmd.Result()
+	if err != nil {
+		return nil, err
+	}
 	if len(m) == 0 {
 		return nil, nil
 	}
 
 	node := &Node{}
-	err = mapToStruct(m, node)
-	if err != nil {
-		return nil, err
-	}
-
-	online, err := isNodeOnline(redis, id)
-	if err != nil {
-		return nil, err
-	}
-
-	isBlacklisted, err := IsBlacklisted(redis, id)
-	if err != nil {
+	if err := mapToStruct(m, node); err != nil {
 		return nil, err
 	}
 
 	node.Id = id
-	node.Online = online
-	node.IsBlacklisted = isBlacklisted
+	node.Online, _ = onlineCmd.Result()
+	node.IsBlacklisted, _ = blacklistCmd.Result()
+
 	return node, nil
 }
 
@@ -190,21 +188,9 @@ func GetbindNodeLen(redis *redis.Redis) (int, error) {
 	return redis.Zcard(redisKeyNodeBind)
 }
 
-func SetNodeOnline(redis *redis.Redis, nodeId string) error {
-	if _, err := redis.Sadd(redisKeyNodeOnline, nodeId); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func SetNodeOffline(redis *redis.Redis, nodeId string) error {
 	_, err := redis.Srem(redisKeyNodeOnline, nodeId)
 	return err
-}
-
-func isNodeOnline(redis *redis.Redis, nodeId string) (bool, error) {
-	return redis.Sismember(redisKeyNodeOnline, nodeId)
 }
 
 func getNodesOnlineStatus(ctx context.Context, redis *redis.Redis, nodeIds []string) (map[string]bool, error) {
@@ -261,24 +247,28 @@ func getNodesBlacklistStatus(ctx context.Context, redis *redis.Redis, nodeIds []
 	return blacklistStatus, nil
 }
 
-func DeleteNodeOnlineData(redis *redis.Redis) error {
-	_, err := redis.Del(redisKeyNodeOnline)
+func DeleteNodeOnlineData(ctx context.Context, redis *redis.Redis) error {
+	pipe, err := redis.TxPipeline()
 	if err != nil {
 		return err
 	}
 
-	_, err = redis.Del(redisKeyNodeFree)
+	pipe.Del(ctx, redisKeyNodeOnline)
+	pipe.Del(ctx, redisKeyNodeFree)
+
+	_, err = pipe.Exec(ctx)
 	return err
 }
 
-func SetNodeOnlineDataExpire(redis *redis.Redis, seconds int) error {
-	if err := redis.Expire(redisKeyNodeOnline, seconds); err != nil {
+func SetNodeOnlineDataExpire(ctx context.Context, redis *redis.Redis, seconds int) error {
+	pipe, err := redis.TxPipeline()
+	if err != nil {
 		return err
 	}
 
-	if err := redis.Expire(redisKeyNodeFree, seconds); err != nil {
-		return err
-	}
+	pipe.Expire(ctx, redisKeyNodeOnline, time.Second*time.Duration(seconds))
+	pipe.Expire(ctx, redisKeyNodeFree, time.Second*time.Duration(seconds))
 
-	return nil
+	_, err = pipe.Exec(ctx)
+	return err
 }

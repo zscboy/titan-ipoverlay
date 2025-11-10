@@ -35,7 +35,7 @@ func (l *GetUserLogic) GetUser(in *pb.GetUserReq) (*pb.User, error) {
 		return nil, fmt.Errorf("user %s not exist", in.UserName)
 	}
 
-	node, err := model.GetNode(l.svcCtx.Redis, user.RouteNodeID)
+	node, err := model.GetNode(l.ctx, l.svcCtx.Redis, user.RouteNodeID)
 	if err != nil {
 		return nil, err
 	}
