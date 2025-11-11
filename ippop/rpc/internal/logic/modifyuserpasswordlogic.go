@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"titan-ipoverlay/ippop/api/model"
+	"titan-ipoverlay/ippop/model"
 	"titan-ipoverlay/ippop/rpc/internal/svc"
 	"titan-ipoverlay/ippop/rpc/pb"
 
@@ -47,9 +47,7 @@ func (l *ModifyUserPasswordLogic) ModifyUserPassword(in *pb.ModifyUserPasswordRe
 		return &pb.UserOperationResp{ErrMsg: err.Error()}, nil
 	}
 
-	deleteUserCacheLogic := NewDeleteUserCache(l.ctx, l.svcCtx)
-	if err := deleteUserCacheLogic.DeleteUserCache(in.UserName); err != nil {
-
+	if err := l.svcCtx.DeleteCache(in.UserName); err != nil {
 		return &pb.UserOperationResp{ErrMsg: err.Error()}, nil
 	}
 

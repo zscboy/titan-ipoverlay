@@ -20,8 +20,11 @@ import (
 
 type RPCServerConfig config.Config
 
-func NewRPCServer(c RPCServerConfig) *zrpc.RpcServer {
+func NewRPCServer(c RPCServerConfig, nodeManager svc.NodeManager, userManger svc.UserManager, endpointProvider svc.EndpointProvider) *zrpc.RpcServer {
 	ctx := svc.NewServiceContext(config.Config(c))
+	ctx.NodeManager = nodeManager
+	ctx.UserManager = userManger
+	ctx.EndpointProvider = endpointProvider
 
 	whitelist := make(map[string]bool)
 	for _, ip := range c.Whitelist {

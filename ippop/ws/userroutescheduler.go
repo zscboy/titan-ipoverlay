@@ -3,7 +3,7 @@ package ws
 import (
 	"context"
 	"time"
-	"titan-ipoverlay/ippop/api/model"
+	"titan-ipoverlay/ippop/model"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )

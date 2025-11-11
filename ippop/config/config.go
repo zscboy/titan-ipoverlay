@@ -1,21 +1,47 @@
 package config
 
 import (
-	api "titan-ipoverlay/ippop/api/export"
 	rpc "titan-ipoverlay/ippop/rpc/export"
 
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/stores/redis"
+	"github.com/zeromicro/go-zero/rest"
 )
 
-type Config struct {
-	APIServer api.APIServerConfig
-	RPCServer rpc.RPCServerConfig
-	Redis     redis.RedisConf
-	Log       logx.LogConf
-	HTTPProxy string `json:",optional"`
-	Pprof     Pprof  `json:",optional"`
-	// TLSKeyPair TLSKeyPair
+type JwtAuth struct {
+	AccessSecret string
+	AccessExpire int64
+}
+
+type Socks5 struct {
+	Addr         string
+	ServerIP     string
+	UDPPortStart int
+	UDPPortEnd   int
+	EnableAuth   bool
+	TCPTimeout   int64
+	UDPTimeout   int64
+}
+
+type WS struct {
+	rest.RestConf
+	TCPTimeout int64
+	UDPTimeout int64
+}
+
+type FilterRule struct {
+	//lint:ignore SA5008 go-zero allows "options" in struct tags
+	Type  string `json:"type,options=domain|ip|port"`
+	Value string `json:"value"`
+	//lint:ignore SA5008 go-zero allows "options" in struct tags
+	Action string `json:"action,options=allow|deny"`
+}
+
+type FilterRules struct {
+	//lint:ignore SA5008 go-zero allows "optional" in struct tags
+	Rules []FilterRule `json:",optional"`
+	//lint:ignore SA5008 go-zero allows "default" in struct tags
+	DefaultAction string `json:",default=allow"`
 }
 
 type Pprof struct {
@@ -23,7 +49,20 @@ type Pprof struct {
 	ListenAddr string
 }
 
-type TLSKeyPair struct {
-	Cert string
-	Key  string
+type Config struct {
+	// APIServer api.APIServerConfig
+	WS        WS
+	RPCServer rpc.RPCServerConfig
+	Redis     redis.RedisConf
+	Log       logx.LogConf
+	//lint:ignore SA5008 go-zero allows "optional" in struct tags
+	HTTPProxy string `json:",optional"`
+	//lint:ignore SA5008 go-zero allows "optional" in struct tags
+	Pprof Pprof `json:",optional"`
+
+	JwtAuth JwtAuth
+	Socks5  Socks5
+	// Domain      string `json:",optional"`
+	FilterRules FilterRules
+	// TLSKeyPair TLSKeyPair
 }

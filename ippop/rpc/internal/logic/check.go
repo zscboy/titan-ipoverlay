@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"time"
-	"titan-ipoverlay/ippop/api/model"
+	"titan-ipoverlay/ippop/model"
 	"titan-ipoverlay/ippop/rpc/pb"
 
 	"github.com/zeromicro/go-zero/core/stores/redis"
@@ -58,11 +58,11 @@ func checkTraffic(trafficLimit *pb.TrafficLimit) error {
 	}
 
 	if trafficLimit.EndTime < time.Now().Unix() {
-		return fmt.Errorf("traffic end time is out of date", trafficLimit.EndTime)
+		return fmt.Errorf("traffic end time %d is out of date", trafficLimit.EndTime)
 	}
 
 	if trafficLimit.TotalTraffic <= 0 {
-		return fmt.Errorf("invalid total traffic ", trafficLimit.TotalTraffic)
+		return fmt.Errorf("invalid total traffic %d", trafficLimit.TotalTraffic)
 	}
 
 	return nil

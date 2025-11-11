@@ -1,13 +1,10 @@
 package logic
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 
+	"titan-ipoverlay/ippop/model"
 	"titan-ipoverlay/ippop/rpc/internal/svc"
 	"titan-ipoverlay/ippop/rpc/pb"
 
@@ -28,40 +25,29 @@ func NewAddBlacklistLogic(ctx context.Context, svcCtx *svc.ServiceContext) *AddB
 	}
 }
 
-func (l *AddBlacklistLogic) AddBlacklist(in *pb.AddBlacklistReq) (*pb.UserOperationResp, error) {
-	return l.addBlacklist(in.NodeId)
-}
-
-func (l *AddBlacklistLogic) addBlacklist(nodeId string) (*pb.UserOperationResp, error) {
-	url := fmt.Sprintf("http://%s/node/blacklist/add", l.svcCtx.Config.APIServer)
-
-	addBlacklistReq := struct {
-		NodeID string `json:"node_id"`
-	}{
-		NodeID: nodeId,
-	}
-
-	jsonData, err := json.Marshal(addBlacklistReq)
+func (l *AddBlacklistLogic) AddBlacklist(req *pb.AddBlacklistReq) (*pb.UserOperationResp, error) {
+	node, err := model.GetNode(l.ctx, l.svcCtx.Redis, req.NodeId)
 	if err != nil {
 		return &pb.UserOperationResp{ErrMsg: err.Error()}, nil
 	}
 
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
-	if err != nil {
+	if node == nil {
+		return &pb.UserOperationResp{ErrMsg: fmt.Sprintf("node %s not exist", req.NodeId)}, nil
+	}
+
+	if len(node.BindUser) != 0 {
+		if err := l.svcCtx.SwitchNode(node.BindUser); err != nil {
+			return &pb.UserOperationResp{ErrMsg: fmt.Sprintf("node %s already bind by user %s, switch new node for user failed:%v", req.NodeId, node.BindUser, err)}, nil
+		}
+	}
+
+	if err := model.AddBlacklist(l.svcCtx.Redis, req.NodeId); err != nil {
 		return &pb.UserOperationResp{ErrMsg: err.Error()}, nil
 	}
-	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	err = l.svcCtx.Kick(req.NodeId)
 	if err != nil {
-		return &pb.UserOperationResp{ErrMsg: err.Error()}, nil
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		buf, _ := io.ReadAll(resp.Body)
-		return &pb.UserOperationResp{ErrMsg: fmt.Sprintf("status code %d, error:%s", resp.StatusCode, string(buf))}, nil
+		logx.Infof("AddBlackListLogic.AddBlackList: %s", err.Error())
 	}
 
 	return &pb.UserOperationResp{Success: true}, nil

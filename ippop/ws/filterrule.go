@@ -2,7 +2,7 @@ package ws
 
 import (
 	"fmt"
-	"titan-ipoverlay/ippop/api/internal/config"
+	"titan-ipoverlay/ippop/config"
 )
 
 const (

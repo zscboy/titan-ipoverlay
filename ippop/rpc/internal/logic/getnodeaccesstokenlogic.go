@@ -2,14 +2,12 @@ package logic
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
+	"time"
 
 	"titan-ipoverlay/ippop/rpc/internal/svc"
 	"titan-ipoverlay/ippop/rpc/pb"
 
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
@@ -28,36 +26,26 @@ func NewGetNodeAccessTokenLogic(ctx context.Context, svcCtx *svc.ServiceContext)
 }
 
 func (l *GetNodeAccessTokenLogic) GetNodeAccessToken(in *pb.GetNodeAccessTokenReq) (*pb.GetNodeAccessTokenResp, error) {
-	return l.getNodeAccessToken(in.NodeId)
+	secret, expire, err := l.svcCtx.GetAuth()
+	if err != nil {
+		return nil, err
+	}
+
+	return l.generateJwtToken(secret, expire, in.NodeId)
 }
 
-func (l *GetNodeAccessTokenLogic) getNodeAccessToken(nodeId string) (*pb.GetNodeAccessTokenResp, error) {
-	url := fmt.Sprintf("http://%s/node/access/token?nodeid=%s", l.svcCtx.Config.APIServer, nodeId)
-
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		buf, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("status code %d, error:%s", resp.StatusCode, string(buf))
+func (l *GetNodeAccessTokenLogic) generateJwtToken(secret string, expire int64, nodeId string) (*pb.GetNodeAccessTokenResp, error) {
+	claims := jwt.MapClaims{
+		"user": nodeId,
+		"exp":  time.Now().Add(time.Second * time.Duration(expire)).Unix(),
+		"iat":  time.Now().Unix(),
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenStr, err := token.SignedString([]byte(secret))
 	if err != nil {
 		return nil, err
 	}
 
-	accessTokenResp := struct {
-		Token string `json:"token"`
-	}{}
-
-	err = json.Unmarshal(body, &accessTokenResp)
-	if err != nil {
-		return nil, err
-	}
-
-	return &pb.GetNodeAccessTokenResp{Token: accessTokenResp.Token}, nil
+	return &pb.GetNodeAccessTokenResp{Token: tokenStr}, nil
 }

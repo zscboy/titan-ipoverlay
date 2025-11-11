@@ -6,9 +6,27 @@ import (
 	"github.com/zeromicro/go-zero/core/stores/redis"
 )
 
+type NodeManager interface {
+	Kick(nodeID string) error
+}
+
+type UserManager interface {
+	SwitchNode(userName string) error
+	DeleteCache(userName string) error
+}
+
+type EndpointProvider interface {
+	GetAuth() (secret string, expire int64, err error)
+	GetWSURL() (string, error)
+	GetSocks5Addr() (string, error)
+}
+
 type ServiceContext struct {
 	Config config.Config
 	Redis  *redis.Redis
+	NodeManager
+	UserManager
+	EndpointProvider
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {

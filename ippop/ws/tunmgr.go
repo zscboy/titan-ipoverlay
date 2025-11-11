@@ -9,10 +9,9 @@ import (
 	"net"
 	"sync"
 	"time"
-	"titan-ipoverlay/ippop/api/internal/config"
-	"titan-ipoverlay/ippop/api/internal/types"
-	"titan-ipoverlay/ippop/api/model"
-	"titan-ipoverlay/ippop/api/socks5"
+	"titan-ipoverlay/ippop/config"
+	"titan-ipoverlay/ippop/model"
+	"titan-ipoverlay/ippop/socks5"
 
 	"github.com/bluele/gcache"
 	"github.com/gorilla/websocket"
@@ -28,12 +27,10 @@ const (
 	userTrafficSaveInterval  = 300
 	setOnlineTableExpireTick = 90
 	onlineTableExpireTime    = 2 * setOnlineTableExpireTick
-	// userCacheExpire = 60
 )
 
 type TunnelManager struct {
-	tunnels sync.Map
-	// svcCtx  *svc.ServiceContext
+	tunnels     sync.Map
 	redis       *redis.Redis
 	config      config.Config
 	userTraffic *userTraffic
@@ -65,7 +62,7 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 	return tm
 }
 
-func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *types.NodeWSReq, nodeIP string) {
+func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, nodeIP string) {
 	v, ok := tm.tunnels.Load(req.NodeId)
 	if ok {
 		oldTun := v.(*Tunnel)
@@ -256,10 +253,7 @@ func (tm *TunnelManager) getTunnelByUser(userName string) (*Tunnel, error) {
 		}
 	}
 
-	// logx.Debugf("user download rate limit:%d, upload rate limit:%d, raadLimiter:%f", user.DownloadRateLimit, user.UploadRateLimit, tun.readLimiter.Limit())
-
 	return tun, nil
-
 }
 
 func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks5.SocksTargetInfo) error {
@@ -395,4 +389,42 @@ func (tm *TunnelManager) getTunnel(id string) *Tunnel {
 
 func (tm *TunnelManager) traffic(userName string, traffic int64) {
 	tm.userTraffic.add(userName, traffic)
+}
+
+// implement interface for rpc server
+func (tm *TunnelManager) Kick(nodeID string) error {
+	return tm.KickNode(nodeID)
+}
+func (tm *TunnelManager) SwitchNode(userName string) error {
+	user, err := model.GetUser(tm.redis, userName)
+	if err != nil {
+		return err
+	}
+
+	if user == nil {
+		return fmt.Errorf("handleNodeOffline, user not exist", userName)
+	}
+
+	return tm.switchNodeForUser(user)
+}
+
+func (tm *TunnelManager) DeleteCache(userName string) error {
+	tm.DeleteUserFromCache(userName)
+	return nil
+}
+
+func (tm *TunnelManager) GetAuth() (secret string, expire int64, err error) {
+	return tm.config.JwtAuth.AccessSecret, tm.config.JwtAuth.AccessExpire, nil
+}
+func (tm *TunnelManager) GetWSURL() (string, error) {
+	domain := tm.config.Socks5.ServerIP
+	return fmt.Sprintf("ws://%s:%d/ws/node", domain, tm.config.WS.Port), nil
+}
+func (tm *TunnelManager) GetSocks5Addr() (string, error) {
+	_, port, err := net.SplitHostPort(tm.config.Socks5.Addr)
+	if err != nil {
+		return "", err
+	}
+	socks5Addr := fmt.Sprintf("%s:%s", tm.config.Socks5.ServerIP, port)
+	return socks5Addr, nil
 }

@@ -3,8 +3,8 @@ package ws
 import (
 	"net"
 	"time"
-	"titan-ipoverlay/ippop/api/socks5"
-	"titan-ipoverlay/ippop/api/ws/pb"
+	"titan-ipoverlay/ippop/socks5"
+	"titan-ipoverlay/ippop/ws/pb"
 
 	"github.com/zeromicro/go-zero/core/logx"
 	"google.golang.org/protobuf/proto"

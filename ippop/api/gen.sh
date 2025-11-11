@@ -1,1 +1,0 @@
-goctl api go -api server.api -dir .

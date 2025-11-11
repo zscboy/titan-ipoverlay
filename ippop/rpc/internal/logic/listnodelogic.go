@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"titan-ipoverlay/ippop/api/model"
+	"titan-ipoverlay/ippop/model"
 	"titan-ipoverlay/ippop/rpc/internal/svc"
 	"titan-ipoverlay/ippop/rpc/pb"
 

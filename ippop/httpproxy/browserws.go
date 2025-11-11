@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 	"time"
-	"titan-ipoverlay/ippop/api/model"
+	"titan-ipoverlay/ippop/model"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"

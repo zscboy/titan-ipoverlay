@@ -8,7 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"titan-ipoverlay/ippop/api/model"
+	"titan-ipoverlay/ippop/model"
 
 	"github.com/google/uuid"
 	"github.com/zeromicro/go-zero/core/logx"

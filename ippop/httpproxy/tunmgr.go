@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync"
 	"time"
-	"titan-ipoverlay/ippop/api/model"
+	"titan-ipoverlay/ippop/model"
 
 	"github.com/bluele/gcache"
 	"github.com/gorilla/websocket"
