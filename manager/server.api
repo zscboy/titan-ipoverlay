@@ -206,7 +206,7 @@ service server-api {
 	post /node/blacklist/remove (RemoveBlackListReq) returns (UserOperationResp)
 
 	@handler getBlackList
-	post /node/blacklist/get (GetBlackListReq) returns (GetBlackListResp)
+	get /node/blacklist/get (GetBlackListReq) returns (GetBlackListResp)
 
 	@handler KickNode
 	post /node/kick (KickNodeReq) returns (UserOperationResp)

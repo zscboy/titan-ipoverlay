@@ -148,7 +148,7 @@ func SwitchNodeByUser(ctx context.Context, redis *redis.Redis, user *User, toNod
 		return err
 	}
 
-	logx.Debugf("fromNodekey:%s, fromM:%v", fromNodekey, fromM)
+	// logx.Debugf("fromNodekey:%s, fromM:%v", fromNodekey, fromM)
 
 	toNode.BindUser = user.UserName
 	toNodekey := fmt.Sprintf(redisKeyNode, toNode.Id)
@@ -157,7 +157,7 @@ func SwitchNodeByUser(ctx context.Context, redis *redis.Redis, user *User, toNod
 		return err
 	}
 
-	logx.Debugf("toM:%v", toM)
+	// logx.Debugf("toM:%v", toM)
 
 	user.RouteNodeID = toNode.Id
 	user.LastRouteSwitchTime = time.Now().Unix()
@@ -167,7 +167,7 @@ func SwitchNodeByUser(ctx context.Context, redis *redis.Redis, user *User, toNod
 		return err
 	}
 
-	logx.Debugf("userMap:%v", userMap)
+	// logx.Debugf("userMap:%v", userMap)
 
 	pipe, err := redis.TxPipeline()
 	if err != nil {
