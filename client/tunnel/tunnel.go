@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 	"titan-ipoverlay/client/bootstrap"
-	"titan-ipoverlay/ippop/api/ws/pb"
+	"titan-ipoverlay/ippop/ws/pb"
 
 	"github.com/gorilla/websocket"
 	"github.com/zeromicro/go-zero/core/logx"
