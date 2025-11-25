@@ -25,8 +25,8 @@ type Socks5 struct {
 
 type WS struct {
 	rest.RestConf
-	TCPTimeout int64
-	UDPTimeout int64
+	// TCPTimeout int64
+	// UDPTimeout int64
 }
 
 type FilterRule struct {

@@ -4,7 +4,7 @@ Port: 41004
 Redis:
   Host: 127.0.0.1:6379
 JwtAuth:
-  AccessSecret: ef61299a-53e6-11f0-87d4-e72f7b1c2247
+  AccessSecret: 2566e166-c9b1-11f0-9e3b-cfb420234783
   AccessExpire: 86400
 Log:
   stat: false
@@ -15,9 +15,8 @@ Pops:
     RpcClient:
       Target: localhost:8080
       Timeout: 30000
-    NodeAccessPoints:
-       "China": "ws://127.0.0.1:41005/ws/node"
-       "Default": "ws://127.0.0.1:41005/ws/node"
+    WSURL: "ws://127.0.0.1:41005/ws/node"
+    MaxCount: 7000
 DefaultArea: Korea
 Geo: 
  API: ""
