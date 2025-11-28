@@ -372,13 +372,13 @@ func (socks5Server *Socks5Server) handleSocks5Associate(req *request) error {
 			return err
 		}
 
-		logx.Debugf("Socks5Server.handleSocks5Associate udp server not exist, new: %s", udpServer.conn.LocalAddr().String())
+		logx.Debugf("Socks5Server.handleSocks5Associate udp server not exist for user %s, new: %s", udpServer.conn.LocalAddr().String(), req.user)
 
 		socks5Server.userUDPServers.Store(req.user, udpServer)
 		go udpServer.serve()
 	}
 
-	logx.Debugf("Socks5Server.handleSocks5Associate udp server ip:%s, port:%d", socks5Server.opts.UDPServerIP, udpServer.port)
+	logx.Debugf("Socks5Server.handleSocks5Associate udp server ip:%s, port:%d for user %s", socks5Server.opts.UDPServerIP, udpServer.port, req.user)
 	ip := net.ParseIP(socks5Server.opts.UDPServerIP)
 	if ip == nil {
 		return fmt.Errorf("parse ip %s failed", socks5Server.opts.UDPServerIP)

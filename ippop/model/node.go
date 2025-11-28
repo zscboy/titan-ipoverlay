@@ -17,6 +17,7 @@ const (
 type Node struct {
 	Id            string
 	OS            string `redis:"os"`
+	Version       string `redis:"version"`
 	LoginAt       string `redis:"login_at"`
 	RegisterAt    string `redis:"register_at"`
 	Online        bool

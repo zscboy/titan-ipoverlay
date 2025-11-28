@@ -82,6 +82,7 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, n
 	}
 
 	node.OS = req.OS
+	node.Version = req.Version
 	node.IP = nodeIP
 	node.Online = true
 	node.LoginAt = time.Now().Format(model.TimeLayout)
@@ -96,9 +97,10 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, n
 	}
 
 	tun := newTunnel(conn, tm, opts)
+	tm.tunnels.Store(node.Id, tun)
+
 	defer tun.leaseComplete()
 
-	tm.tunnels.Store(node.Id, tun)
 	defer tm.tunnels.Delete(node.Id)
 
 	if err := model.HandleNodeOnline(context.Background(), tm.redis, node); err != nil {
