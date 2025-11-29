@@ -361,21 +361,9 @@ func (socks5Server *Socks5Server) handleSocks5Associate(req *request) error {
 	socks5Server.userUDPCount.incr(req.user)
 	defer socks5Server.userUDPCount.decr(req.user)
 
-	var udpServer *UDPServer
-	server, ok := socks5Server.userUDPServers.Load(req.user)
-	if ok {
-		udpServer = server.(*UDPServer)
-	} else {
-		var err error
-		udpServer, err = newUDPServer(socks5Server.opts.UDPPortStart, socks5Server.opts.UDPPortEnd, socks5Server, req.user)
-		if err != nil {
-			return err
-		}
-
-		logx.Debugf("Socks5Server.handleSocks5Associate udp server not exist for user %s, new: %s", udpServer.conn.LocalAddr().String(), req.user)
-
-		socks5Server.userUDPServers.Store(req.user, udpServer)
-		go udpServer.serve()
+	udpServer, err := socks5Server.loadOrNewUserUDPServer(req.user)
+	if err != nil {
+		return err
 	}
 
 	logx.Debugf("Socks5Server.handleSocks5Associate udp server ip:%s, port:%d for user %s", socks5Server.opts.UDPServerIP, udpServer.port, req.user)
@@ -391,4 +379,27 @@ func (socks5Server *Socks5Server) handleSocks5Associate(req *request) error {
 
 	io.Copy(io.Discard, req.conn)
 	return nil
+}
+
+func (socks5Server *Socks5Server) loadOrNewUserUDPServer(userName string) (*UDPServer, error) {
+	server, ok := socks5Server.userUDPServers.Load(userName)
+	if ok {
+		return server.(*UDPServer), nil
+	}
+
+	udpServer, err := newUDPServer(socks5Server.opts.UDPPortStart, socks5Server.opts.UDPPortEnd, socks5Server, userName)
+	if err != nil {
+		return nil, err
+	}
+
+	actual, loaded := socks5Server.userUDPServers.LoadOrStore(userName, udpServer)
+	if loaded {
+		udpServer.stop()
+		return actual.(*UDPServer), nil
+	}
+
+	logx.Debugf("Socks5Server.loadOrNewUserUDPServer new udp server ip:%s, port:%d for user %s", socks5Server.opts.UDPServerIP, udpServer.port, userName)
+
+	go udpServer.serve()
+	return udpServer, nil
 }

@@ -61,7 +61,7 @@ func (udp *UDPServer) serve() {
 		udp.handleUDPConn(src, buf[:n])
 	}
 
-	logx.Infof("user %s udp server close", udp.user)
+	logx.Infof("user %s udp server %d close", udp.user, udp.port)
 }
 
 func (udp *UDPServer) handleUDPConn(src *net.UDPAddr, data []byte) error {
