@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"net/http"
 	_ "net/http/pprof"
 	"titan-ipoverlay/ippop/config"
@@ -30,17 +31,22 @@ func initPprof(listenAddr string) {
 
 func newWS(config config.Config, tunMgr *ws.TunnelManager) *rest.Server {
 	server := rest.MustNewServer(config.WS.RestConf)
-	defer server.Stop()
 
 	jwtMiddleware := rest.WithJwt(config.JwtAuth.AccessSecret)
 
 	nodews := ws.NewNodeWS(tunMgr)
+	nodePop := ws.NewNodePop(&config)
 
 	server.AddRoute(rest.Route{
 		Method:  "GET",
 		Path:    "/ws/node",
 		Handler: nodews.ServeWS,
 	}, jwtMiddleware)
+	server.AddRoute(rest.Route{
+		Method:  "GET",
+		Path:    "/node/pop",
+		Handler: nodePop.ServeNodePop,
+	})
 
 	return server
 
@@ -68,9 +74,9 @@ func main() {
 
 	var c config.Config
 	conf.MustLoad(*configFile, &c)
-
 	logx.MustSetup(c.Log)
 
+	fmt.Printf("log:%#v\n", c.Log)
 	if c.Pprof.Enable {
 		initPprof(c.Pprof.ListenAddr)
 	}

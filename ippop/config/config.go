@@ -25,6 +25,8 @@ type Socks5 struct {
 
 type WS struct {
 	rest.RestConf
+	//lint:ignore SA5008 go-zero allows "default" in struct tags
+	Domain string `json:",optional"`
 	// TCPTimeout int64
 	// UDPTimeout int64
 }

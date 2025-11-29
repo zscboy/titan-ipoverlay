@@ -420,6 +420,9 @@ func (tm *TunnelManager) GetAuth() (secret string, expire int64, err error) {
 }
 func (tm *TunnelManager) GetWSURL() (string, error) {
 	domain := tm.config.Socks5.ServerIP
+	if len(tm.config.WS.Domain) > 0 {
+		domain = tm.config.WS.Domain
+	}
 	return fmt.Sprintf("ws://%s:%d/ws/node", domain, tm.config.WS.Port), nil
 }
 func (tm *TunnelManager) GetSocks5Addr() (string, error) {
