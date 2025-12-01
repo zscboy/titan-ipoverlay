@@ -30,7 +30,7 @@ func NewNodePop(cfg *config.Config) *NodePop {
 }
 
 func (pop *NodePop) ServeNodePop(w http.ResponseWriter, r *http.Request) {
-	logx.Infof("NodeWS.ServeNodePop %s", r.URL.Path)
+	logx.Infof("NodeWS.ServeNodePop %s %s", r.URL.Path, r.URL.RawQuery)
 
 	var req GetNodePopReq
 	if err := httpx.Parse(r, &req); err != nil {

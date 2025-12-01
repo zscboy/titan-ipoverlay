@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"net/http"
 	_ "net/http/pprof"
 	"titan-ipoverlay/ippop/config"
@@ -76,7 +75,6 @@ func main() {
 	conf.MustLoad(*configFile, &c)
 	logx.MustSetup(c.Log)
 
-	fmt.Printf("log:%#v\n", c.Log)
 	if c.Pprof.Enable {
 		initPprof(c.Pprof.ListenAddr)
 	}

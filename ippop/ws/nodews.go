@@ -29,7 +29,7 @@ func NewNodeWS(tunMgr *TunnelManager) *NodeWS {
 }
 
 func (ws *NodeWS) ServeWS(w http.ResponseWriter, r *http.Request) {
-	logx.Infof("NodeWS.ServeWS %s", r.URL.Path)
+	logx.Infof("NodeWS.ServeWS %s %s", r.URL.Path, r.URL.RawQuery)
 
 	var req NodeWSReq
 	if err := httpx.Parse(r, &req); err != nil {
