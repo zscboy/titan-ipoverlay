@@ -3,25 +3,19 @@ WS:
   Host: 0.0.0.0
   Port: 41005
   MaxConns: 20000
-  ## 4 seconds
-  ### example: dail dest timeout
-  TCPTimeout: 4
-  ### 120 seconds
-  ### udp proxy timeout if no data transfer
-  ### client udp proxy timeout is 60s
-  UDPTimeout: 120
+  Domain: 127.0.0.1
 RPCServer:
   Name: server.rpc
   ListenOn: 127.0.0.1:8080
   # APIServer: localhost:8888
 Redis:
   Host: 127.0.0.1:6379
-HTTPProxy: 0.0.0.0:8001
+#HTTPProxy: 0.0.0.0:8001
 Log:
   #Mode: file
   stat: false
   level: debug 
-
+  #Path: "d:/codes/titan-ipoverlay/logs"
 JwtAuth:
   AccessSecret: 1b4bc426-c9b1-11f0-828d-035c0c67ded5
   AccessExpire: 2592000
