@@ -16,6 +16,7 @@ const (
 	RouteModeAuto RouteMode = iota + 1
 	RouteModeManual
 	RouteModeTimed
+	RouteModeCustom
 )
 
 func (m RouteMode) String() string {
@@ -26,6 +27,8 @@ func (m RouteMode) String() string {
 		return "manual"
 	case RouteModeTimed:
 		return "timed"
+	case RouteModeCustom:
+		return "custom"
 	default:
 		return fmt.Sprintf("unknown(%d)", int(m))
 	}
@@ -44,7 +47,7 @@ type User struct {
 	// unit Bytes
 	CurrentTraffic int64 `redis:"current_traffic"`
 
-	// 1.manual, 2.auto, 3.Timed
+	// 1.manual, 2.auto, 3.Timed, 4.customer
 	RouteMode int `redis:"route_mode"`
 	// if NodeID is empty, will auto allocate a node for user
 	RouteNodeID string `redis:"route_node_id"`

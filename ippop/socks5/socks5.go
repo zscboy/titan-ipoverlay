@@ -14,7 +14,7 @@ import (
 type Socks5Handler interface {
 	HandleSocks5TCP(*net.TCPConn, *SocksTargetInfo) error
 	HandleSocks5UDP(udpConn UDPConn, udpInfo *Socks5UDPInfo, data []byte) error
-	HandleUserAuth(userName, password string) error
+	HandleUserAuth(username, password string) error
 }
 
 type Socks5ServerOptions struct {
@@ -34,7 +34,9 @@ type SocksTargetInfo struct {
 	Port       int
 
 	ExtraBytes []byte
-	UserName   string
+	Username   string
+	Session    string
+	SessTime   int64
 }
 
 type UDPConn interface {
@@ -171,7 +173,7 @@ func (socks5Server *Socks5Server) serveSocks5Conn(conn net.Conn) {
 	}
 
 	if user != nil {
-		r1.user = string(user)
+		r1.user = user
 	}
 
 	err = socks5Server.handleSocks5Request(r1)
@@ -183,7 +185,7 @@ func (socks5Server *Socks5Server) serveSocks5Conn(conn net.Conn) {
 	handled = true
 }
 
-func (socks5Server *Socks5Server) authenticate(conn io.Writer, bufConn io.Reader) ([]byte, error) {
+func (socks5Server *Socks5Server) authenticate(conn io.Writer, bufConn io.Reader) (*User, error) {
 	// Get the methods
 	methods, err := readAuthMethods(bufConn)
 	if err != nil {
@@ -208,60 +210,69 @@ func (socks5Server *Socks5Server) authenticate(conn io.Writer, bufConn io.Reader
 	}
 
 	if authMethod == userPassAuth {
-		return socks5Server.userPassAuth(conn, bufConn)
+		if err := socks5Server.replyClientNeedPassword(conn); err != nil {
+			return nil, err
+		}
+		username, pass, err := socks5Server.readUserAndPassword(bufConn)
+		if err != nil {
+			return nil, userPassAuthFailure(conn)
+		}
+
+		user, err := paserUsername(string(username))
+		if err != nil {
+			return nil, userPassAuthFailure(conn)
+		}
+
+		if err := socks5Server.opts.Handler.HandleUserAuth(string(user.username), string(pass)); err != nil {
+			return nil, userPassAuthFailure(conn)
+		}
+
+		if err := userPassAuthSuccess(conn); err != nil {
+			return nil, err
+		}
+		return user, nil
 	}
 
 	return nil, noAuthAuthenticator{}.authenticate(conn)
 }
 
-// userPassAuth return user
-func (socks5Server *Socks5Server) userPassAuth(writer io.Writer, reader io.Reader) ([]byte, error) {
-	// Tell the client to use user/pass auth
-	if _, err := writer.Write([]byte{socks5Version, userPassAuth}); err != nil {
-		return nil, err
-	}
+func (socks5Server *Socks5Server) replyClientNeedPassword(writer io.Writer) error {
+	_, err := writer.Write([]byte{socks5Version, userPassAuth})
+	return err
+}
 
+func (socks5Server *Socks5Server) readUserAndPassword(reader io.Reader) (username []byte, password []byte, err error) {
 	// Get the version and username length
 	header := []byte{0, 0}
 	if _, err := io.ReadAtLeast(reader, header, 2); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Ensure we are compatible
 	if header[0] != userAuthVersion {
-		return nil, fmt.Errorf("unsupported auth version: %v", header[0])
+		return nil, nil, fmt.Errorf("unsupported auth version: %v", header[0])
 	}
 
 	// Get the user name
 	userLen := int(header[1])
 	user := make([]byte, userLen)
 	if _, err := io.ReadAtLeast(reader, user, userLen); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Get the password length
 	if _, err := reader.Read(header[:1]); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Get the password
 	passLen := int(header[0])
 	pass := make([]byte, passLen)
 	if _, err := io.ReadAtLeast(reader, pass, passLen); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	// Verify the password
-	if err := socks5Server.opts.Handler.HandleUserAuth(string(user), string(pass)); err != nil {
-		logx.Errorf("Socks5Server.userPassAuth HandleUserAuth failed:%v", err.Error())
-		return nil, userPassAuthFailure(writer)
-	}
-
-	if err := userPassAuthSuccess(writer); err != nil {
-		return nil, err
-	}
-
-	return user, nil
+	return user, pass, nil
 }
 
 func (socks5Server *Socks5Server) handleSocks5Request(r *request) error {
@@ -311,7 +322,9 @@ func (socks5Server *Socks5Server) handleSocks5Connect(req *request) error {
 		Port:       req.destAddr.port,
 		DomainName: req.destAddr.fqdn,
 		ExtraBytes: extraBytes,
-		UserName:   req.user,
+		Username:   req.user.username,
+		Session:    req.user.session,
+		SessTime:   int64(req.user.sessTime),
 	}
 
 	tcpConn, ok := req.conn.(*net.TCPConn)
@@ -329,18 +342,6 @@ func (socks5Server *Socks5Server) handleSocks5Connect(req *request) error {
 		return fmt.Errorf("failed to send reply to socks5 client: %v", err)
 	}
 
-	// socks5conn := socks5conn{
-	// 	TCPConn: tcpConn,
-	// }
-
-	// if cfg.UseBypass && cfg.BypassHandler != nil {
-	// 	bypass := cfg.BypassHandler
-	// 	if bypass.BypassAble(targetInfo.DomainName) {
-	// 		bypass.HandleHttpSocks5TCP(socks5conn, targetInfo)
-	// 		return nil
-	// 	}
-	// }
-
 	return socks5Server.opts.Handler.HandleSocks5TCP(tcpConn, targetInfo)
 }
 
@@ -354,19 +355,20 @@ func (socks5Server *Socks5Server) handleSocks5Bind(req *request) error {
 }
 
 func (socks5Server *Socks5Server) handleSocks5Associate(req *request) error {
-	keyUserIPCount := fmt.Sprintf("%s:%s", req.user, req.srcIP)
+	username := req.user.username
+	keyUserIPCount := fmt.Sprintf("%s:%s", username, req.srcIP)
 	socks5Server.userIPCount.incr(keyUserIPCount)
 	defer socks5Server.userIPCount.decr(keyUserIPCount)
 
-	socks5Server.userUDPCount.incr(req.user)
-	defer socks5Server.userUDPCount.decr(req.user)
+	socks5Server.userUDPCount.incr(username)
+	defer socks5Server.userUDPCount.decr(username)
 
-	udpServer, err := socks5Server.loadOrNewUserUDPServer(req.user)
+	udpServer, err := socks5Server.loadOrNewUserUDPServer(username)
 	if err != nil {
 		return err
 	}
 
-	logx.Debugf("Socks5Server.handleSocks5Associate udp server ip:%s, port:%d for user %s", socks5Server.opts.UDPServerIP, udpServer.port, req.user)
+	logx.Debugf("Socks5Server.handleSocks5Associate udp server ip:%s, port:%d for user %s", socks5Server.opts.UDPServerIP, udpServer.port, username)
 	ip := net.ParseIP(socks5Server.opts.UDPServerIP)
 	if ip == nil {
 		return fmt.Errorf("parse ip %s failed", socks5Server.opts.UDPServerIP)
@@ -381,24 +383,24 @@ func (socks5Server *Socks5Server) handleSocks5Associate(req *request) error {
 	return nil
 }
 
-func (socks5Server *Socks5Server) loadOrNewUserUDPServer(userName string) (*UDPServer, error) {
-	server, ok := socks5Server.userUDPServers.Load(userName)
+func (socks5Server *Socks5Server) loadOrNewUserUDPServer(username string) (*UDPServer, error) {
+	server, ok := socks5Server.userUDPServers.Load(username)
 	if ok {
 		return server.(*UDPServer), nil
 	}
 
-	udpServer, err := newUDPServer(socks5Server.opts.UDPPortStart, socks5Server.opts.UDPPortEnd, socks5Server, userName)
+	udpServer, err := newUDPServer(socks5Server.opts.UDPPortStart, socks5Server.opts.UDPPortEnd, socks5Server, username)
 	if err != nil {
 		return nil, err
 	}
 
-	actual, loaded := socks5Server.userUDPServers.LoadOrStore(userName, udpServer)
+	actual, loaded := socks5Server.userUDPServers.LoadOrStore(username, udpServer)
 	if loaded {
 		udpServer.stop()
 		return actual.(*UDPServer), nil
 	}
 
-	logx.Debugf("Socks5Server.loadOrNewUserUDPServer new udp server ip:%s, port:%d for user %s", socks5Server.opts.UDPServerIP, udpServer.port, userName)
+	logx.Debugf("Socks5Server.loadOrNewUserUDPServer new udp server ip:%s, port:%d for user %s", socks5Server.opts.UDPServerIP, udpServer.port, username)
 
 	go udpServer.serve()
 	return udpServer, nil

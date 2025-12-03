@@ -44,7 +44,7 @@ type Tunnel struct {
 	waitList    sync.Map
 	tunMgr      *TunnelManager
 	waitLeaseCh chan bool
-	netDelays   []uint64
+	// netDelays   []uint64
 	//  bytes/sec
 	readLimiter *rate.Limiter
 	//  bytes/sec
@@ -270,7 +270,7 @@ func (t *Tunnel) acceptSocks5TCPConn(conn net.Conn, targetInfo *socks5.SocksTarg
 		t.onProxyDataFromProxy(sessionID, targetInfo.ExtraBytes)
 	}
 
-	proxyTCP := newTCPProxy(sessionID, conn, t, targetInfo.UserName)
+	proxyTCP := newTCPProxy(sessionID, conn, t, targetInfo.Username)
 
 	t.proxys.Store(sessionID, proxyTCP)
 	defer t.proxys.Delete(sessionID)
