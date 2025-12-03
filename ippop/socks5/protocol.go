@@ -7,7 +7,10 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"regexp"
 	"strconv"
+	"strings"
+	"time"
 )
 
 const (
@@ -113,6 +116,15 @@ type addrSpec struct {
 	port int
 }
 
+type User struct {
+	username string
+	zone     string
+	region   string
+	session  string
+	// duration
+	sessTime time.Duration
+}
+
 type request struct {
 	// protocol version
 	version uint8
@@ -126,7 +138,7 @@ type request struct {
 	bufreader *bufio.Reader
 	srcIP     string
 	// the user of socks5
-	user string
+	user *User
 }
 
 func replySocks5Client(w io.Writer, resp uint8, addr *addrSpec) error {
@@ -206,7 +218,7 @@ func newRequest(bufreader *bufio.Reader, conn net.Conn) (*request, error) {
 		conn:      conn,
 		bufreader: bufreader,
 		srcIP:     srcIP,
-		user:      anonymousUserName,
+		user:      &User{username: anonymousUserName},
 	}
 
 	return request, nil
@@ -410,4 +422,69 @@ func toAddress(a byte, addr []byte, port []byte) string {
 	}
 	p = strconv.Itoa(int(binary.BigEndian.Uint16(port)))
 	return net.JoinHostPort(h, p)
+}
+
+var sessionRegex = regexp.MustCompile(`^[0-9A-Za-z]{1,9}$`)
+
+func validateSession(u *User) error {
+	if !sessionRegex.MatchString(u.session) {
+		return fmt.Errorf("invalid session: %q (must be 1~9 chars of 0-9, a-z, A-Z)", u.session)
+	}
+	return nil
+}
+
+// username="ceshi1_11-zone-static-region-us-session-1312a838o-sessTime-5"
+func paserUsername(username string) (*User, error) {
+	parts := strings.Split(username, "-")
+	if len(parts) < 1 {
+		return nil, errors.New("invalid username string")
+	}
+
+	keys := map[string]bool{
+		"zone":     true,
+		"region":   true,
+		"session":  true,
+		"sessTime": true,
+	}
+
+	user := &User{
+		username: parts[0],
+	}
+
+	i := 1
+	for i < len(parts) {
+		key := parts[i]
+		if !keys[key] {
+			i++
+			continue
+		}
+
+		j := i + 1
+		for j < len(parts) && !keys[parts[j]] {
+			j++
+		}
+
+		value := strings.Join(parts[i+1:j], "-")
+
+		switch key {
+		case "zone":
+			user.zone = value
+		case "region":
+			user.region = value
+		case "session":
+			user.session = value
+		case "sessTime":
+			if n, err := strconv.Atoi(value); err == nil {
+				user.sessTime = time.Duration(n) * time.Minute
+			}
+		}
+
+		i = j
+	}
+
+	if err := validateSession(user); err != nil {
+		return nil, err
+	}
+
+	return user, nil
 }

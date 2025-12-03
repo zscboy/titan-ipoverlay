@@ -39,7 +39,7 @@ type (
 		Total int     `json:"total"`
 	}
 	Route {
-		// 1. auto mode, 2. manual mode, 3. Timed switching点击并应用
+		// 1. auto mode, 2. manual mode, 3. Timed, 4.custom
 		Mode int `json:"mode"`
 		// if NodeID is empty, will auto allocate a node for user
 		NodeID string `json:"node_id,optional"`

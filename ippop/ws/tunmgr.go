@@ -29,6 +29,14 @@ const (
 	onlineTableExpireTime    = 2 * setOnlineTableExpireTick
 )
 
+type UserSession struct {
+	deviceID     string
+	sessTime     int64
+	assignedTime time.Time
+	// lastUsed       time.Time
+	connetCount int
+}
+
 type TunnelManager struct {
 	tunnels     sync.Map
 	redis       *redis.Redis
@@ -37,6 +45,7 @@ type TunnelManager struct {
 	userCache   gcache.Cache
 	userTunLock sync.Mutex
 	filterRules *Rules
+	sessions    map[string]map[string]*UserSession
 }
 
 func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
@@ -223,14 +232,65 @@ func (tm *TunnelManager) KickNode(nodeID string) error {
 	return fmt.Errorf("node %s already offline", nodeID)
 }
 
-func (tm *TunnelManager) getTunnelByUser(userName string) (*Tunnel, error) {
+func (tm *TunnelManager) allocateTunnelByUserSession(username, sessionID string, sessTime int64) (*Tunnel, error) {
 	tm.userTunLock.Lock()
 	defer tm.userTunLock.Unlock()
 
-	user, err := tm.getUserFromCache(userName)
+	sessions, ok := tm.sessions[username]
+	if !ok {
+		sessions = make(map[string]*UserSession)
+	}
+
+	var oldDeviceID string
+	session, ok := sessions[sessionID]
+	if ok {
+		if time.Since(session.assignedTime) < time.Duration(session.sessTime) {
+			v, ok := tm.tunnels.Load(session.deviceID)
+			if ok {
+				return v.(*Tunnel), nil
+			}
+		}
+		oldDeviceID = session.deviceID
+	}
+
+	// release old device
+	if len(oldDeviceID) > 0 {
+		_, ok := tm.tunnels.Load(oldDeviceID)
+		if ok {
+			model.AddFreeNode(tm.redis, oldDeviceID)
+		}
+	}
+
+	// new session for user
+	nodeIDBytes, err := model.AllocateFreeNode(context.Background(), tm.redis)
 	if err != nil {
 		return nil, err
 	}
+
+	if session == nil {
+		session = &UserSession{sessTime: sessTime}
+		sessions[sessionID] = session
+	}
+
+	session.deviceID = string(nodeIDBytes)
+	session.assignedTime = time.Now()
+	session.connetCount++
+
+	v, ok := tm.tunnels.Load(session.deviceID)
+	if ok {
+		return v.(*Tunnel), nil
+	}
+	return nil, fmt.Errorf("can not allocate tunnel for user %s session %s", username, sessionID)
+}
+
+func (tm *TunnelManager) getTunnelByUser(user *model.User) (*Tunnel, error) {
+	tm.userTunLock.Lock()
+	defer tm.userTunLock.Unlock()
+
+	// user, err := tm.getUserFromCache(userName)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	tun := tm.getTunnel(user.RouteNodeID)
 	if tun == nil {
@@ -259,17 +319,29 @@ func (tm *TunnelManager) getTunnelByUser(userName string) (*Tunnel, error) {
 }
 
 func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks5.SocksTargetInfo) error {
-	logx.Debugf("HandleSocks5TCP, user %s, DomainName %s, port %d", targetInfo.UserName, targetInfo.DomainName, targetInfo.Port)
+	logx.Debugf("HandleSocks5TCP, user %s, DomainName %s, port %d", targetInfo.Username, targetInfo.DomainName, targetInfo.Port)
 	if tm.filterRules.isDeny(targetInfo.DomainName, fmt.Sprintf("%d", targetInfo.Port)) {
 		return fmt.Errorf("tcp: target %s:%d have been deny", targetInfo.DomainName, targetInfo.Port)
 	}
 
-	tun, err := tm.getTunnelByUser(targetInfo.UserName)
+	user, err := tm.getUserFromCache(targetInfo.Username)
 	if err != nil {
 		return err
 	}
+
+	var tun *Tunnel
+	if user.RouteMode == int(model.RouteModeCustom) {
+		tun, err = tm.allocateTunnelByUserSession(targetInfo.Username, targetInfo.Session, targetInfo.SessTime)
+	} else {
+		tun, err = tm.getTunnelByUser(user)
+	}
+
+	if err != nil {
+		return err
+	}
+
 	if tun == nil {
-		return fmt.Errorf("can not allocate tunnel, user %s", targetInfo.UserName)
+		return fmt.Errorf("can not allocate tunnel, user %s", targetInfo.Username)
 	}
 
 	return tun.acceptSocks5TCPConn(tcpConn, targetInfo)
@@ -285,7 +357,12 @@ func (tm *TunnelManager) HandleSocks5UDP(udpConn socks5.UDPConn, udpInfo *socks5
 		return fmt.Errorf("udp: target %s have been deny", udpInfo.Dest)
 	}
 
-	tun, err := tm.getTunnelByUser(udpInfo.UserName)
+	user, err := tm.getUserFromCache(udpInfo.UserName)
+	if err != nil {
+		return err
+	}
+
+	tun, err := tm.getTunnelByUser(user)
 	if err != nil {
 		return err
 	}
@@ -404,7 +481,7 @@ func (tm *TunnelManager) SwitchNode(userName string) error {
 	}
 
 	if user == nil {
-		return fmt.Errorf("handleNodeOffline, user not exist", userName)
+		return fmt.Errorf("handleNodeOffline, user %s not exist", userName)
 	}
 
 	return tm.switchNodeForUser(user)
