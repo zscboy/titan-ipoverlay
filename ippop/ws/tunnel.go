@@ -48,14 +48,18 @@ type Tunnel struct {
 	//  bytes/sec
 	readLimiter *rate.Limiter
 	//  bytes/sec
-	writeLimiter *rate.Limiter
+	writeLimiter    *rate.Limiter
+	rateLimiterLock sync.Mutex
+	// if socks5 client connect with session
+	userSessionID string
 }
 
 func newTunnel(conn *websocket.Conn, tunMgr *TunnelManager, opts *TunOptions) *Tunnel {
 	t := &Tunnel{
-		conn:   conn,
-		opts:   opts,
-		tunMgr: tunMgr,
+		conn:            conn,
+		opts:            opts,
+		tunMgr:          tunMgr,
+		rateLimiterLock: sync.Mutex{},
 	}
 
 	conn.SetPingHandler(func(data string) error {
@@ -71,6 +75,29 @@ func newTunnel(conn *websocket.Conn, tunMgr *TunnelManager, opts *TunOptions) *T
 	})
 
 	return t
+}
+
+func (t *Tunnel) setRateLimit(downloadRateLimit, uploadRateLimit int64) {
+	t.rateLimiterLock.Lock()
+	t.rateLimiterLock.Unlock()
+
+	if downloadRateLimit <= 0 {
+		t.readLimiter = nil
+	} else {
+		if t.readLimiter == nil || t.readLimiter.Limit() != rate.Limit(downloadRateLimit) {
+			t.readLimiter = rate.NewLimiter(rate.Limit(downloadRateLimit), limitRateBurst)
+			logx.Debugf("tun %s new readLimiter", t.opts.Id)
+		}
+	}
+
+	if uploadRateLimit <= 0 {
+		t.writeLimiter = nil
+	} else {
+		if t.writeLimiter == nil || t.writeLimiter.Limit() != rate.Limit(uploadRateLimit) {
+			t.writeLimiter = rate.NewLimiter(rate.Limit(uploadRateLimit), limitRateBurst)
+			logx.Debugf("tun %s new writerLimiter for", t.opts.Id)
+		}
+	}
 }
 
 func (t *Tunnel) writePong(msg []byte) error {

@@ -426,9 +426,9 @@ func toAddress(a byte, addr []byte, port []byte) string {
 
 var sessionRegex = regexp.MustCompile(`^[0-9A-Za-z]{1,9}$`)
 
-func validateSession(u *User) error {
-	if !sessionRegex.MatchString(u.session) {
-		return fmt.Errorf("invalid session: %q (must be 1~9 chars of 0-9, a-z, A-Z)", u.session)
+func validateSession(session string) error {
+	if !sessionRegex.MatchString(session) {
+		return fmt.Errorf("invalid session: %q (must be 1~9 chars of 0-9, a-z, A-Z)", session)
 	}
 	return nil
 }
@@ -482,8 +482,10 @@ func paserUsername(username string) (*User, error) {
 		i = j
 	}
 
-	if err := validateSession(user); err != nil {
-		return nil, err
+	if user.session != "" {
+		if err := validateSession(user.session); err != nil {
+			return nil, err
+		}
 	}
 
 	return user, nil
