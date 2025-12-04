@@ -5,6 +5,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	"strings"
 	"time"
 
 	"titan-ipoverlay/ippop/model"
@@ -43,9 +44,17 @@ func (l *CreateUserLogic) CreateUser(in *pb.CreateUserReq) (*pb.CreateUserResp, 
 		return nil, fmt.Errorf("user %s already exist", in.UserName)
 	}
 
+	if strings.Contains(in.UserName, "-") {
+		return nil, fmt.Errorf("invalid username %s, can not contain '-'", in.UserName)
+	}
+
 	if in.Route != nil {
 		if err := checkRoute(l.ctx, l.svcCtx.Redis, in.Route); err != nil {
 			return nil, err
+		}
+
+		if in.Route.Mode == int32(model.RouteModeCustom) {
+			return l.createUserWithoutBindDevice(in)
 		}
 	}
 
@@ -135,4 +144,48 @@ func (l *CreateUserLogic) defaultTrafficLimit() *pb.TrafficLimit {
 		EndTime:      time.Now().AddDate(0, 1, 0).Unix(),
 		TotalTraffic: defaultTotalTraffic,
 	}
+}
+
+func (l *CreateUserLogic) createUserWithoutBindDevice(in *pb.CreateUserReq) (*pb.CreateUserResp, error) {
+	if in.TrafficLimit != nil {
+		if err := checkTraffic(in.TrafficLimit); err != nil {
+			return nil, err
+		}
+	}
+
+	hash := md5.Sum([]byte(in.Password))
+	passwordMD5 := hex.EncodeToString(hash[:])
+
+	trafficLimit := in.TrafficLimit
+	if trafficLimit == nil {
+		trafficLimit = l.defaultTrafficLimit()
+	}
+
+	user := &model.User{
+		UserName:            in.UserName,
+		PasswordMD5:         passwordMD5,
+		StartTime:           trafficLimit.StartTime,
+		EndTime:             trafficLimit.EndTime,
+		TotalTraffic:        trafficLimit.TotalTraffic,
+		RouteMode:           int(in.Route.Mode),
+		LastRouteSwitchTime: time.Now().Unix(),
+		UploadRateLimit:     in.UploadRateLimite,
+		DownloadRateLimit:   in.DownloadRateLimit,
+	}
+
+	if err := model.SaveUser(l.svcCtx.Redis, user); err != nil {
+		return nil, err
+	}
+
+	if err := model.ZaddUser(l.svcCtx.Redis, in.UserName); err != nil {
+		return nil, err
+	}
+
+	createUserResp := &pb.CreateUserResp{
+		UserName:     in.UserName,
+		TrafficLimit: trafficLimit,
+		Route:        in.Route,
+	}
+
+	return createUserResp, nil
 }

@@ -40,23 +40,29 @@ func (l *GetUserLogic) GetUser(in *pb.GetUserReq) (*pb.User, error) {
 		return nil, err
 	}
 
-	if node == nil {
-		return nil, fmt.Errorf("node %s not exist", user.RouteNodeID)
-	}
+	// if node == nil {
+	// 	return nil, fmt.Errorf("node %s not exist", user.RouteNodeID)
+	// }
 
 	trafficLimit := &pb.TrafficLimit{StartTime: user.StartTime, EndTime: user.EndTime, TotalTraffic: user.TotalTraffic}
 	route := &pb.Route{Mode: int32(user.RouteMode), NodeId: user.RouteNodeID, IntervalMinutes: int32(user.UpdateRouteIntervalMinutes), UtcMinuteOfDay: int32(user.UpdateRouteUtcMinuteOfDay)}
 	u := &pb.User{
-		UserName:            in.UserName,
-		TrafficLimit:        trafficLimit,
-		Route:               route,
-		NodeIp:              node.IP,
-		NodeOnline:          node.Online,
+		UserName:     in.UserName,
+		TrafficLimit: trafficLimit,
+		Route:        route,
+		// NodeIp:              node.IP,
+		// NodeOnline:          node.Online,
 		CurrentTraffic:      user.CurrentTraffic,
 		Off:                 user.Off,
 		UploadRateLimite:    user.UploadRateLimit,
 		DownloadRateLimit:   user.DownloadRateLimit,
 		LastRouteSwitchTime: user.LastRouteSwitchTime,
 	}
+
+	if node != nil {
+		u.NodeIp = node.IP
+		u.NodeOnline = node.Online
+	}
+
 	return u, nil
 }

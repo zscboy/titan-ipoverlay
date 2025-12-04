@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/rand"
 	"net"
 	"sync"
 	"time"
@@ -17,16 +18,17 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/stores/redis"
-	"golang.org/x/time/rate"
 )
 
 const (
 	userCacheSize = 512
 	// 30 seconds
-	keepaliveInterval        = 30
-	userTrafficSaveInterval  = 300
-	setOnlineTableExpireTick = 90
-	onlineTableExpireTime    = 2 * setOnlineTableExpireTick
+	keepaliveInterval         = 30
+	userTrafficSaveInterval   = 300
+	setOnlineTableExpireTick  = 90
+	onlineTableExpireTime     = 2 * setOnlineTableExpireTick
+	userSessionExpireInterval = 120
+	userSessionExpireDuration = 3 * time.Minute
 )
 
 type UserSession struct {
@@ -34,7 +36,14 @@ type UserSession struct {
 	sessTime     int64
 	assignedTime time.Time
 	// lastUsed       time.Time
-	connetCount int
+	connectCount   int32
+	disconnectTime time.Time
+}
+
+type ExpiredSession struct {
+	sessionID     string
+	deviceID      string
+	isLeaseDevice bool
 }
 
 type TunnelManager struct {
@@ -43,9 +52,10 @@ type TunnelManager struct {
 	config      config.Config
 	userTraffic *userTraffic
 	userCache   gcache.Cache
-	userTunLock sync.Mutex
-	filterRules *Rules
-	sessions    map[string]map[string]*UserSession
+	// userTunLock     sync.Mutex
+	filterRules     *Rules
+	userSessionMap  map[string]map[string]*UserSession
+	userSessionLock sync.Mutex
 }
 
 func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
@@ -54,12 +64,13 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 	}
 
 	tm := &TunnelManager{
-		config:      config,
-		redis:       redis,
-		userTraffic: newUserTraffic(),
-		userCache:   gcache.New(userCacheSize).LRU().Build(),
-		userTunLock: sync.Mutex{},
-		filterRules: &Rules{rules: RulesToMap(config.FilterRules.Rules), defaultAction: config.FilterRules.DefaultAction},
+		config:          config,
+		redis:           redis,
+		userTraffic:     newUserTraffic(),
+		userCache:       gcache.New(userCacheSize).LRU().Build(),
+		filterRules:     &Rules{rules: RulesToMap(config.FilterRules.Rules), defaultAction: config.FilterRules.DefaultAction},
+		userSessionMap:  make(map[string]map[string]*UserSession),
+		userSessionLock: sync.Mutex{},
 	}
 
 	routeScheduler := newUserRouteScheduler(tm)
@@ -67,6 +78,7 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 	go tm.keepalive()
 	go tm.setNodeOnlineDataExpire()
 	go tm.startUserTrafficTimer()
+	go tm.RecyclUserSession()
 	go routeScheduler.start()
 	return tm
 }
@@ -213,7 +225,7 @@ func (tm *TunnelManager) getUserFromCache(userName string) (*model.User, error) 
 
 		return user, nil
 	}
-	logx.Debugf("getUserFromCache v:%v", v)
+	// logx.Debugf("getUserFromCache v:%v", v)
 	return v.(*model.User), nil
 }
 
@@ -232,90 +244,106 @@ func (tm *TunnelManager) KickNode(nodeID string) error {
 	return fmt.Errorf("node %s already offline", nodeID)
 }
 
-func (tm *TunnelManager) allocateTunnelByUserSession(username, sessionID string, sessTime int64) (*Tunnel, error) {
-	tm.userTunLock.Lock()
-	defer tm.userTunLock.Unlock()
+func (tm *TunnelManager) allocateTunnelByUserSession(user *model.User, sessionID string, sessTime int64) (*Tunnel, *UserSession, error) {
+	tm.userSessionLock.Lock()
+	defer tm.userSessionLock.Unlock()
 
-	sessions, ok := tm.sessions[username]
+	// No sessionID provided → return a random tunnel
+	if sessionID == "" {
+		tun, err := tm.randomTunnel()
+		if err != nil {
+			return nil, nil, err
+		}
+		return tun, nil, nil
+	}
+
+	// Load or create the session map for this user
+	sessions, ok := tm.userSessionMap[user.UserName]
 	if !ok {
 		sessions = make(map[string]*UserSession)
+		tm.userSessionMap[user.UserName] = sessions
 	}
 
-	var oldDeviceID string
-	session, ok := sessions[sessionID]
-	if ok {
-		if time.Since(session.assignedTime) < time.Duration(session.sessTime) {
-			v, ok := tm.tunnels.Load(session.deviceID)
-			if ok {
-				return v.(*Tunnel), nil
-			}
+	// If the session already exists, try to reuse it
+	if session, exists := sessions[sessionID]; exists {
+		// Look up the tunnel by the deviceID bound to this session
+		if v, ok := tm.tunnels.Load(session.deviceID); ok {
+			session.connectCount++
+			return v.(*Tunnel), session, nil
 		}
-		oldDeviceID = session.deviceID
+
+		// Session exists but its tunnel does not (unexpected state)
+		// → fall through to allocate a new session
 	}
 
-	// release old device
-	if len(oldDeviceID) > 0 {
-		_, ok := tm.tunnels.Load(oldDeviceID)
-		if ok {
-			model.AddFreeNode(tm.redis, oldDeviceID)
-		}
-	}
-
-	// new session for user
+	// Allocate a new session by taking a free device node
 	nodeIDBytes, err := model.AllocateFreeNode(context.Background(), tm.redis)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
+	// Create the session object if it does not exist yet
+	session := sessions[sessionID]
 	if session == nil {
-		session = &UserSession{sessTime: sessTime}
+		session = &UserSession{
+			sessTime: sessTime,
+		}
 		sessions[sessionID] = session
 	}
 
 	session.deviceID = string(nodeIDBytes)
 	session.assignedTime = time.Now()
-	session.connetCount++
+	session.connectCount++
 
+	// Load the corresponding tunnel instance
 	v, ok := tm.tunnels.Load(session.deviceID)
-	if ok {
-		return v.(*Tunnel), nil
+	if !ok {
+		return nil, nil, fmt.Errorf("allocated deviceID=%s but tunnel not found", session.deviceID)
 	}
-	return nil, fmt.Errorf("can not allocate tunnel for user %s session %s", username, sessionID)
+
+	tunnel := v.(*Tunnel)
+	tunnel.userSessionID = sessionID
+	tunnel.setRateLimit(user.DownloadRateLimit, user.UploadRateLimit)
+
+	return tunnel, session, nil
 }
 
 func (tm *TunnelManager) getTunnelByUser(user *model.User) (*Tunnel, error) {
-	tm.userTunLock.Lock()
-	defer tm.userTunLock.Unlock()
-
-	// user, err := tm.getUserFromCache(userName)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	tun := tm.getTunnel(user.RouteNodeID)
-	if tun == nil {
+	v, ok := tm.tunnels.Load(user.RouteNodeID)
+	if !ok {
 		return nil, nil
 	}
+	tun := v.(*Tunnel)
 
-	if user.DownloadRateLimit <= 0 {
-		tun.readLimiter = nil
-	} else {
-		if tun.readLimiter == nil || tun.readLimiter.Limit() != rate.Limit(user.DownloadRateLimit) {
-			tun.readLimiter = rate.NewLimiter(rate.Limit(user.DownloadRateLimit), limitRateBurst)
-			logx.Debugf("new readLimiter for user:%s", user.UserName)
-		}
-	}
-
-	if user.UploadRateLimit <= 0 {
-		tun.writeLimiter = nil
-	} else {
-		if tun.writeLimiter == nil || tun.writeLimiter.Limit() != rate.Limit(user.UploadRateLimit) {
-			tun.writeLimiter = rate.NewLimiter(rate.Limit(user.UploadRateLimit), limitRateBurst)
-			logx.Debugf("new writerLimiter for user:%s", user.UserName)
-		}
-	}
+	tun.setRateLimit(user.DownloadRateLimit, user.UploadRateLimit)
 
 	return tun, nil
+}
+
+func (tm *TunnelManager) randomTunnel() (*Tunnel, error) {
+	var result any
+	count := 0
+
+	tm.tunnels.Range(func(_, value any) bool {
+		count++
+		if rand.Intn(count) == 0 {
+			result = value
+		}
+		return true
+	})
+
+	if count == 0 {
+		return nil, fmt.Errorf("no tunnel exist")
+	}
+
+	return result.(*Tunnel), nil
+}
+func (tm *TunnelManager) handleUserSessionWhenSocks5TCPClose(session *UserSession) {
+	tm.userSessionLock.Lock()
+	defer tm.userSessionLock.Unlock()
+
+	session.connectCount--
+	session.disconnectTime = time.Now()
 }
 
 func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks5.SocksTargetInfo) error {
@@ -330,8 +358,9 @@ func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks
 	}
 
 	var tun *Tunnel
+	var userSession *UserSession
 	if user.RouteMode == int(model.RouteModeCustom) {
-		tun, err = tm.allocateTunnelByUserSession(targetInfo.Username, targetInfo.Session, targetInfo.SessTime)
+		tun, userSession, err = tm.allocateTunnelByUserSession(user, targetInfo.Session, targetInfo.SessTime)
 	} else {
 		tun, err = tm.getTunnelByUser(user)
 	}
@@ -343,6 +372,14 @@ func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks
 	if tun == nil {
 		return fmt.Errorf("can not allocate tunnel, user %s", targetInfo.Username)
 	}
+
+	logx.Debugf("allocate tun %s for user %s session %s", tun.opts.Id, targetInfo.Username, targetInfo.Session)
+
+	defer func() {
+		if userSession != nil {
+			tm.handleUserSessionWhenSocks5TCPClose(userSession)
+		}
+	}()
 
 	return tun.acceptSocks5TCPConn(tcpConn, targetInfo)
 }
@@ -374,7 +411,7 @@ func (tm *TunnelManager) HandleSocks5UDP(udpConn socks5.UDPConn, udpInfo *socks5
 }
 
 func (tm *TunnelManager) HandleUserAuth(userName, password string) error {
-	logx.Debugf("HandleUserAuth userName %s password %s", userName, password)
+	logx.Debugf("HandleUserAuth username %s password %s", userName, password)
 	user, err := tm.getUserFromCache(userName)
 	if err != nil {
 		return fmt.Errorf("get user from redis error %v", err)
@@ -458,19 +495,89 @@ func (tm *TunnelManager) startUserTrafficTimer() {
 	}
 }
 
-func (tm *TunnelManager) getTunnel(id string) *Tunnel {
-	v, ok := tm.tunnels.Load(id)
-	if !ok {
-		return nil
-	}
-	return v.(*Tunnel)
-}
-
 func (tm *TunnelManager) traffic(userName string, traffic int64) {
 	tm.userTraffic.add(userName, traffic)
 }
 
+func (tm *TunnelManager) RecyclUserSession() {
+	ticker := time.NewTicker(userSessionExpireInterval * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		tm.userSessionLock.Lock()
+
+		removeSessions := tm.collectExpiredSessions()
+
+		tm.removeSessions(removeSessions)
+
+		tm.userSessionLock.Unlock()
+	}
+}
+
+func (tm *TunnelManager) collectExpiredSessions() map[string]*ExpiredSession {
+	expiredSessions := make(map[string]*ExpiredSession)
+
+	for username, userSessions := range tm.userSessionMap {
+		for sessionID, session := range userSessions {
+			if session.connectCount > 0 {
+				logx.Debugf("session %s connectCount %d", sessionID, session.connectCount)
+				continue
+			}
+
+			if time.Since(session.disconnectTime) <= userSessionExpireDuration {
+				logx.Debugf("session %s is free %fs count %d", sessionID, time.Since(session.disconnectTime).Seconds(), session.connectCount)
+				continue
+			}
+
+			expiredSession := &ExpiredSession{
+				sessionID: sessionID,
+				deviceID:  session.deviceID,
+			}
+
+			if v, ok := tm.tunnels.Load(session.deviceID); ok {
+				tunnel := v.(*Tunnel)
+				expiredSession.isLeaseDevice = tunnel.userSessionID == sessionID
+			}
+
+			expiredSessions[username] = expiredSession
+		}
+	}
+
+	return expiredSessions
+}
+
+func (tm *TunnelManager) removeSessions(expiredSessions map[string]*ExpiredSession) {
+	logx.Debugf("remove expire session %#v", expiredSessions)
+	for username, sess := range expiredSessions {
+		sessions := tm.userSessionMap[username]
+		delete(sessions, sess.sessionID)
+
+		if len(sessions) == 0 {
+			delete(tm.userSessionMap, username)
+		}
+
+		if sess.isLeaseDevice {
+			model.AddFreeNode(tm.redis, sess.deviceID)
+		}
+	}
+}
+
 // implement interface for rpc server
+/*type NodeManager interface {
+	Kick(nodeID string) error
+}
+
+type UserManager interface {
+	SwitchNode(userName string) error
+	DeleteCache(userName string) error
+}
+
+type EndpointProvider interface {
+	GetAuth() (secret string, expire int64, err error)
+	GetWSURL() (string, error)
+	GetSocks5Addr() (string, error)
+}*/
+
 func (tm *TunnelManager) Kick(nodeID string) error {
 	return tm.KickNode(nodeID)
 }
