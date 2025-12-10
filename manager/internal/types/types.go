@@ -97,8 +97,8 @@ type ModifyUserPasswordReq struct {
 
 type ModifyUserReq struct {
 	UserName     string        `json:"user_name"`
-	TrafficLimit *TrafficLimit `json:"traffic_limit"`
-	Route        *Route        `json:"route"`
+	TrafficLimit *TrafficLimit `json:"traffic_limit,optional"`
+	Route        *Route        `json:"route,optional"`
 }
 
 type Node struct {
@@ -110,10 +110,13 @@ type Node struct {
 }
 
 type Pop struct {
-	ID         string `json:"id"`
-	Area       string `json:"area"`
-	Socks5Addr string `json:"socks5_addr"`
-	TotalNode  int    `json:"total_node"`
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	Area            string `json:"area"`
+	Socks5Addr      string `json:"socks5_addr"`
+	TotalNode       int    `json:"total_node"`
+	OnlineNodeCount int    `json:"online_node_count"`
+	CountryCode     string `json:"country_code"`
 }
 
 type RemoveBlackListReq struct {

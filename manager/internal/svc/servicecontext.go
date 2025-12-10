@@ -10,39 +10,41 @@ import (
 	"github.com/zeromicro/go-zero/zrpc"
 )
 
-type Server struct {
-	API         serverapi.ServerAPI
-	Socks5Addr  string
-	WSServerURL string
+type Pop struct {
+	API        serverapi.ServerAPI
+	Socks5Addr string
+	// WSServerURL string
 	Area        string
+	Name        string
+	CountryCode string
 }
 
 type ServiceContext struct {
 	Config        config.Config
 	Redis         *redis.Redis
 	JwtMiddleware rest.Middleware
-	Servers       map[string]*Server
+	Pops          map[string]*Pop
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
 	redis := redis.MustNewRedis(c.Redis)
 	return &ServiceContext{
-		Config:  c,
-		Redis:   redis,
-		Servers: newServers(c),
+		Config: c,
+		Redis:  redis,
+		Pops:   newPops(c),
 	}
 }
 
 // TODO: can not get server info in here, server may be stop
-func newServers(c config.Config) map[string]*Server {
-	servers := make(map[string]*Server)
+func newPops(c config.Config) map[string]*Pop {
+	servers := make(map[string]*Pop)
 	for _, pop := range c.Pops {
 		api := serverapi.NewServerAPI(zrpc.MustNewClient(pop.RpcClient))
 		resp, err := api.GetServerInfo(context.Background(), &serverapi.Empty{})
 		if err != nil {
 			panic("Get server info failed:" + err.Error())
 		}
-		servers[pop.Id] = &Server{API: api, Socks5Addr: resp.Socks5Addr, WSServerURL: resp.WsServerUrl, Area: pop.Area}
+		servers[pop.Id] = &Pop{API: api, Socks5Addr: resp.Socks5Addr, Area: pop.Area, Name: pop.Name, CountryCode: pop.CountryCode}
 	}
 	return servers
 }

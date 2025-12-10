@@ -36,7 +36,7 @@ func (l *AddBlackListLogic) AddBlackList(req *types.AddBlackListReq) (resp *type
 		return &types.UserOperationResp{ErrMsg: fmt.Sprintf("node %s not exist", req.NodeID)}, nil
 	}
 
-	server := l.svcCtx.Servers[string(popID)]
+	server := l.svcCtx.Pops[string(popID)]
 	if server == nil {
 		return &types.UserOperationResp{ErrMsg: fmt.Sprintf("pop %s not found", popID)}, nil
 	}

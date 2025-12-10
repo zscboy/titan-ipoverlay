@@ -27,7 +27,7 @@ func NewCreateUserLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Create
 }
 
 func (l *CreateUserLogic) CreateUser(req *types.CreateUserReq) (resp *types.CreateUserResp, err error) {
-	server := l.svcCtx.Servers[req.PopId]
+	server := l.svcCtx.Pops[req.PopId]
 	if server == nil {
 		return nil, fmt.Errorf("pop %s not found", req.PopId)
 	}
@@ -38,7 +38,7 @@ func (l *CreateUserLogic) CreateUser(req *types.CreateUserReq) (resp *types.Crea
 	}
 
 	if len(popID) != 0 {
-		return nil, fmt.Errorf("user already %s exist", req.UserName)
+		return nil, fmt.Errorf("user %s already exist", req.UserName)
 	}
 
 	in := &serverapi.CreateUserReq{UserName: req.UserName, Password: req.Password, UploadRateLimite: req.UploadRateLimit, DownloadRateLimit: req.DownloadRateLimit}

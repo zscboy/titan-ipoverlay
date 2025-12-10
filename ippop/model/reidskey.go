@@ -4,8 +4,17 @@ const (
 	redisKeyUser               = "titan:user:%s"
 	redisKeyUserZset           = "titan:user:zset"
 	redisKeyUserRouteScheduler = "titan:user:routescheduler"
-	redisKeyUserTraffic        = "titan:traffic:%s"
-	redisKeyUserTrafficAll     = "titan:trafficall"
+	// redisKeyUserTrafficDay     = "titan:traffic:%s"
+	// redisKeyUserTrafficDayAll  = "titan:trafficall"
+
+	redisKeyUserTraffic5min    = "titan:traffic5min:%s"
+	redisKeyUserTraffic5minAll = "titan:traffic5minall"
+
+	redisKeyUserTrafficHour    = "titan:traffichour:%s"
+	redisKeyUserTrafficHourAll = "titan:traffichourmall"
+
+	redisKeyUserTrafficDay    = "titan:trafficday:%s"
+	redisKeyUserTrafficDayAll = "titan:trafficdayall"
 
 	redisKeyNode     = "titan:node:%s"
 	redisKeyNodeZset = "titan:node:zset"

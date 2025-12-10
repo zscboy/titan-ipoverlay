@@ -26,7 +26,7 @@ func NewListUserLogic(ctx context.Context, svcCtx *svc.ServiceContext) *ListUser
 }
 
 func (l *ListUserLogic) ListUser(req *types.ListUserReq) (resp *types.ListUserResp, err error) {
-	server := l.svcCtx.Servers[req.PopID]
+	server := l.svcCtx.Pops[req.PopID]
 	if server == nil {
 		return nil, fmt.Errorf("pop %s not found", req.PopID)
 	}
