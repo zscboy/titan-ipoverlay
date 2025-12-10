@@ -36,7 +36,7 @@ func (l *SwitchUserRouteNodeLogic) SwitchUserRouteNode(req *types.SwitchUserRout
 		return &types.UserOperationResp{ErrMsg: fmt.Sprintf("user %s not exist", req.UserName)}, nil
 	}
 
-	server := l.svcCtx.Servers[popID]
+	server := l.svcCtx.Pops[popID]
 	if server == nil {
 		return &types.UserOperationResp{ErrMsg: fmt.Sprintf("pop %s not found", popID)}, nil
 	}

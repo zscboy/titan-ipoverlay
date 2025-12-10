@@ -97,3 +97,33 @@ func (s *ServerAPIServer) KickNode(ctx context.Context, in *pb.KickNodeReq) (*pb
 	l := logic.NewKickNodeLogic(ctx, s.svcCtx)
 	return l.KickNode(in)
 }
+
+func (s *ServerAPIServer) GetAllStats5Min(ctx context.Context, in *pb.AllStatsReq) (*pb.AllStatsResp, error) {
+	l := logic.NewGetAllStats5MinLogic(ctx, s.svcCtx)
+	return l.GetAllStats5Min(in)
+}
+
+func (s *ServerAPIServer) GetAllStatsHour(ctx context.Context, in *pb.AllStatsReq) (*pb.AllStatsResp, error) {
+	l := logic.NewGetAllStatsHourLogic(ctx, s.svcCtx)
+	return l.GetAllStatsHour(in)
+}
+
+func (s *ServerAPIServer) GetAllStatsDay(ctx context.Context, in *pb.AllStatsDayReq) (*pb.AllStatsResp, error) {
+	l := logic.NewGetAllStatsDayLogic(ctx, s.svcCtx)
+	return l.GetAllStatsDay(in)
+}
+
+func (s *ServerAPIServer) GetUserStats5Min(ctx context.Context, in *pb.UserStatsReq) (*pb.UserStatsResp, error) {
+	l := logic.NewGetUserStats5MinLogic(ctx, s.svcCtx)
+	return l.GetUserStats5Min(in)
+}
+
+func (s *ServerAPIServer) GetUserStatsHour(ctx context.Context, in *pb.UserStatsReq) (*pb.UserStatsResp, error) {
+	l := logic.NewGetUserStatsHourLogic(ctx, s.svcCtx)
+	return l.GetUserStatsHour(in)
+}
+
+func (s *ServerAPIServer) GetUserStatsDay(ctx context.Context, in *pb.UserStatsDayReq) (*pb.UserStatsResp, error) {
+	l := logic.NewGetUserStatsDayLogic(ctx, s.svcCtx)
+	return l.GetUserStatsDay(in)
+}

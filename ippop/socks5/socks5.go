@@ -211,19 +211,23 @@ func (socks5Server *Socks5Server) authenticate(conn io.Writer, bufConn io.Reader
 
 	if authMethod == userPassAuth {
 		if err := socks5Server.replyClientNeedPassword(conn); err != nil {
+			logx.Error("replyClientNeedPassword error:%s", err.Error())
 			return nil, err
 		}
 		username, pass, err := socks5Server.readUserAndPassword(bufConn)
 		if err != nil {
+			logx.Error("readUserAndPassword error:%s", err.Error())
 			return nil, userPassAuthFailure(conn)
 		}
 
 		user, err := paserUsername(string(username))
 		if err != nil {
+			logx.Error("paserUsername error:%s", err.Error())
 			return nil, userPassAuthFailure(conn)
 		}
 
 		if err := socks5Server.opts.Handler.HandleUserAuth(string(user.username), string(pass)); err != nil {
+			logx.Error("HandleUserAuth error:%s", err.Error())
 			return nil, userPassAuthFailure(conn)
 		}
 

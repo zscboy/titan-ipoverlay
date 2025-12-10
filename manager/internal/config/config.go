@@ -12,11 +12,13 @@ type JwtAuth struct {
 }
 
 type Pop struct {
-	Id        string
-	Area      string
-	RpcClient zrpc.RpcClientConf
-	WSURL     string
-	MaxCount  int
+	Name        string
+	Id          string
+	Area        string
+	CountryCode string
+	RpcClient   zrpc.RpcClientConf
+	WSURL       string
+	MaxCount    int
 }
 
 type Geo struct {

@@ -147,8 +147,8 @@ func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*config.Pop, er
 	return nil, fmt.Errorf("no pop found for %s, location:%v", req.NodeId, location)
 }
 
-func (l *GetNodePopLogic) getPodServer(id string) *svc.Server {
-	for podID, pop := range l.svcCtx.Servers {
+func (l *GetNodePopLogic) getPodServer(id string) *svc.Pop {
+	for podID, pop := range l.svcCtx.Pops {
 		if podID == id {
 			return pop
 		}

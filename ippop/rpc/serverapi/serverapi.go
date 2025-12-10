@@ -15,6 +15,9 @@ import (
 
 type (
 	AddBlacklistReq        = pb.AddBlacklistReq
+	AllStatsDayReq         = pb.AllStatsDayReq
+	AllStatsReq            = pb.AllStatsReq
+	AllStatsResp           = pb.AllStatsResp
 	CreateUserReq          = pb.CreateUserReq
 	CreateUserResp         = pb.CreateUserResp
 	DeleteUserReq          = pb.DeleteUserReq
@@ -37,8 +40,12 @@ type (
 	StartOrStopUserReq     = pb.StartOrStopUserReq
 	SwitchUserRouteNodeReq = pb.SwitchUserRouteNodeReq
 	TrafficLimit           = pb.TrafficLimit
+	TrendData              = pb.TrendData
 	User                   = pb.User
 	UserOperationResp      = pb.UserOperationResp
+	UserStatsDayReq        = pb.UserStatsDayReq
+	UserStatsReq           = pb.UserStatsReq
+	UserStatsResp          = pb.UserStatsResp
 
 	ServerAPI interface {
 		ListNode(ctx context.Context, in *ListNodeReq, opts ...grpc.CallOption) (*ListNodeResp, error)
@@ -56,6 +63,12 @@ type (
 		RemoveBlacklist(ctx context.Context, in *RemoveBlacklistReq, opts ...grpc.CallOption) (*UserOperationResp, error)
 		GetBlacklist(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetBlacklistResp, error)
 		KickNode(ctx context.Context, in *KickNodeReq, opts ...grpc.CallOption) (*UserOperationResp, error)
+		GetAllStats5Min(ctx context.Context, in *AllStatsReq, opts ...grpc.CallOption) (*AllStatsResp, error)
+		GetAllStatsHour(ctx context.Context, in *AllStatsReq, opts ...grpc.CallOption) (*AllStatsResp, error)
+		GetAllStatsDay(ctx context.Context, in *AllStatsDayReq, opts ...grpc.CallOption) (*AllStatsResp, error)
+		GetUserStats5Min(ctx context.Context, in *UserStatsReq, opts ...grpc.CallOption) (*UserStatsResp, error)
+		GetUserStatsHour(ctx context.Context, in *UserStatsReq, opts ...grpc.CallOption) (*UserStatsResp, error)
+		GetUserStatsDay(ctx context.Context, in *UserStatsDayReq, opts ...grpc.CallOption) (*UserStatsResp, error)
 	}
 
 	defaultServerAPI struct {
@@ -142,4 +155,34 @@ func (m *defaultServerAPI) GetBlacklist(ctx context.Context, in *Empty, opts ...
 func (m *defaultServerAPI) KickNode(ctx context.Context, in *KickNodeReq, opts ...grpc.CallOption) (*UserOperationResp, error) {
 	client := pb.NewServerAPIClient(m.cli.Conn())
 	return client.KickNode(ctx, in, opts...)
+}
+
+func (m *defaultServerAPI) GetAllStats5Min(ctx context.Context, in *AllStatsReq, opts ...grpc.CallOption) (*AllStatsResp, error) {
+	client := pb.NewServerAPIClient(m.cli.Conn())
+	return client.GetAllStats5Min(ctx, in, opts...)
+}
+
+func (m *defaultServerAPI) GetAllStatsHour(ctx context.Context, in *AllStatsReq, opts ...grpc.CallOption) (*AllStatsResp, error) {
+	client := pb.NewServerAPIClient(m.cli.Conn())
+	return client.GetAllStatsHour(ctx, in, opts...)
+}
+
+func (m *defaultServerAPI) GetAllStatsDay(ctx context.Context, in *AllStatsDayReq, opts ...grpc.CallOption) (*AllStatsResp, error) {
+	client := pb.NewServerAPIClient(m.cli.Conn())
+	return client.GetAllStatsDay(ctx, in, opts...)
+}
+
+func (m *defaultServerAPI) GetUserStats5Min(ctx context.Context, in *UserStatsReq, opts ...grpc.CallOption) (*UserStatsResp, error) {
+	client := pb.NewServerAPIClient(m.cli.Conn())
+	return client.GetUserStats5Min(ctx, in, opts...)
+}
+
+func (m *defaultServerAPI) GetUserStatsHour(ctx context.Context, in *UserStatsReq, opts ...grpc.CallOption) (*UserStatsResp, error) {
+	client := pb.NewServerAPIClient(m.cli.Conn())
+	return client.GetUserStatsHour(ctx, in, opts...)
+}
+
+func (m *defaultServerAPI) GetUserStatsDay(ctx context.Context, in *UserStatsDayReq, opts ...grpc.CallOption) (*UserStatsResp, error) {
+	client := pb.NewServerAPIClient(m.cli.Conn())
+	return client.GetUserStatsDay(ctx, in, opts...)
 }

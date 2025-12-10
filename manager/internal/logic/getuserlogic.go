@@ -36,7 +36,7 @@ func (l *GetUserLogic) GetUser(req *types.GetUserReq) (resp *types.GetUserResp, 
 		return nil, fmt.Errorf("user %s not exist", req.UserName)
 	}
 
-	server := l.svcCtx.Servers[popID]
+	server := l.svcCtx.Pops[popID]
 	if server == nil {
 		return nil, fmt.Errorf("pop %s not found", popID)
 	}

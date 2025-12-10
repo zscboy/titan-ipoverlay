@@ -24,9 +24,14 @@ func (ut *userTraffic) snapshotAndClear() map[string]int64 {
 	defer ut.lock.Unlock()
 
 	result := make(map[string]int64, len(ut.users))
+
 	for user, traffic := range ut.users {
-		result[user] = traffic
+		if traffic >= 1024 {
+			toSend := (traffic / 1024) * 1024
+			result[user] = toSend
+			ut.users[user] = traffic - toSend
+		}
 	}
-	ut.users = make(map[string]int64) // 清空
+
 	return result
 }

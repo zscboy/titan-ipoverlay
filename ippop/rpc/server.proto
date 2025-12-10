@@ -149,6 +149,39 @@ message KickNodeReq {
   string node_id = 1;
 }
 
+message TrendData {
+  int64 timestamp = 1;
+  int64 bandwidth = 2;
+  int64 traffic = 3;
+}
+
+message AllStatsReq {
+  int32 hours = 1;
+}
+
+message AllStatsDayReq {
+  int32 days = 1;
+}
+
+message AllStatsResp {
+  repeated TrendData trend_datas = 1;
+}
+
+message UserStatsReq {
+  string username = 1;
+  int32 hours = 2;
+}
+
+message UserStatsDayReq {
+  string username = 1;
+  int32 days = 2;
+}
+
+message UserStatsResp {
+  repeated TrendData trend_datas = 1;
+}
+
+
 message Empty {}
 
 // ---- Service Definition ----
@@ -169,5 +202,12 @@ service ServerAPI {
   rpc RemoveBlacklist(RemoveBlacklistReq) returns (UserOperationResp);
   rpc GetBlacklist(Empty) returns (GetBlacklistResp);
   rpc KickNode(KickNodeReq) returns (UserOperationResp);
+  
+  rpc GetAllStats5Min (AllStatsReq) returns (AllStatsResp);
+  rpc GetAllStatsHour (AllStatsReq) returns (AllStatsResp);
+  rpc GetAllStatsDay (AllStatsDayReq) returns (AllStatsResp);
 
+  rpc GetUserStats5Min (UserStatsReq) returns (UserStatsResp);
+  rpc GetUserStatsHour (UserStatsReq) returns (UserStatsResp);
+  rpc GetUserStatsDay (UserStatsDayReq) returns (UserStatsResp);
 }

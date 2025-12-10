@@ -88,7 +88,7 @@ type UserOperationResp struct {
 1. route definition
 
 - Url: /node/blacklist/get
-- Method: POST
+- Method: GET
 - Request: `GetBlackListReq`
 - Response: `GetBlackListResp`
 

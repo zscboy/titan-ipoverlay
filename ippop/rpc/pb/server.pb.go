@@ -1420,6 +1420,346 @@ func (x *KickNodeReq) GetNodeId() string {
 	return ""
 }
 
+type TrendData struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Timestamp     int64                  `protobuf:"varint,1,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	Bandwidth     int64                  `protobuf:"varint,2,opt,name=bandwidth,proto3" json:"bandwidth,omitempty"`
+	Traffic       int64                  `protobuf:"varint,3,opt,name=traffic,proto3" json:"traffic,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TrendData) Reset() {
+	*x = TrendData{}
+	mi := &file_server_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TrendData) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TrendData) ProtoMessage() {}
+
+func (x *TrendData) ProtoReflect() protoreflect.Message {
+	mi := &file_server_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TrendData.ProtoReflect.Descriptor instead.
+func (*TrendData) Descriptor() ([]byte, []int) {
+	return file_server_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *TrendData) GetTimestamp() int64 {
+	if x != nil {
+		return x.Timestamp
+	}
+	return 0
+}
+
+func (x *TrendData) GetBandwidth() int64 {
+	if x != nil {
+		return x.Bandwidth
+	}
+	return 0
+}
+
+func (x *TrendData) GetTraffic() int64 {
+	if x != nil {
+		return x.Traffic
+	}
+	return 0
+}
+
+type AllStatsReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Hours         int32                  `protobuf:"varint,1,opt,name=hours,proto3" json:"hours,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AllStatsReq) Reset() {
+	*x = AllStatsReq{}
+	mi := &file_server_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AllStatsReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AllStatsReq) ProtoMessage() {}
+
+func (x *AllStatsReq) ProtoReflect() protoreflect.Message {
+	mi := &file_server_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AllStatsReq.ProtoReflect.Descriptor instead.
+func (*AllStatsReq) Descriptor() ([]byte, []int) {
+	return file_server_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *AllStatsReq) GetHours() int32 {
+	if x != nil {
+		return x.Hours
+	}
+	return 0
+}
+
+type AllStatsDayReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Days          int32                  `protobuf:"varint,1,opt,name=days,proto3" json:"days,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AllStatsDayReq) Reset() {
+	*x = AllStatsDayReq{}
+	mi := &file_server_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AllStatsDayReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AllStatsDayReq) ProtoMessage() {}
+
+func (x *AllStatsDayReq) ProtoReflect() protoreflect.Message {
+	mi := &file_server_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AllStatsDayReq.ProtoReflect.Descriptor instead.
+func (*AllStatsDayReq) Descriptor() ([]byte, []int) {
+	return file_server_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *AllStatsDayReq) GetDays() int32 {
+	if x != nil {
+		return x.Days
+	}
+	return 0
+}
+
+type AllStatsResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TrendDatas    []*TrendData           `protobuf:"bytes,1,rep,name=trend_datas,json=trendDatas,proto3" json:"trend_datas,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AllStatsResp) Reset() {
+	*x = AllStatsResp{}
+	mi := &file_server_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AllStatsResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AllStatsResp) ProtoMessage() {}
+
+func (x *AllStatsResp) ProtoReflect() protoreflect.Message {
+	mi := &file_server_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AllStatsResp.ProtoReflect.Descriptor instead.
+func (*AllStatsResp) Descriptor() ([]byte, []int) {
+	return file_server_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *AllStatsResp) GetTrendDatas() []*TrendData {
+	if x != nil {
+		return x.TrendDatas
+	}
+	return nil
+}
+
+type UserStatsReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Username      string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
+	Hours         int32                  `protobuf:"varint,2,opt,name=hours,proto3" json:"hours,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UserStatsReq) Reset() {
+	*x = UserStatsReq{}
+	mi := &file_server_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserStatsReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserStatsReq) ProtoMessage() {}
+
+func (x *UserStatsReq) ProtoReflect() protoreflect.Message {
+	mi := &file_server_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserStatsReq.ProtoReflect.Descriptor instead.
+func (*UserStatsReq) Descriptor() ([]byte, []int) {
+	return file_server_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *UserStatsReq) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *UserStatsReq) GetHours() int32 {
+	if x != nil {
+		return x.Hours
+	}
+	return 0
+}
+
+type UserStatsDayReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Username      string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
+	Days          int32                  `protobuf:"varint,2,opt,name=days,proto3" json:"days,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UserStatsDayReq) Reset() {
+	*x = UserStatsDayReq{}
+	mi := &file_server_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserStatsDayReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserStatsDayReq) ProtoMessage() {}
+
+func (x *UserStatsDayReq) ProtoReflect() protoreflect.Message {
+	mi := &file_server_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserStatsDayReq.ProtoReflect.Descriptor instead.
+func (*UserStatsDayReq) Descriptor() ([]byte, []int) {
+	return file_server_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *UserStatsDayReq) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *UserStatsDayReq) GetDays() int32 {
+	if x != nil {
+		return x.Days
+	}
+	return 0
+}
+
+type UserStatsResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TrendDatas    []*TrendData           `protobuf:"bytes,1,rep,name=trend_datas,json=trendDatas,proto3" json:"trend_datas,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UserStatsResp) Reset() {
+	*x = UserStatsResp{}
+	mi := &file_server_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserStatsResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserStatsResp) ProtoMessage() {}
+
+func (x *UserStatsResp) ProtoReflect() protoreflect.Message {
+	mi := &file_server_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserStatsResp.ProtoReflect.Descriptor instead.
+func (*UserStatsResp) Descriptor() ([]byte, []int) {
+	return file_server_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *UserStatsResp) GetTrendDatas() []*TrendData {
+	if x != nil {
+		return x.TrendDatas
+	}
+	return nil
+}
+
 type Empty struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -1428,7 +1768,7 @@ type Empty struct {
 
 func (x *Empty) Reset() {
 	*x = Empty{}
-	mi := &file_server_proto_msgTypes[24]
+	mi := &file_server_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1440,7 +1780,7 @@ func (x *Empty) String() string {
 func (*Empty) ProtoMessage() {}
 
 func (x *Empty) ProtoReflect() protoreflect.Message {
-	mi := &file_server_proto_msgTypes[24]
+	mi := &file_server_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1453,7 +1793,7 @@ func (x *Empty) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Empty.ProtoReflect.Descriptor instead.
 func (*Empty) Descriptor() ([]byte, []int) {
-	return file_server_proto_rawDescGZIP(), []int{24}
+	return file_server_proto_rawDescGZIP(), []int{31}
 }
 
 var File_server_proto protoreflect.FileDescriptor
@@ -1555,8 +1895,29 @@ const file_server_proto_rawDesc = "" +
 	"\x10GetBlacklistResp\x12\x14\n" +
 	"\x05nodes\x18\x01 \x03(\tR\x05nodes\"&\n" +
 	"\vKickNodeReq\x12\x17\n" +
-	"\anode_id\x18\x01 \x01(\tR\x06nodeId\"\a\n" +
-	"\x05Empty2\xe2\a\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\"a\n" +
+	"\tTrendData\x12\x1c\n" +
+	"\ttimestamp\x18\x01 \x01(\x03R\ttimestamp\x12\x1c\n" +
+	"\tbandwidth\x18\x02 \x01(\x03R\tbandwidth\x12\x18\n" +
+	"\atraffic\x18\x03 \x01(\x03R\atraffic\"#\n" +
+	"\vAllStatsReq\x12\x14\n" +
+	"\x05hours\x18\x01 \x01(\x05R\x05hours\"$\n" +
+	"\x0eAllStatsDayReq\x12\x12\n" +
+	"\x04days\x18\x01 \x01(\x05R\x04days\"B\n" +
+	"\fAllStatsResp\x122\n" +
+	"\vtrend_datas\x18\x01 \x03(\v2\x11.server.TrendDataR\n" +
+	"trendDatas\"@\n" +
+	"\fUserStatsReq\x12\x1a\n" +
+	"\busername\x18\x01 \x01(\tR\busername\x12\x14\n" +
+	"\x05hours\x18\x02 \x01(\x05R\x05hours\"A\n" +
+	"\x0fUserStatsDayReq\x12\x1a\n" +
+	"\busername\x18\x01 \x01(\tR\busername\x12\x12\n" +
+	"\x04days\x18\x02 \x01(\x05R\x04days\"C\n" +
+	"\rUserStatsResp\x122\n" +
+	"\vtrend_datas\x18\x01 \x03(\v2\x11.server.TrendDataR\n" +
+	"trendDatas\"\a\n" +
+	"\x05Empty2\xe3\n" +
+	"\n" +
 	"\tServerAPI\x125\n" +
 	"\bListNode\x12\x13.server.ListNodeReq\x1a\x14.server.ListNodeResp\x12;\n" +
 	"\n" +
@@ -1575,7 +1936,13 @@ const file_server_proto_rawDesc = "" +
 	"\fAddBlacklist\x12\x17.server.AddBlacklistReq\x1a\x19.server.UserOperationResp\x12H\n" +
 	"\x0fRemoveBlacklist\x12\x1a.server.RemoveBlacklistReq\x1a\x19.server.UserOperationResp\x127\n" +
 	"\fGetBlacklist\x12\r.server.Empty\x1a\x18.server.GetBlacklistResp\x12:\n" +
-	"\bKickNode\x12\x13.server.KickNodeReq\x1a\x19.server.UserOperationRespB\x06Z\x04./pbb\x06proto3"
+	"\bKickNode\x12\x13.server.KickNodeReq\x1a\x19.server.UserOperationResp\x12<\n" +
+	"\x0fGetAllStats5Min\x12\x13.server.AllStatsReq\x1a\x14.server.AllStatsResp\x12<\n" +
+	"\x0fGetAllStatsHour\x12\x13.server.AllStatsReq\x1a\x14.server.AllStatsResp\x12>\n" +
+	"\x0eGetAllStatsDay\x12\x16.server.AllStatsDayReq\x1a\x14.server.AllStatsResp\x12?\n" +
+	"\x10GetUserStats5Min\x12\x14.server.UserStatsReq\x1a\x15.server.UserStatsResp\x12?\n" +
+	"\x10GetUserStatsHour\x12\x14.server.UserStatsReq\x1a\x15.server.UserStatsResp\x12A\n" +
+	"\x0fGetUserStatsDay\x12\x17.server.UserStatsDayReq\x1a\x15.server.UserStatsRespB\x06Z\x04./pbb\x06proto3"
 
 var (
 	file_server_proto_rawDescOnce sync.Once
@@ -1589,7 +1956,7 @@ func file_server_proto_rawDescGZIP() []byte {
 	return file_server_proto_rawDescData
 }
 
-var file_server_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_server_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
 var file_server_proto_goTypes = []any{
 	(*ListNodeReq)(nil),            // 0: server.ListNodeReq
 	(*Node)(nil),                   // 1: server.Node
@@ -1615,7 +1982,14 @@ var file_server_proto_goTypes = []any{
 	(*RemoveBlacklistReq)(nil),     // 21: server.RemoveBlacklistReq
 	(*GetBlacklistResp)(nil),       // 22: server.GetBlacklistResp
 	(*KickNodeReq)(nil),            // 23: server.KickNodeReq
-	(*Empty)(nil),                  // 24: server.Empty
+	(*TrendData)(nil),              // 24: server.TrendData
+	(*AllStatsReq)(nil),            // 25: server.AllStatsReq
+	(*AllStatsDayReq)(nil),         // 26: server.AllStatsDayReq
+	(*AllStatsResp)(nil),           // 27: server.AllStatsResp
+	(*UserStatsReq)(nil),           // 28: server.UserStatsReq
+	(*UserStatsDayReq)(nil),        // 29: server.UserStatsDayReq
+	(*UserStatsResp)(nil),          // 30: server.UserStatsResp
+	(*Empty)(nil),                  // 31: server.Empty
 }
 var file_server_proto_depIdxs = []int32{
 	1,  // 0: server.ListNodeResp.nodes:type_name -> server.Node
@@ -1628,41 +2002,55 @@ var file_server_proto_depIdxs = []int32{
 	4,  // 7: server.User.traffic_limit:type_name -> server.TrafficLimit
 	3,  // 8: server.User.route:type_name -> server.Route
 	14, // 9: server.ListUserResp.users:type_name -> server.User
-	0,  // 10: server.ServerAPI.ListNode:input_type -> server.ListNodeReq
-	5,  // 11: server.ServerAPI.CreateUser:input_type -> server.CreateUserReq
-	15, // 12: server.ServerAPI.ListUser:input_type -> server.ListUserReq
-	8,  // 13: server.ServerAPI.ModifyUserPassword:input_type -> server.ModifyUserPasswordReq
-	9,  // 14: server.ServerAPI.ModifyUser:input_type -> server.ModifyUserReq
-	10, // 15: server.ServerAPI.GetUser:input_type -> server.GetUserReq
-	12, // 16: server.ServerAPI.DeleteUser:input_type -> server.DeleteUserReq
-	11, // 17: server.ServerAPI.SwitchUserRouteNode:input_type -> server.SwitchUserRouteNodeReq
-	13, // 18: server.ServerAPI.StartOrStopUser:input_type -> server.StartOrStopUserReq
-	24, // 19: server.ServerAPI.GetServerInfo:input_type -> server.Empty
-	18, // 20: server.ServerAPI.GetNodeAccessToken:input_type -> server.GetNodeAccessTokenReq
-	20, // 21: server.ServerAPI.AddBlacklist:input_type -> server.AddBlacklistReq
-	21, // 22: server.ServerAPI.RemoveBlacklist:input_type -> server.RemoveBlacklistReq
-	24, // 23: server.ServerAPI.GetBlacklist:input_type -> server.Empty
-	23, // 24: server.ServerAPI.KickNode:input_type -> server.KickNodeReq
-	2,  // 25: server.ServerAPI.ListNode:output_type -> server.ListNodeResp
-	6,  // 26: server.ServerAPI.CreateUser:output_type -> server.CreateUserResp
-	16, // 27: server.ServerAPI.ListUser:output_type -> server.ListUserResp
-	7,  // 28: server.ServerAPI.ModifyUserPassword:output_type -> server.UserOperationResp
-	7,  // 29: server.ServerAPI.ModifyUser:output_type -> server.UserOperationResp
-	14, // 30: server.ServerAPI.GetUser:output_type -> server.User
-	7,  // 31: server.ServerAPI.DeleteUser:output_type -> server.UserOperationResp
-	7,  // 32: server.ServerAPI.SwitchUserRouteNode:output_type -> server.UserOperationResp
-	7,  // 33: server.ServerAPI.StartOrStopUser:output_type -> server.UserOperationResp
-	17, // 34: server.ServerAPI.GetServerInfo:output_type -> server.GetServerInfoResp
-	19, // 35: server.ServerAPI.GetNodeAccessToken:output_type -> server.GetNodeAccessTokenResp
-	7,  // 36: server.ServerAPI.AddBlacklist:output_type -> server.UserOperationResp
-	7,  // 37: server.ServerAPI.RemoveBlacklist:output_type -> server.UserOperationResp
-	22, // 38: server.ServerAPI.GetBlacklist:output_type -> server.GetBlacklistResp
-	7,  // 39: server.ServerAPI.KickNode:output_type -> server.UserOperationResp
-	25, // [25:40] is the sub-list for method output_type
-	10, // [10:25] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	24, // 10: server.AllStatsResp.trend_datas:type_name -> server.TrendData
+	24, // 11: server.UserStatsResp.trend_datas:type_name -> server.TrendData
+	0,  // 12: server.ServerAPI.ListNode:input_type -> server.ListNodeReq
+	5,  // 13: server.ServerAPI.CreateUser:input_type -> server.CreateUserReq
+	15, // 14: server.ServerAPI.ListUser:input_type -> server.ListUserReq
+	8,  // 15: server.ServerAPI.ModifyUserPassword:input_type -> server.ModifyUserPasswordReq
+	9,  // 16: server.ServerAPI.ModifyUser:input_type -> server.ModifyUserReq
+	10, // 17: server.ServerAPI.GetUser:input_type -> server.GetUserReq
+	12, // 18: server.ServerAPI.DeleteUser:input_type -> server.DeleteUserReq
+	11, // 19: server.ServerAPI.SwitchUserRouteNode:input_type -> server.SwitchUserRouteNodeReq
+	13, // 20: server.ServerAPI.StartOrStopUser:input_type -> server.StartOrStopUserReq
+	31, // 21: server.ServerAPI.GetServerInfo:input_type -> server.Empty
+	18, // 22: server.ServerAPI.GetNodeAccessToken:input_type -> server.GetNodeAccessTokenReq
+	20, // 23: server.ServerAPI.AddBlacklist:input_type -> server.AddBlacklistReq
+	21, // 24: server.ServerAPI.RemoveBlacklist:input_type -> server.RemoveBlacklistReq
+	31, // 25: server.ServerAPI.GetBlacklist:input_type -> server.Empty
+	23, // 26: server.ServerAPI.KickNode:input_type -> server.KickNodeReq
+	25, // 27: server.ServerAPI.GetAllStats5Min:input_type -> server.AllStatsReq
+	25, // 28: server.ServerAPI.GetAllStatsHour:input_type -> server.AllStatsReq
+	26, // 29: server.ServerAPI.GetAllStatsDay:input_type -> server.AllStatsDayReq
+	28, // 30: server.ServerAPI.GetUserStats5Min:input_type -> server.UserStatsReq
+	28, // 31: server.ServerAPI.GetUserStatsHour:input_type -> server.UserStatsReq
+	29, // 32: server.ServerAPI.GetUserStatsDay:input_type -> server.UserStatsDayReq
+	2,  // 33: server.ServerAPI.ListNode:output_type -> server.ListNodeResp
+	6,  // 34: server.ServerAPI.CreateUser:output_type -> server.CreateUserResp
+	16, // 35: server.ServerAPI.ListUser:output_type -> server.ListUserResp
+	7,  // 36: server.ServerAPI.ModifyUserPassword:output_type -> server.UserOperationResp
+	7,  // 37: server.ServerAPI.ModifyUser:output_type -> server.UserOperationResp
+	14, // 38: server.ServerAPI.GetUser:output_type -> server.User
+	7,  // 39: server.ServerAPI.DeleteUser:output_type -> server.UserOperationResp
+	7,  // 40: server.ServerAPI.SwitchUserRouteNode:output_type -> server.UserOperationResp
+	7,  // 41: server.ServerAPI.StartOrStopUser:output_type -> server.UserOperationResp
+	17, // 42: server.ServerAPI.GetServerInfo:output_type -> server.GetServerInfoResp
+	19, // 43: server.ServerAPI.GetNodeAccessToken:output_type -> server.GetNodeAccessTokenResp
+	7,  // 44: server.ServerAPI.AddBlacklist:output_type -> server.UserOperationResp
+	7,  // 45: server.ServerAPI.RemoveBlacklist:output_type -> server.UserOperationResp
+	22, // 46: server.ServerAPI.GetBlacklist:output_type -> server.GetBlacklistResp
+	7,  // 47: server.ServerAPI.KickNode:output_type -> server.UserOperationResp
+	27, // 48: server.ServerAPI.GetAllStats5Min:output_type -> server.AllStatsResp
+	27, // 49: server.ServerAPI.GetAllStatsHour:output_type -> server.AllStatsResp
+	27, // 50: server.ServerAPI.GetAllStatsDay:output_type -> server.AllStatsResp
+	30, // 51: server.ServerAPI.GetUserStats5Min:output_type -> server.UserStatsResp
+	30, // 52: server.ServerAPI.GetUserStatsHour:output_type -> server.UserStatsResp
+	30, // 53: server.ServerAPI.GetUserStatsDay:output_type -> server.UserStatsResp
+	33, // [33:54] is the sub-list for method output_type
+	12, // [12:33] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_server_proto_init() }
@@ -1676,7 +2064,7 @@ func file_server_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_server_proto_rawDesc), len(file_server_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   25,
+			NumMessages:   32,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

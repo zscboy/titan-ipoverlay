@@ -27,8 +27,8 @@ func NewGetPopsLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetPopsLo
 func (l *GetPopsLogic) GetPops() (resp *types.GetPopsResp, err error) {
 	popIDs := make([]string, 0, len(l.svcCtx.Config.Pops))
 	pops := make([]*types.Pop, 0, len(l.svcCtx.Config.Pops))
-	for id, server := range l.svcCtx.Servers {
-		p := &types.Pop{ID: id, Area: server.Area, Socks5Addr: server.Socks5Addr}
+	for id, pop := range l.svcCtx.Pops {
+		p := &types.Pop{ID: id, Name: pop.Name, Area: pop.Area, Socks5Addr: pop.Socks5Addr, CountryCode: pop.CountryCode}
 		pops = append(pops, p)
 
 		popIDs = append(popIDs, id)

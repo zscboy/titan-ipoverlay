@@ -26,7 +26,7 @@ func NewGetBlackListLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetB
 }
 
 func (l *GetBlackListLogic) GetBlackList(req *types.GetBlackListReq) (resp *types.GetBlackListResp, err error) {
-	server := l.svcCtx.Servers[string(req.PodID)]
+	server := l.svcCtx.Pops[string(req.PodID)]
 	if server == nil {
 		return nil, fmt.Errorf("")
 	}

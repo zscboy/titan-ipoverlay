@@ -11,7 +11,9 @@ Log:
   level: debug   
 Pops: 
   - Id: 14bf4178-6160-11f0-a0c5-00163e023040
+    Name: "test"
     Area: Korea
+    CountryCode: ko
     RpcClient:
       Target: localhost:8080
       Timeout: 30000
