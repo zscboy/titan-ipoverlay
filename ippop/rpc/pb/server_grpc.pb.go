@@ -34,12 +34,8 @@ const (
 	ServerAPI_RemoveBlacklist_FullMethodName     = "/server.ServerAPI/RemoveBlacklist"
 	ServerAPI_GetBlacklist_FullMethodName        = "/server.ServerAPI/GetBlacklist"
 	ServerAPI_KickNode_FullMethodName            = "/server.ServerAPI/KickNode"
-	ServerAPI_GetAllStats5Min_FullMethodName     = "/server.ServerAPI/GetAllStats5Min"
-	ServerAPI_GetAllStatsHour_FullMethodName     = "/server.ServerAPI/GetAllStatsHour"
-	ServerAPI_GetAllStatsDay_FullMethodName      = "/server.ServerAPI/GetAllStatsDay"
-	ServerAPI_GetUserStats5Min_FullMethodName    = "/server.ServerAPI/GetUserStats5Min"
-	ServerAPI_GetUserStatsHour_FullMethodName    = "/server.ServerAPI/GetUserStatsHour"
-	ServerAPI_GetUserStatsDay_FullMethodName     = "/server.ServerAPI/GetUserStatsDay"
+	ServerAPI_GetUserBaseStats_FullMethodName    = "/server.ServerAPI/GetUserBaseStats"
+	ServerAPI_GetUserStatChart_FullMethodName    = "/server.ServerAPI/GetUserStatChart"
 )
 
 // ServerAPIClient is the client API for ServerAPI service.
@@ -61,12 +57,8 @@ type ServerAPIClient interface {
 	RemoveBlacklist(ctx context.Context, in *RemoveBlacklistReq, opts ...grpc.CallOption) (*UserOperationResp, error)
 	GetBlacklist(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetBlacklistResp, error)
 	KickNode(ctx context.Context, in *KickNodeReq, opts ...grpc.CallOption) (*UserOperationResp, error)
-	GetAllStats5Min(ctx context.Context, in *AllStatsReq, opts ...grpc.CallOption) (*AllStatsResp, error)
-	GetAllStatsHour(ctx context.Context, in *AllStatsReq, opts ...grpc.CallOption) (*AllStatsResp, error)
-	GetAllStatsDay(ctx context.Context, in *AllStatsDayReq, opts ...grpc.CallOption) (*AllStatsResp, error)
-	GetUserStats5Min(ctx context.Context, in *UserStatsReq, opts ...grpc.CallOption) (*UserStatsResp, error)
-	GetUserStatsHour(ctx context.Context, in *UserStatsReq, opts ...grpc.CallOption) (*UserStatsResp, error)
-	GetUserStatsDay(ctx context.Context, in *UserStatsDayReq, opts ...grpc.CallOption) (*UserStatsResp, error)
+	GetUserBaseStats(ctx context.Context, in *UserBaseStatsReq, opts ...grpc.CallOption) (*UserBaseStatsResp, error)
+	GetUserStatChart(ctx context.Context, in *UserStatChartReq, opts ...grpc.CallOption) (*UserStatChartResp, error)
 }
 
 type serverAPIClient struct {
@@ -227,60 +219,20 @@ func (c *serverAPIClient) KickNode(ctx context.Context, in *KickNodeReq, opts ..
 	return out, nil
 }
 
-func (c *serverAPIClient) GetAllStats5Min(ctx context.Context, in *AllStatsReq, opts ...grpc.CallOption) (*AllStatsResp, error) {
+func (c *serverAPIClient) GetUserBaseStats(ctx context.Context, in *UserBaseStatsReq, opts ...grpc.CallOption) (*UserBaseStatsResp, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(AllStatsResp)
-	err := c.cc.Invoke(ctx, ServerAPI_GetAllStats5Min_FullMethodName, in, out, cOpts...)
+	out := new(UserBaseStatsResp)
+	err := c.cc.Invoke(ctx, ServerAPI_GetUserBaseStats_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *serverAPIClient) GetAllStatsHour(ctx context.Context, in *AllStatsReq, opts ...grpc.CallOption) (*AllStatsResp, error) {
+func (c *serverAPIClient) GetUserStatChart(ctx context.Context, in *UserStatChartReq, opts ...grpc.CallOption) (*UserStatChartResp, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(AllStatsResp)
-	err := c.cc.Invoke(ctx, ServerAPI_GetAllStatsHour_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *serverAPIClient) GetAllStatsDay(ctx context.Context, in *AllStatsDayReq, opts ...grpc.CallOption) (*AllStatsResp, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(AllStatsResp)
-	err := c.cc.Invoke(ctx, ServerAPI_GetAllStatsDay_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *serverAPIClient) GetUserStats5Min(ctx context.Context, in *UserStatsReq, opts ...grpc.CallOption) (*UserStatsResp, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(UserStatsResp)
-	err := c.cc.Invoke(ctx, ServerAPI_GetUserStats5Min_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *serverAPIClient) GetUserStatsHour(ctx context.Context, in *UserStatsReq, opts ...grpc.CallOption) (*UserStatsResp, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(UserStatsResp)
-	err := c.cc.Invoke(ctx, ServerAPI_GetUserStatsHour_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *serverAPIClient) GetUserStatsDay(ctx context.Context, in *UserStatsDayReq, opts ...grpc.CallOption) (*UserStatsResp, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(UserStatsResp)
-	err := c.cc.Invoke(ctx, ServerAPI_GetUserStatsDay_FullMethodName, in, out, cOpts...)
+	out := new(UserStatChartResp)
+	err := c.cc.Invoke(ctx, ServerAPI_GetUserStatChart_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -306,12 +258,8 @@ type ServerAPIServer interface {
 	RemoveBlacklist(context.Context, *RemoveBlacklistReq) (*UserOperationResp, error)
 	GetBlacklist(context.Context, *Empty) (*GetBlacklistResp, error)
 	KickNode(context.Context, *KickNodeReq) (*UserOperationResp, error)
-	GetAllStats5Min(context.Context, *AllStatsReq) (*AllStatsResp, error)
-	GetAllStatsHour(context.Context, *AllStatsReq) (*AllStatsResp, error)
-	GetAllStatsDay(context.Context, *AllStatsDayReq) (*AllStatsResp, error)
-	GetUserStats5Min(context.Context, *UserStatsReq) (*UserStatsResp, error)
-	GetUserStatsHour(context.Context, *UserStatsReq) (*UserStatsResp, error)
-	GetUserStatsDay(context.Context, *UserStatsDayReq) (*UserStatsResp, error)
+	GetUserBaseStats(context.Context, *UserBaseStatsReq) (*UserBaseStatsResp, error)
+	GetUserStatChart(context.Context, *UserStatChartReq) (*UserStatChartResp, error)
 	mustEmbedUnimplementedServerAPIServer()
 }
 
@@ -367,23 +315,11 @@ func (UnimplementedServerAPIServer) GetBlacklist(context.Context, *Empty) (*GetB
 func (UnimplementedServerAPIServer) KickNode(context.Context, *KickNodeReq) (*UserOperationResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method KickNode not implemented")
 }
-func (UnimplementedServerAPIServer) GetAllStats5Min(context.Context, *AllStatsReq) (*AllStatsResp, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetAllStats5Min not implemented")
+func (UnimplementedServerAPIServer) GetUserBaseStats(context.Context, *UserBaseStatsReq) (*UserBaseStatsResp, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetUserBaseStats not implemented")
 }
-func (UnimplementedServerAPIServer) GetAllStatsHour(context.Context, *AllStatsReq) (*AllStatsResp, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetAllStatsHour not implemented")
-}
-func (UnimplementedServerAPIServer) GetAllStatsDay(context.Context, *AllStatsDayReq) (*AllStatsResp, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetAllStatsDay not implemented")
-}
-func (UnimplementedServerAPIServer) GetUserStats5Min(context.Context, *UserStatsReq) (*UserStatsResp, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetUserStats5Min not implemented")
-}
-func (UnimplementedServerAPIServer) GetUserStatsHour(context.Context, *UserStatsReq) (*UserStatsResp, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetUserStatsHour not implemented")
-}
-func (UnimplementedServerAPIServer) GetUserStatsDay(context.Context, *UserStatsDayReq) (*UserStatsResp, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetUserStatsDay not implemented")
+func (UnimplementedServerAPIServer) GetUserStatChart(context.Context, *UserStatChartReq) (*UserStatChartResp, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetUserStatChart not implemented")
 }
 func (UnimplementedServerAPIServer) mustEmbedUnimplementedServerAPIServer() {}
 func (UnimplementedServerAPIServer) testEmbeddedByValue()                   {}
@@ -676,110 +612,38 @@ func _ServerAPI_KickNode_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ServerAPI_GetAllStats5Min_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(AllStatsReq)
+func _ServerAPI_GetUserBaseStats_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UserBaseStatsReq)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ServerAPIServer).GetAllStats5Min(ctx, in)
+		return srv.(ServerAPIServer).GetUserBaseStats(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ServerAPI_GetAllStats5Min_FullMethodName,
+		FullMethod: ServerAPI_GetUserBaseStats_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerAPIServer).GetAllStats5Min(ctx, req.(*AllStatsReq))
+		return srv.(ServerAPIServer).GetUserBaseStats(ctx, req.(*UserBaseStatsReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ServerAPI_GetAllStatsHour_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(AllStatsReq)
+func _ServerAPI_GetUserStatChart_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UserStatChartReq)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ServerAPIServer).GetAllStatsHour(ctx, in)
+		return srv.(ServerAPIServer).GetUserStatChart(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ServerAPI_GetAllStatsHour_FullMethodName,
+		FullMethod: ServerAPI_GetUserStatChart_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerAPIServer).GetAllStatsHour(ctx, req.(*AllStatsReq))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ServerAPI_GetAllStatsDay_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(AllStatsDayReq)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ServerAPIServer).GetAllStatsDay(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ServerAPI_GetAllStatsDay_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerAPIServer).GetAllStatsDay(ctx, req.(*AllStatsDayReq))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ServerAPI_GetUserStats5Min_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(UserStatsReq)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ServerAPIServer).GetUserStats5Min(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ServerAPI_GetUserStats5Min_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerAPIServer).GetUserStats5Min(ctx, req.(*UserStatsReq))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ServerAPI_GetUserStatsHour_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(UserStatsReq)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ServerAPIServer).GetUserStatsHour(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ServerAPI_GetUserStatsHour_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerAPIServer).GetUserStatsHour(ctx, req.(*UserStatsReq))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ServerAPI_GetUserStatsDay_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(UserStatsDayReq)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ServerAPIServer).GetUserStatsDay(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ServerAPI_GetUserStatsDay_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerAPIServer).GetUserStatsDay(ctx, req.(*UserStatsDayReq))
+		return srv.(ServerAPIServer).GetUserStatChart(ctx, req.(*UserStatChartReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -852,28 +716,12 @@ var ServerAPI_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _ServerAPI_KickNode_Handler,
 		},
 		{
-			MethodName: "GetAllStats5Min",
-			Handler:    _ServerAPI_GetAllStats5Min_Handler,
+			MethodName: "GetUserBaseStats",
+			Handler:    _ServerAPI_GetUserBaseStats_Handler,
 		},
 		{
-			MethodName: "GetAllStatsHour",
-			Handler:    _ServerAPI_GetAllStatsHour_Handler,
-		},
-		{
-			MethodName: "GetAllStatsDay",
-			Handler:    _ServerAPI_GetAllStatsDay_Handler,
-		},
-		{
-			MethodName: "GetUserStats5Min",
-			Handler:    _ServerAPI_GetUserStats5Min_Handler,
-		},
-		{
-			MethodName: "GetUserStatsHour",
-			Handler:    _ServerAPI_GetUserStatsHour_Handler,
-		},
-		{
-			MethodName: "GetUserStatsDay",
-			Handler:    _ServerAPI_GetUserStatsDay_Handler,
+			MethodName: "GetUserStatChart",
+			Handler:    _ServerAPI_GetUserStatChart_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

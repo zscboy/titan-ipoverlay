@@ -99,6 +99,16 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Path:    "/user/startorstop",
 				Handler: startOrStopUserHandler(serverCtx),
 			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/user/stats/base",
+				Handler: GetUserBaseStatsHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/user/stats/chart",
+				Handler: GetUserStatsChartHandler(serverCtx),
+			},
 		},
 		rest.WithJwt(serverCtx.Config.JwtAuth.AccessSecret),
 	)

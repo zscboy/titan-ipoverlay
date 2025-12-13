@@ -22,7 +22,7 @@ func floorTo5Min(t time.Time) int64 {
 }
 
 // 保存用户每 5 分钟流量
-func AddUsersTrafficFiveMinutes(ctx context.Context, rdb *redis.Redis, users map[string]int64) error {
+func AddUsersTraffic5Minutes(ctx context.Context, rdb *redis.Redis, users map[string]int64) error {
 	now := time.Now()
 	ts := floorTo5Min(now)            // 5 分钟粒度时间戳
 	scoreBase := ts << fiveMinDataBit // 高位存时间戳
@@ -71,12 +71,15 @@ func AddUsersTrafficFiveMinutes(ctx context.Context, rdb *redis.Redis, users map
 }
 
 // 获取用户最近 N 小时的流量
-func ListUserTrafficPer5Min(ctx context.Context, rdb *redis.Redis, userName string, hours int) (map[int64]int64, error) {
-	now := time.Now()
-	startTs := now.Add(-time.Hour*time.Duration(hours)).Unix() / fiveMinutes
-	start := startTs << fiveMinDataBit
-	stop := ((now.Unix() / fiveMinutes) + 1) << fiveMinDataBit
-	key := fmt.Sprintf(redisKeyUserTraffic5min, userName)
+// startTime, endTime 是时间戳
+func ListUserTrafficPer5Min(ctx context.Context, rdb *redis.Redis, usernmae string, startTime int64, endTime int64) (map[int64]int64, error) {
+	if startTime < 0 || endTime < 0 {
+		return nil, fmt.Errorf("invalid startTime and endTime")
+	}
+
+	start := (startTime / fiveMinutes) << fiveMinDataBit
+	stop := ((endTime / fiveMinutes) + 1) << fiveMinDataBit
+	key := fmt.Sprintf(redisKeyUserTraffic5min, usernmae)
 	pairs, err := rdb.ZrangebyscoreWithScores(key, start, stop)
 	if err != nil {
 		return nil, err
@@ -93,9 +96,9 @@ func ListUserTrafficPer5Min(ctx context.Context, rdb *redis.Redis, userName stri
 }
 
 // 获取全部用户最近 N 小时的流量
-func ListAllTrafficPer5Min(ctx context.Context, rdb *redis.Redis, hours int) (map[int64]int64, error) {
+func ListAllTrafficPer5Min(ctx context.Context, rdb *redis.Redis, minutes int) (map[int64]int64, error) {
 	now := time.Now()
-	startTs := now.Add(-time.Hour*time.Duration(hours)).Unix() / fiveMinutes
+	startTs := now.Add(-time.Minute*time.Duration(minutes)).Unix() / fiveMinutes
 	start := startTs << fiveMinDataBit
 	stop := ((now.Unix() / fiveMinutes) + 1) << fiveMinDataBit
 
@@ -112,4 +115,22 @@ func ListAllTrafficPer5Min(ctx context.Context, rdb *redis.Redis, hours int) (ma
 	}
 
 	return res, nil
+}
+
+// return timastamp, traffic, err
+func GetUserLastTrafficPer5Min(rdb *redis.Redis, username string) (int64, int64, error) {
+	key := fmt.Sprintf(redisKeyUserTraffic5min, username)
+	pairs, err := rdb.ZrevrangeWithScores(key, 0, 0)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	if len(pairs) > 0 {
+		ts, _ := strconv.ParseInt(pairs[0].Key, 10, 64)
+		ts = ts * fiveMinutes
+		traffic := int64(pairs[0].Score) & ((1 << fiveMinDataBit) - 1)
+		return ts, traffic, nil
+	}
+
+	return 0, 0, nil
 }

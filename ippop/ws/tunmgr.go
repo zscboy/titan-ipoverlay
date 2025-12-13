@@ -484,7 +484,15 @@ func (tm *TunnelManager) startUserTrafficTimer() {
 	for {
 		<-ticker.C
 		trafficMap := tm.userTraffic.snapshotAndClear()
-		if err := model.AddUsersDayTraffic(context.TODO(), tm.redis, trafficMap); err != nil {
+		if err := model.AddUsersTrafficOneDay(context.TODO(), tm.redis, trafficMap); err != nil {
+			logx.Errorf("AddUsersDayTraffic failed:%v", err)
+		}
+
+		if err := model.AddUsersTrafficOneHour(context.TODO(), tm.redis, trafficMap); err != nil {
+			logx.Errorf("AddUsersDayTraffic failed:%v", err)
+		}
+
+		if err := model.AddUsersTraffic5Minutes(context.TODO(), tm.redis, trafficMap); err != nil {
 			logx.Errorf("AddUsersDayTraffic failed:%v", err)
 		}
 

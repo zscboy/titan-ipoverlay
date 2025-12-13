@@ -157,6 +157,57 @@ type (
 	KickNodeReq {
 		NodeID string `form:"nodeid"`
 	}
+	AllStatsPer5MinReq {
+		PopID   string `form:"popid"`
+		Minutes int32  `form:"minutes"`
+	}
+	AllStatsPerHourReq {
+		PopID string `form:"popid"`
+		Hours int32  `form:"hours"`
+	}
+	AllStatsPerDayReq {
+		PopID string `form:"popid"`
+		Days  int32  `form:"days"`
+	}
+	UserStats5PerMinReq {
+		Username string `form:"username"`
+		Minutes  int32  `form:"minutes"`
+	}
+	UserStatsPerHourReq {
+		Username string `form:"username"`
+		Hours    int32  `form:"hours"`
+	}
+	UserStatsPerDayReq {
+		Username string `form:"username"`
+		Days     int32  `form:"days"`
+	}
+	StatPoint {
+		Timestamp int64 `json:"timestamp"`
+		// unit KB
+		Bandwidth int64 `json:"bandwidth"`
+		Traffic   int64 `json:"traffic'`
+	}
+	StatsResp {
+		Stats []*StatPoint `json:"stats"`
+	}
+	UserStatsChartReq {
+		Type      string `form:"type"` // 类型为:minute, hour, day
+		Username  string `form:"username"`
+		StartTime int64  `form:"start_time"`
+		EndTime   int64  `form:"end_time"`
+	}
+	UserStatsChartResp {
+		Stats []*StatPoint `json:"stats"`
+	}
+	UserBaseStatsReq {
+		Username string `form:"username"`
+	}
+	UserBaseStatsResp {
+		CurrentBandwidth int64 `json:"current_bandwidth"`
+		TopBandwidth     int64 `json:"top_bandwidth"`
+		TotalTraffic     int64 `json:"total_traffic"`
+		CurrentConns     int   `json:"current_conns"`
+	}
 )
 
 service server-api {
@@ -201,6 +252,12 @@ service server-api {
 
 	@handler startOrStopUser
 	post /user/startorstop (StartOrStopUserReq) returns (UserOperationResp)
+
+	@handler GetUserStatsChart
+	get /user/stats/chart (UserStatsChartReq) returns (UserStatsChartResp)
+
+	@handler GetUserBaseStats
+	get /user/stats/base (UserBaseStatsReq) returns (UserBaseStatsResp)
 
 	@handler addBlackList
 	post /node/blacklist/add (AddBlackListReq) returns (UserOperationResp)
