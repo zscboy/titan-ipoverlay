@@ -70,11 +70,13 @@ func AddUsersTrafficOneHour(ctx context.Context, rdb *redis.Redis, users map[str
 }
 
 // 获取用户最近 N 小时的流量
-func ListUserTrafficPerHour(ctx context.Context, rdb *redis.Redis, userName string, hours int) (map[int64]int64, error) {
-	now := time.Now()
-	startTs := now.Add(-time.Hour*time.Duration(hours)).Unix() / oneHour
-	start := startTs << oneHourDataBit
-	stop := ((now.Unix() / oneHour) + 1) << oneHourDataBit
+func ListUserTrafficPerHour(ctx context.Context, rdb *redis.Redis, userName string, startTime int64, endTime int64) (map[int64]int64, error) {
+	if startTime < 0 || endTime < 0 {
+		return nil, fmt.Errorf("invalid startTime and endTime")
+	}
+
+	start := (startTime / oneHour) << oneHourDataBit
+	stop := ((endTime / oneHour) + 1) << oneHourDataBit
 	// logx.Debugf("start:%d, stop:%d", start, stop)
 	key := fmt.Sprintf(redisKeyUserTrafficHour, userName)
 	pairs, err := rdb.ZrangebyscoreWithScores(key, start, stop)

@@ -46,7 +46,7 @@ type User struct {
 	TotalTraffic int64 `redis:"total_traffic"`
 	// unit Bytes
 	CurrentTraffic int64 `redis:"current_traffic"`
-
+	TopBandwidth   int64 `redis:"top_bandwidth"`
 	// 1.manual, 2.auto, 3.Timed, 4.customer
 	RouteMode int `redis:"route_mode"`
 	// if NodeID is empty, will auto allocate a node for user

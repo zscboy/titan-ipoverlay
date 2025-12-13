@@ -149,13 +149,17 @@ message KickNodeReq {
   string node_id = 1;
 }
 
-message TrendData {
+message StatPoint {
   int64 timestamp = 1;
   int64 bandwidth = 2;
   int64 traffic = 3;
 }
 
-message AllStatsReq {
+message AllStatsMinuteReq {
+  int32 minutes = 1;
+}
+
+message AllStatsHourReq {
   int32 hours = 1;
 }
 
@@ -163,11 +167,16 @@ message AllStatsDayReq {
   int32 days = 1;
 }
 
-message AllStatsResp {
-  repeated TrendData trend_datas = 1;
+message StatsResp {
+  repeated StatPoint stats = 1;
 }
 
-message UserStatsReq {
+message UserStatsMinuteReq {
+  string username = 1;
+  int32 minutes = 2;
+}
+
+message UserStatsHourReq {
   string username = 1;
   int32 hours = 2;
 }
@@ -177,10 +186,29 @@ message UserStatsDayReq {
   int32 days = 2;
 }
 
-message UserStatsResp {
-  repeated TrendData trend_datas = 1;
+// 获取一批指定用户的基础统计
+message UserBaseStatsReq {
+  string username = 1;
 }
 
+message UserBaseStatsResp {
+  int64 current_bandwidth = 2;
+  int64 top_bandwidth = 3;
+  int64 total_traffic = 4;
+  int64 current_conns = 5;
+}
+
+
+message UserStatChartReq {
+  string username = 1;
+  string type = 2;
+  int64 start_time = 3;
+  int64 end_time = 4;
+}
+
+message UserStatChartResp {
+  repeated StatPoint stats = 1;
+}
 
 message Empty {}
 
@@ -202,12 +230,9 @@ service ServerAPI {
   rpc RemoveBlacklist(RemoveBlacklistReq) returns (UserOperationResp);
   rpc GetBlacklist(Empty) returns (GetBlacklistResp);
   rpc KickNode(KickNodeReq) returns (UserOperationResp);
-  
-  rpc GetAllStats5Min (AllStatsReq) returns (AllStatsResp);
-  rpc GetAllStatsHour (AllStatsReq) returns (AllStatsResp);
-  rpc GetAllStatsDay (AllStatsDayReq) returns (AllStatsResp);
 
-  rpc GetUserStats5Min (UserStatsReq) returns (UserStatsResp);
-  rpc GetUserStatsHour (UserStatsReq) returns (UserStatsResp);
-  rpc GetUserStatsDay (UserStatsDayReq) returns (UserStatsResp);
+
+  rpc GetUserBaseStats (UserBaseStatsReq) returns (UserBaseStatsResp);
+  rpc GetUserStatChart (UserStatChartReq) returns (UserStatChartResp);
+
 }

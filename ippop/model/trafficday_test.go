@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/zeromicro/go-zero/core/stores/redis"
 )
@@ -23,7 +24,7 @@ func TestTrafficOneDay(t *testing.T) {
 		return
 	}
 
-	traffics, err := ListUserTrafficPerDay(context.TODO(), rd, "test4", 24*7)
+	traffics, err := ListUserTrafficPerDay(context.TODO(), rd, "test4", time.Now().Add(-time.Hour*(24*60)).Unix(), time.Now().Unix())
 	if err != nil {
 		t.Logf("ListUserTrafficPer5Min failed:%v", err)
 		return
@@ -57,7 +58,7 @@ func TestListTrafficPerDay(t *testing.T) {
 	// 	return
 	// }
 
-	traffics, err := ListUserTrafficPerDay(context.TODO(), rd, "test4", 24*7)
+	traffics, err := ListUserTrafficPerDay(context.TODO(), rd, "test4", time.Now().Add(-time.Hour*(24*60)).Unix(), time.Now().Unix())
 	if err != nil {
 		t.Logf("ListUserTrafficPer5Min failed:%v", err)
 		return
