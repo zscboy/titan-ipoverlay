@@ -108,7 +108,7 @@ type (
 	}
 	SwitchUserRouteNodeReq {
 		UserName string `json:"user_name"`
-		NodeId   string `json:"node_id, optional"`
+		NodeId   string `json:"node_id,optional"`
 	}
 	DeleteUserReq {
 		UserName string `json:"user_name"`
@@ -185,7 +185,7 @@ type (
 		Timestamp int64 `json:"timestamp"`
 		// unit KB
 		Bandwidth int64 `json:"bandwidth"`
-		Traffic   int64 `json:"traffic'`
+		Traffic   int64 `json:"traffic"`
 	}
 	StatsResp {
 		Stats []*StatPoint `json:"stats"`
@@ -200,11 +200,11 @@ type (
 		Stats []*StatPoint `json:"stats"`
 	}
 	SetStatPoint {
-		Username string `form:"username"`
-		Traffic  int64  `json:"traffic'`
+		Username string `json:"username"`
+		Traffic  int64  `json:"traffic"`
 	}
 	SetUserStatsReq {
-		Type  string          `form:"type"` // 类型为:minute, hour, day
+		Type  string          `json:"type"` // 类型为:minute, hour, day
 		Stats []*SetStatPoint `json:"stats"`
 	}
 	SetUserStatsResp  {}

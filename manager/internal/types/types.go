@@ -146,12 +146,12 @@ type Route struct {
 }
 
 type SetStatPoint struct {
-	Username string `form:"username"`
-	Traffic  int64  `json:"traffic'`
+	Username string `json:"username"`
+	Traffic  int64  `json:"traffic"`
 }
 
 type SetUserStatsReq struct {
-	Type  string          `form:"type"` // 类型为:minute, hour, day
+	Type  string          `json:"type"` // 类型为:minute, hour, day
 	Stats []*SetStatPoint `json:"stats"`
 }
 
@@ -166,7 +166,7 @@ type StartOrStopUserReq struct {
 type StatPoint struct {
 	Timestamp int64 `json:"timestamp"`
 	Bandwidth int64 `json:"bandwidth"`
-	Traffic   int64 `json:"traffic'`
+	Traffic   int64 `json:"traffic"`
 }
 
 type StatsResp struct {
@@ -175,7 +175,7 @@ type StatsResp struct {
 
 type SwitchUserRouteNodeReq struct {
 	UserName string `json:"user_name"`
-	NodeId   string `json:"node_id, optional"`
+	NodeId   string `json:"node_id,optional"`
 }
 
 type TrafficLimit struct {
