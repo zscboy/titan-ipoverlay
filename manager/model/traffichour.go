@@ -44,7 +44,7 @@ func AddUsersTrafficOneHour(ctx context.Context, rdb *redis.Redis, users map[str
 		total += trafficKB
 		key := fmt.Sprintf(redisKeyUserTrafficHour, user)
 
-		// NX 确保当前1小时 bucket 存在
+		// NX 确保当前1小时bucket 存在
 		pipe.ZAddNX(ctx, key, goredis.Z{
 			Score:  float64(scoreBase),
 			Member: fmt.Sprintf("%d", ts),

@@ -199,6 +199,15 @@ type (
 	UserStatsChartResp {
 		Stats []*StatPoint `json:"stats"`
 	}
+	SetStatPoint {
+		Username string `form:"username"`
+		Traffic  int64  `json:"traffic'`
+	}
+	SetUserStatsReq {
+		Type  string          `form:"type"` // 类型为:minute, hour, day
+		Stats []*SetStatPoint `json:"stats"`
+	}
+	SetUserStatsResp  {}
 	UserBaseStatsReq {
 		Username string `form:"username"`
 	}
@@ -255,6 +264,9 @@ service server-api {
 
 	@handler GetUserStatsChart
 	get /user/stats/chart (UserStatsChartReq) returns (UserStatsChartResp)
+
+	@handler SetUserStats
+	post /user/stats (SetUserStatsReq) returns (SetUserStatsResp)
 
 	@handler GetUserBaseStats
 	get /user/stats/base (UserBaseStatsReq) returns (UserBaseStatsResp)
