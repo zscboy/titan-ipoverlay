@@ -15,6 +15,7 @@ import (
 	"titan-ipoverlay/ippop/socks5"
 
 	"github.com/bluele/gcache"
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/stores/redis"
@@ -41,6 +42,7 @@ type UserSession struct {
 }
 
 type ExpiredSession struct {
+	username      string
 	sessionID     string
 	deviceID      string
 	isLeaseDevice bool
@@ -526,6 +528,7 @@ func (tm *TunnelManager) collectExpiredSessions() map[string]*ExpiredSession {
 	expiredSessions := make(map[string]*ExpiredSession)
 
 	for username, userSessions := range tm.userSessionMap {
+		logx.Debugf("user %s session count %d", username, len(userSessions))
 		for sessionID, session := range userSessions {
 			if session.connectCount > 0 {
 				logx.Debugf("session %s connectCount %d", sessionID, session.connectCount)
@@ -533,13 +536,14 @@ func (tm *TunnelManager) collectExpiredSessions() map[string]*ExpiredSession {
 			}
 
 			if time.Since(session.disconnectTime) <= userSessionExpireDuration {
-				logx.Debugf("session %s is free %fs count %d", sessionID, time.Since(session.disconnectTime).Seconds(), session.connectCount)
+				// logx.Debugf("session %s is free later %fs  count %d", sessionID, (userSessionExpireDuration - time.Since(session.disconnectTime)).Seconds(), session.connectCount)
 				continue
 			}
 
 			expiredSession := &ExpiredSession{
 				sessionID: sessionID,
 				deviceID:  session.deviceID,
+				username:  username,
 			}
 
 			if v, ok := tm.tunnels.Load(session.deviceID); ok {
@@ -547,7 +551,7 @@ func (tm *TunnelManager) collectExpiredSessions() map[string]*ExpiredSession {
 				expiredSession.isLeaseDevice = tunnel.userSessionID == sessionID
 			}
 
-			expiredSessions[username] = expiredSession
+			expiredSessions[uuid.NewString()] = expiredSession
 		}
 	}
 
@@ -555,13 +559,14 @@ func (tm *TunnelManager) collectExpiredSessions() map[string]*ExpiredSession {
 }
 
 func (tm *TunnelManager) removeSessions(expiredSessions map[string]*ExpiredSession) {
-	logx.Debugf("remove expire session %#v", expiredSessions)
-	for username, sess := range expiredSessions {
-		sessions := tm.userSessionMap[username]
+	// logx.Debugf("remove expire session count %d", len(expiredSessions))
+	for _, sess := range expiredSessions {
+		// logx.Debugf("remove session %#v", sess)
+		sessions := tm.userSessionMap[sess.username]
 		delete(sessions, sess.sessionID)
 
 		if len(sessions) == 0 {
-			delete(tm.userSessionMap, username)
+			delete(tm.userSessionMap, sess.username)
 		}
 
 		if sess.isLeaseDevice {
