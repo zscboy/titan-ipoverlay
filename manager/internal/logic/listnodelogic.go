@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"titan-ipoverlay/ippop/rpc/serverapi"
+	"titan-ipoverlay/manager/internal/logic/util"
 	"titan-ipoverlay/manager/internal/svc"
 	"titan-ipoverlay/manager/internal/types"
 
@@ -44,7 +45,7 @@ func (l *ListNodeLogic) ListNode(req *types.ListNodeReq) (resp *types.ListNodeRe
 
 	nodes := make([]*types.Node, 0, len(listNodeResp.Nodes))
 	for _, node := range listNodeResp.Nodes {
-		nodes = append(nodes, toNodeResp(node))
+		nodes = append(nodes, util.ToNodeResp(node))
 	}
 
 	return &types.ListNodeResp{Nodes: nodes, Total: int(listNodeResp.Total)}, nil

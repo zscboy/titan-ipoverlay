@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"titan-ipoverlay/ippop/rpc/serverapi"
+	"titan-ipoverlay/manager/internal/logic/util"
 	"titan-ipoverlay/manager/internal/svc"
 	"titan-ipoverlay/manager/internal/types"
 	"titan-ipoverlay/manager/model"
@@ -43,11 +44,11 @@ func (l *ModifyUserLogic) ModifyUser(req *types.ModifyUserReq) (resp *types.User
 
 	in := &serverapi.ModifyUserReq{UserName: req.UserName}
 	if req.TrafficLimit != nil {
-		in.TrafficLimit = toTrafficLimitReq(req.TrafficLimit)
+		in.TrafficLimit = util.ToTrafficLimitReq(req.TrafficLimit)
 	}
 
 	if req.Route != nil {
-		in.Route = toRouteReq(req.Route)
+		in.Route = util.ToRouteReq(req.Route)
 	}
 
 	modifyUserResp, err := server.API.ModifyUser(l.ctx, in)

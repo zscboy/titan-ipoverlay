@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"titan-ipoverlay/ippop/rpc/serverapi"
+	"titan-ipoverlay/manager/internal/logic/util"
 	"titan-ipoverlay/manager/internal/svc"
 	"titan-ipoverlay/manager/internal/types"
 	"titan-ipoverlay/manager/model"
@@ -46,8 +47,8 @@ func (l *GetUserLogic) GetUser(req *types.GetUserReq) (resp *types.GetUserResp, 
 		return nil, err
 	}
 
-	traffic := toTrafficLimitResp(getUserResp.TrafficLimit)
-	route := toRouteResp(getUserResp.Route)
+	traffic := util.ToTrafficLimitResp(getUserResp.TrafficLimit)
+	route := util.ToRouteResp(getUserResp.Route)
 
 	user := types.User{
 		UserName:            getUserResp.UserName,

@@ -300,3 +300,24 @@ service server-api {
 	post /node/kick (KickNodeReq) returns (UserOperationResp)
 }
 
+@server (
+	prefix: /api/yuanren
+	group:  yuanren
+	jwt:    JwtAuth // Enable jwt authentication
+)
+service server-api {
+	@handler getPops
+	get /pops returns (GetPopsResp)
+
+	@handler createUser
+	post /user/create (CreateUserReq)
+
+	@handler modifyUser
+	post /user/modify (ModifyUserReq)
+
+	@handler deleteUser
+	post /user/delete (DeleteUserReq)
+	@handler startOrStopUser
+	post /user/startorstop (StartOrStopUserReq)
+}
+

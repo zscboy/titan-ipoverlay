@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"titan-ipoverlay/ippop/rpc/serverapi"
+	"titan-ipoverlay/manager/internal/logic/util"
 	"titan-ipoverlay/manager/internal/svc"
 	"titan-ipoverlay/manager/internal/types"
 
@@ -49,8 +50,8 @@ func (l *ListUserLogic) ListUser(req *types.ListUserReq) (resp *types.ListUserRe
 			NodeOnline:          user.NodeOnline,
 			CurrentTraffic:      user.CurrentTraffic,
 			Off:                 user.Off,
-			TrafficLimit:        toTrafficLimitResp(user.TrafficLimit),
-			Route:               toRouteResp(user.Route),
+			TrafficLimit:        util.ToTrafficLimitResp(user.TrafficLimit),
+			Route:               util.ToRouteResp(user.Route),
 			UploadRateLimit:     user.UploadRateLimite,
 			DownloadRateLimit:   user.DownloadRateLimit,
 			LastRouteSwitchTime: user.LastRouteSwitchTime,

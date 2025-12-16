@@ -6,6 +6,7 @@ package handler
 import (
 	"net/http"
 
+	yuanren "titan-ipoverlay/manager/internal/handler/yuanren"
 	"titan-ipoverlay/manager/internal/svc"
 
 	"github.com/zeromicro/go-zero/rest"
@@ -121,5 +122,37 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 			},
 		},
 		rest.WithJwt(serverCtx.Config.JwtAuth.AccessSecret),
+	)
+
+	server.AddRoutes(
+		[]rest.Route{
+			{
+				Method:  http.MethodGet,
+				Path:    "/pops",
+				Handler: yuanren.GetPopsHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/user/create",
+				Handler: yuanren.CreateUserHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/user/delete",
+				Handler: yuanren.DeleteUserHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/user/modify",
+				Handler: yuanren.ModifyUserHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/user/startorstop",
+				Handler: yuanren.StartOrStopUserHandler(serverCtx),
+			},
+		},
+		rest.WithJwt(serverCtx.Config.JwtAuth.AccessSecret),
+		rest.WithPrefix("/api/yuanren"),
 	)
 }

@@ -1,28 +1,28 @@
-package logic
+package util
 
 import (
 	"titan-ipoverlay/ippop/rpc/serverapi"
 	"titan-ipoverlay/manager/internal/types"
 )
 
-func toCreateUserResp(in *serverapi.CreateUserResp) *types.CreateUserResp {
+func ToCreateUserResp(in *serverapi.CreateUserResp) *types.CreateUserResp {
 	resp := &types.CreateUserResp{
 		UserName: in.UserName,
 		NodeIP:   in.NodeIp,
 	}
 
 	if in.TrafficLimit != nil {
-		resp.TrafficLimit = toTrafficLimitResp(in.TrafficLimit)
+		resp.TrafficLimit = ToTrafficLimitResp(in.TrafficLimit)
 	}
 
 	if in.Route != nil {
-		resp.Route = toRouteResp(in.Route)
+		resp.Route = ToRouteResp(in.Route)
 	}
 
 	return resp
 }
 
-func toTrafficLimitResp(in *serverapi.TrafficLimit) *types.TrafficLimit {
+func ToTrafficLimitResp(in *serverapi.TrafficLimit) *types.TrafficLimit {
 	if in == nil {
 		return nil
 	}
@@ -35,7 +35,7 @@ func toTrafficLimitResp(in *serverapi.TrafficLimit) *types.TrafficLimit {
 	return &trafficLimit
 }
 
-func toTrafficLimitReq(in *types.TrafficLimit) *serverapi.TrafficLimit {
+func ToTrafficLimitReq(in *types.TrafficLimit) *serverapi.TrafficLimit {
 	if in == nil {
 		return nil
 	}
@@ -48,7 +48,7 @@ func toTrafficLimitReq(in *types.TrafficLimit) *serverapi.TrafficLimit {
 	return &trafficLimit
 }
 
-func toRouteResp(in *serverapi.Route) *types.Route {
+func ToRouteResp(in *serverapi.Route) *types.Route {
 	if in == nil {
 		return nil
 	}
@@ -62,7 +62,7 @@ func toRouteResp(in *serverapi.Route) *types.Route {
 	return &route
 }
 
-func toRouteReq(in *types.Route) *serverapi.Route {
+func ToRouteReq(in *types.Route) *serverapi.Route {
 	if in == nil {
 		return nil
 	}
@@ -76,7 +76,7 @@ func toRouteReq(in *types.Route) *serverapi.Route {
 	return &route
 }
 
-func toNodeResp(in *serverapi.Node) *types.Node {
+func ToNodeResp(in *serverapi.Node) *types.Node {
 	if in == nil {
 		return nil
 	}

@@ -26,6 +26,15 @@ type Geo struct {
 	Key string
 }
 
+type Yuanren struct {
+	Name        string
+	Id          string
+	Area        string
+	CountryCode string
+	Socks5Addr  string
+	Pops        []string
+}
+
 type Config struct {
 	rest.RestConf
 	Redis   redis.RedisConf
@@ -35,4 +44,5 @@ type Config struct {
 	DefaultArea string
 	Geo         Geo
 	Whitelist   []string `json:",optional"`
+	Yuanren     Yuanren
 }

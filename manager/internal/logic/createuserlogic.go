@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"titan-ipoverlay/ippop/rpc/serverapi"
+	"titan-ipoverlay/manager/internal/logic/util"
 	"titan-ipoverlay/manager/internal/svc"
 	"titan-ipoverlay/manager/internal/types"
 	"titan-ipoverlay/manager/model"
@@ -43,11 +44,11 @@ func (l *CreateUserLogic) CreateUser(req *types.CreateUserReq) (resp *types.Crea
 
 	in := &serverapi.CreateUserReq{UserName: req.UserName, Password: req.Password, UploadRateLimite: req.UploadRateLimit, DownloadRateLimit: req.DownloadRateLimit}
 	if req.TrafficLimit != nil {
-		in.TrafficLimit = toTrafficLimitReq(req.TrafficLimit)
+		in.TrafficLimit = util.ToTrafficLimitReq(req.TrafficLimit)
 	}
 
 	if req.Route != nil {
-		in.Route = toRouteReq(req.Route)
+		in.Route = util.ToRouteReq(req.Route)
 	}
 
 	createUserResp, err := server.API.CreateUser(l.ctx, in)
@@ -59,5 +60,5 @@ func (l *CreateUserLogic) CreateUser(req *types.CreateUserReq) (resp *types.Crea
 		return nil, err
 	}
 
-	return toCreateUserResp(createUserResp), nil
+	return util.ToCreateUserResp(createUserResp), nil
 }
