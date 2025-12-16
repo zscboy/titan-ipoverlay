@@ -17,33 +17,28 @@ const (
 	oneDay        = 24 * 60 * 60
 )
 
-func floorToDay(t time.Time) int64 {
-	return t.Unix() / oneDay // oneDay = 5分钟
+func floorToDay(timestamp int64) int64 {
+	return timestamp / oneDay // oneDay = 24小时
 }
 
 // 保存用户每1天流量
-func AddUsersTrafficOneDay(ctx context.Context, rdb *redis.Redis, users map[string]int64) error {
-	now := time.Now()
-	ts := floorToDay(now)            // 1天粒度时间戳
-	scoreBase := ts << oneDayDataBit // 高位存时间戳
-	minScore := (now.Add(-time.Hour*keepSevenDays).Unix() / oneDay) << oneDayDataBit
+func AddUsersTrafficOneDay(ctx context.Context, rdb *redis.Redis, traffics []*TrafficRecore) error {
+	minScore := (time.Now().Add(-time.Hour*keepSevenDays).Unix() / oneDay) << oneDayDataBit
 
 	pipe, err := rdb.TxPipeline()
 	if err != nil {
 		return err
 	}
 
-	total := int64(0)
-
-	for user, traffic := range users {
-		if traffic <= 0 {
+	for _, traffic := range traffics {
+		if traffic.Value <= 0 {
 			continue
 		}
 
-		trafficKB := traffic / KB
+		ts := floorToDay(traffic.Timestamp) // 1天粒度时间戳
+		scoreBase := ts << oneDayDataBit    // 高位存时间戳
 
-		total += trafficKB
-		key := fmt.Sprintf(redisKeyUserTrafficDay, user)
+		key := fmt.Sprintf(redisKeyUserTrafficDay, traffic.Username)
 
 		// NX 确保当前1天bucket 存在
 		pipe.ZAddNX(ctx, key, goredis.Z{
@@ -51,20 +46,13 @@ func AddUsersTrafficOneDay(ctx context.Context, rdb *redis.Redis, users map[stri
 			Member: fmt.Sprintf("%d", ts),
 		})
 
+		trafficKB := traffic.Value / KB
 		// 增加 traffic（低 20bit 内累积）
 		pipe.ZIncrBy(ctx, key, float64(trafficKB), fmt.Sprintf("%d", ts))
 
 		// 清理旧数据
 		pipe.ZRemRangeByScore(ctx, key, "0", fmt.Sprintf("%d", minScore))
 	}
-
-	// 汇总 all
-	pipe.ZAddNX(ctx, redisKeyUserTrafficDayAll, goredis.Z{
-		Score:  float64(scoreBase),
-		Member: fmt.Sprintf("%d", ts),
-	})
-	pipe.ZIncrBy(ctx, redisKeyUserTrafficDayAll, float64(total), fmt.Sprintf("%d", ts))
-	pipe.ZRemRangeByScore(ctx, redisKeyUserTrafficDayAll, "0", fmt.Sprintf("%d", minScore))
 
 	_, err = pipe.Exec(ctx)
 	return err

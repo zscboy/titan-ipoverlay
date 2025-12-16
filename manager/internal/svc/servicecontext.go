@@ -4,6 +4,7 @@ import (
 	"context"
 	"titan-ipoverlay/ippop/rpc/serverapi"
 	"titan-ipoverlay/manager/internal/config"
+	"titan-ipoverlay/manager/internal/push"
 
 	"github.com/zeromicro/go-zero/core/stores/redis"
 	"github.com/zeromicro/go-zero/rest"
@@ -24,14 +25,16 @@ type ServiceContext struct {
 	Redis         *redis.Redis
 	JwtMiddleware rest.Middleware
 	Pops          map[string]*Pop
+	PushManager   *push.PushManager
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
 	redis := redis.MustNewRedis(c.Redis)
 	return &ServiceContext{
-		Config: c,
-		Redis:  redis,
-		Pops:   newPops(c),
+		Config:      c,
+		Redis:       redis,
+		Pops:        newPops(c),
+		PushManager: push.NewPushManager(redis),
 	}
 }
 

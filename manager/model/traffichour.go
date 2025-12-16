@@ -16,33 +16,29 @@ const (
 	oneHour        = 1 * 60 * 60
 )
 
-func floorToHour(t time.Time) int64 {
-	return t.Unix() / oneHour // oneHour = 5分钟
+func floorToHour(timestamp int64) int64 {
+	return timestamp / oneHour // oneHour = 5分钟
 }
 
 // 保存用户每1小时流量
-func AddUsersTrafficOneHour(ctx context.Context, rdb *redis.Redis, users map[string]int64) error {
-	now := time.Now()
-	ts := floorToHour(now)            // 1小时粒度时间戳
-	scoreBase := ts << oneHourDataBit // 高位存时间戳
-	minScore := (now.Add(-time.Hour*keepSevenDays).Unix() / oneHour) << oneHourDataBit
+func AddUsersTrafficOneHour(ctx context.Context, rdb *redis.Redis, traffics []*TrafficRecore) error {
+	// scoreBase := ts << oneHourDataBit // 高位存时间戳
+	minScore := (time.Now().Add(-time.Hour*keepSevenDays).Unix() / oneHour) << oneHourDataBit
 
 	pipe, err := rdb.TxPipeline()
 	if err != nil {
 		return err
 	}
 
-	total := int64(0)
-
-	for user, traffic := range users {
-		if traffic <= 0 {
+	for _, traffic := range traffics {
+		if traffic.Value <= 0 {
 			continue
 		}
 
-		trafficKB := traffic / KB
+		ts := floorToHour(traffic.Timestamp) // 1小时粒度时间戳
+		scoreBase := ts << oneHourDataBit    // 高位存时间戳
 
-		total += trafficKB
-		key := fmt.Sprintf(redisKeyUserTrafficHour, user)
+		key := fmt.Sprintf(redisKeyUserTrafficHour, traffic.Username)
 
 		// NX 确保当前1小时bucket 存在
 		pipe.ZAddNX(ctx, key, goredis.Z{
@@ -50,20 +46,13 @@ func AddUsersTrafficOneHour(ctx context.Context, rdb *redis.Redis, users map[str
 			Member: fmt.Sprintf("%d", ts),
 		})
 
+		trafficKB := traffic.Value / KB
 		// 增加 traffic（低 20bit 内累积）
 		pipe.ZIncrBy(ctx, key, float64(trafficKB), fmt.Sprintf("%d", ts))
 
 		// 清理旧数据
 		pipe.ZRemRangeByScore(ctx, key, "0", fmt.Sprintf("%d", minScore))
 	}
-
-	// 汇总 all
-	pipe.ZAddNX(ctx, redisKeyUserTrafficHourAll, goredis.Z{
-		Score:  float64(scoreBase),
-		Member: fmt.Sprintf("%d", ts),
-	})
-	pipe.ZIncrBy(ctx, redisKeyUserTrafficHourAll, float64(total), fmt.Sprintf("%d", ts))
-	pipe.ZRemRangeByScore(ctx, redisKeyUserTrafficHourAll, "0", fmt.Sprintf("%d", minScore))
 
 	_, err = pipe.Exec(ctx)
 	return err

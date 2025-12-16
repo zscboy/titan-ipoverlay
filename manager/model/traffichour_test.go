@@ -11,14 +11,32 @@ import (
 func TestTrafficOneHour(t *testing.T) {
 	conf := redis.RedisConf{Host: "127.0.0.1:6379", Type: "node"}
 	rd := redis.MustNewRedis(conf)
-	users := map[string]int64{
-		"test1": 1024,
-		"test2": 1024 * 2,
-		"test3": 1024 * 3,
-		"test4": 300 * 1024 * 1024 * 1024,
+	nowTimestamp := time.Now().Unix()
+
+	trafficRecores := []*TrafficRecore{
+		&TrafficRecore{
+			"test1",
+			nowTimestamp,
+			1024,
+		},
+		&TrafficRecore{
+			"test1",
+			nowTimestamp,
+			1024 * 2,
+		},
+		&TrafficRecore{
+			"test1",
+			nowTimestamp,
+			1024 * 3,
+		},
+		&TrafficRecore{
+			"test1",
+			nowTimestamp,
+			300 * 1024 * 1024 * 1024,
+		},
 	}
 
-	err := AddUsersTrafficOneHour(context.TODO(), rd, users)
+	err := AddUsersTrafficOneHour(context.TODO(), rd, trafficRecores)
 	if err != nil {
 		t.Logf("AddUsersTrafficFiveMinutes failed:%v", err)
 		return

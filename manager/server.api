@@ -208,6 +208,19 @@ type (
 		Stats []*SetStatPoint `json:"stats"`
 	}
 	SetUserStatsResp  {}
+	PusStatsReq {
+		Type    string // 类型为:traffic
+		Payload interface{}
+	}
+	TrafficPoint {
+		Username  string `json:"username"`
+		Timestamp int64  `json:"timestamp"`
+		Traffic   int64  `json:"traffic"`
+	}
+	Relation {
+		Username   string `json:"username"`
+		ParentUUID string `json:"parent_uuid"`
+	}
 	UserBaseStatsReq {
 		Username string `form:"username"`
 	}
@@ -267,6 +280,9 @@ service server-api {
 
 	@handler SetUserStats
 	post /user/stats (SetUserStatsReq) returns (SetUserStatsResp)
+
+	@handler PushStats
+	post /user/stats/push (PusStatsReq)
 
 	@handler GetUserBaseStats
 	get /user/stats/base (UserBaseStatsReq) returns (UserBaseStatsResp)

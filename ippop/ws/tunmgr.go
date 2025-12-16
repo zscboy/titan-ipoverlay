@@ -347,7 +347,7 @@ func (tm *TunnelManager) handleUserSessionWhenSocks5TCPClose(session *UserSessio
 }
 
 func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks5.SocksTargetInfo) error {
-	logx.Debugf("HandleSocks5TCP, user %s, DomainName %s, port %d", targetInfo.Username, targetInfo.DomainName, targetInfo.Port)
+	logx.Debugf("HandleSocks5TCP, user %s, DomainName %s, port %d, remote:%s", targetInfo.Username, targetInfo.DomainName, targetInfo.Port, tcpConn.RemoteAddr().String())
 	if tm.filterRules.isDeny(targetInfo.DomainName, fmt.Sprintf("%d", targetInfo.Port)) {
 		return fmt.Errorf("tcp: target %s:%d have been deny", targetInfo.DomainName, targetInfo.Port)
 	}

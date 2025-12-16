@@ -17,54 +17,47 @@ const (
 	KB             = 1024
 )
 
-func floorTo5Min(t time.Time) int64 {
-	return t.Unix() / fiveMinutes // fiveMinux = 5分钟
+type TrafficRecore struct {
+	Username  string
+	Timestamp int64
+	Value     int64
+}
+
+func floorTo5Min(timestamp int64) int64 {
+	return timestamp / fiveMinutes // fiveMinux = 5分钟
 }
 
 // 保存用户每 5 分钟流量
-func AddUsersTraffic5Minutes(ctx context.Context, rdb *redis.Redis, users map[string]int64) error {
-	now := time.Now()
-	ts := floorTo5Min(now)            // 5 分钟粒度时间戳
-	scoreBase := ts << fiveMinDataBit // 高位存时间戳
-	minScore := (now.Add(-time.Hour*keep24Hours).Unix() / fiveMinutes) << fiveMinDataBit
+func AddUsersTraffic5Minutes(ctx context.Context, rdb *redis.Redis, traffics []*TrafficRecore) error {
+	minScore := (time.Now().Add(-time.Hour*keep24Hours).Unix() / fiveMinutes) << fiveMinDataBit
 
 	pipe, err := rdb.TxPipeline()
 	if err != nil {
 		return err
 	}
 
-	total := int64(0)
-
-	for user, traffic := range users {
-		if traffic <= 0 {
+	for _, traffic := range traffics {
+		if traffic.Value <= 0 {
 			continue
 		}
 
-		trafficKB := traffic / KB
+		ts := floorTo5Min(traffic.Timestamp) // 5 分钟粒度时间戳
+		scoreBase := ts << fiveMinDataBit    // 高位存时间戳
 
-		total += trafficKB
-		key := fmt.Sprintf(redisKeyUserTraffic5min, user)
+		key := fmt.Sprintf(redisKeyUserTraffic5min, traffic.Username)
 
-		// NX 确保当前 5 分钟 bucket 存在
 		pipe.ZAddNX(ctx, key, goredis.Z{
 			Score:  float64(scoreBase),
 			Member: fmt.Sprintf("%d", ts),
 		})
 
-		// 增加 traffic（低 20bit 内累积）
+		// 增加 traffic（低 fiveMinDataBit 内累积）
+		trafficKB := traffic.Value / KB
 		pipe.ZIncrBy(ctx, key, float64(trafficKB), fmt.Sprintf("%d", ts))
 
 		// 清理旧数据
 		pipe.ZRemRangeByScore(ctx, key, "0", fmt.Sprintf("%d", minScore))
 	}
-
-	// 汇总 all
-	pipe.ZAddNX(ctx, redisKeyUserTraffic5minAll, goredis.Z{
-		Score:  float64(scoreBase),
-		Member: fmt.Sprintf("%d", ts),
-	})
-	pipe.ZIncrBy(ctx, redisKeyUserTraffic5minAll, float64(total), fmt.Sprintf("%d", ts))
-	pipe.ZRemRangeByScore(ctx, redisKeyUserTraffic5minAll, "0", fmt.Sprintf("%d", minScore))
 
 	_, err = pipe.Exec(ctx)
 	return err
@@ -90,28 +83,6 @@ func ListUserTrafficPer5Min(ctx context.Context, rdb *redis.Redis, usernmae stri
 		ts, _ := strconv.ParseInt(pair.Key, 10, 64)
 		ts = ts * fiveMinutes
 		res[ts] = pair.Score & ((1 << fiveMinDataBit) - 1)
-	}
-
-	return res, nil
-}
-
-// 获取全部用户最近 N 小时的流量
-func ListAllTrafficPer5Min(ctx context.Context, rdb *redis.Redis, minutes int) (map[int64]int64, error) {
-	now := time.Now()
-	startTs := now.Add(-time.Minute*time.Duration(minutes)).Unix() / fiveMinutes
-	start := startTs << fiveMinDataBit
-	stop := ((now.Unix() / fiveMinutes) + 1) << fiveMinDataBit
-
-	pairs, err := rdb.ZrangebyscoreWithScores(redisKeyUserTraffic5minAll, start, stop)
-	if err != nil {
-		return nil, err
-	}
-
-	res := make(map[int64]int64)
-	for _, pair := range pairs {
-		ts, _ := strconv.ParseInt(pair.Key, 10, 64)
-		ts = ts * fiveMinutes
-		res[ts] = int64(pair.Score) & ((1 << fiveMinDataBit) - 1)
 	}
 
 	return res, nil
