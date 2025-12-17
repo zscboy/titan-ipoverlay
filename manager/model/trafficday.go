@@ -12,13 +12,12 @@ import (
 )
 
 const (
-	oneDayDataBit = 37      // 低 29 bit 存流量
-	keepThirtyDay = 24 * 30 // 保留7天
+	oneDayDataBit = 37 // 低 37 bit 存流量
 	oneDay        = 24 * 60 * 60
 )
 
 func floorToDay(timestamp int64) int64 {
-	return timestamp / oneDay // oneDay = 24小时
+	return timestamp / oneDay
 }
 
 // 保存用户每1天流量

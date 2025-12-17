@@ -65,14 +65,14 @@ func AddUsersTraffic5Minutes(ctx context.Context, rdb *redis.Redis, traffics []*
 
 // 获取用户最近 N 小时的流量
 // startTime, endTime 是时间戳
-func ListUserTrafficPer5Min(ctx context.Context, rdb *redis.Redis, usernmae string, startTime int64, endTime int64) (map[int64]int64, error) {
+func ListUserTrafficPer5Min(ctx context.Context, rdb *redis.Redis, userName string, startTime int64, endTime int64) (map[int64]int64, error) {
 	if startTime < 0 || endTime < 0 {
 		return nil, fmt.Errorf("invalid startTime and endTime")
 	}
 
 	start := (startTime / fiveMinutes) << fiveMinDataBit
 	stop := ((endTime / fiveMinutes) + 1) << fiveMinDataBit
-	key := fmt.Sprintf(redisKeyUserTraffic5min, usernmae)
+	key := fmt.Sprintf(redisKeyUserTraffic5min, userName)
 	pairs, err := rdb.ZrangebyscoreWithScores(key, start, stop)
 	if err != nil {
 		return nil, err

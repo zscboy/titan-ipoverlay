@@ -11,13 +11,13 @@ import (
 )
 
 const (
-	oneHourDataBit = 32     // 低 29 bit 存流量
+	oneHourDataBit = 32     // 低 32 bit 存流量
 	keepSevenDays  = 24 * 7 // 保留7天
 	oneHour        = 1 * 60 * 60
 )
 
 func floorToHour(timestamp int64) int64 {
-	return timestamp / oneHour // oneHour = 5分钟
+	return timestamp / oneHour
 }
 
 // 保存用户每1小时流量
