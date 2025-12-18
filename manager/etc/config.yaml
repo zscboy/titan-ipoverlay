@@ -23,3 +23,11 @@ DefaultArea: Korea
 Geo: 
  API: ""
  Key: ""
+Yuanren:
+    Id: 14bf4178-6160-11f0-a0c5-00163e023040
+    Name: "Globally"
+    Area: Globally
+    CountryCode: CN
+    Socks5Addr: "127.0.0.1:41003"
+    Pops:
+      - 14bf4178-6160-11f0-a0c5-00163e023040
