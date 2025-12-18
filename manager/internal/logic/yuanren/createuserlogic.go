@@ -30,6 +30,7 @@ func NewCreateUserLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Create
 
 // TODO: 如果并发，会有问题
 func (l *CreateUserLogic) CreateUser(req *types.CreateUserReq) error {
+	logx.Debugf("CreateUser")
 	pops := l.svcCtx.Config.Yuanren.Pops
 	if len(pops) == 0 {
 		return fmt.Errorf("not config pops to yuanren user")
@@ -82,13 +83,26 @@ func (l *CreateUserLogic) CreateUser(req *types.CreateUserReq) error {
 
 	wg.Wait()
 
-	if len(results) != len(popID) {
+	if len(results) != len(popServers) {
 		// TODO　rollback, delete all user
+		for _, pop := range popServers {
+			resp, err := pop.API.DeleteUser(context.Background(), &serverapi.DeleteUserReq{UserName: req.UserName})
+			if err != nil {
+				logx.Errorf("rollback delete user failed:%v", err)
+				continue
+			}
+
+			if !resp.Success {
+				logx.Errorf("rollback delete user failed:%v", resp.ErrMsg)
+			}
+		}
+		logx.Debugf("lastErr:%v", lastErr)
 		return lastErr
 	}
+	logx.Debugf("CreateUser %s success", req.UserName)
 
 	// TODO:这里有问题，目前只保存用户的第一个Pop,表明用户已经创建了，不能根据用户索引pop
-	return model.SetUserPop(l.svcCtx.Redis, req.UserName, results[0].PopId)
+	return model.SetUserPop(l.svcCtx.Redis, req.UserName, pops[0])
 
 }
 
