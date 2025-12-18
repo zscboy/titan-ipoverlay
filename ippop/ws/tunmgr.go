@@ -110,13 +110,15 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, n
 	node.Online = true
 	node.LoginAt = time.Now().Format(model.TimeLayout)
 
-	socksConfig := tm.config.Socks5
+	config := tm.config
 	opts := &TunOptions{
-		Id:         node.Id,
-		OS:         node.OS,
-		IP:         node.IP,
-		UDPTimeout: int(socksConfig.UDPTimeout),
-		TCPTimeout: int(socksConfig.TCPTimeout),
+		Id:                node.Id,
+		OS:                node.OS,
+		IP:                node.IP,
+		UDPTimeout:        int(config.Socks5.UDPTimeout),
+		TCPTimeout:        int(config.Socks5.TCPTimeout),
+		DownloadRateLimti: config.WS.DownloadRateLimit,
+		UploadRateLimit:   config.WS.UploadRateLimit,
 	}
 
 	tun := newTunnel(conn, tm, opts)

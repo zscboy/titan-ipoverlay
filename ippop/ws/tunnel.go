@@ -28,8 +28,10 @@ type TunOptions struct {
 	VMAPI string
 	IP    string
 	// seconds
-	UDPTimeout int
-	TCPTimeout int
+	UDPTimeout        int
+	TCPTimeout        int
+	DownloadRateLimti int64
+	UploadRateLimit   int64
 }
 
 // Tunnel Tunnel
@@ -62,6 +64,8 @@ func newTunnel(conn *websocket.Conn, tunMgr *TunnelManager, opts *TunOptions) *T
 		rateLimiterLock: sync.Mutex{},
 	}
 
+	t.setRateLimit(opts.DownloadRateLimti, opts.UploadRateLimit)
+
 	conn.SetPingHandler(func(data string) error {
 		if err := t.writePong([]byte(data)); err != nil {
 			logx.Errorf("writePong error:%s", err.Error())
@@ -79,7 +83,7 @@ func newTunnel(conn *websocket.Conn, tunMgr *TunnelManager, opts *TunOptions) *T
 
 func (t *Tunnel) setRateLimit(downloadRateLimit, uploadRateLimit int64) {
 	t.rateLimiterLock.Lock()
-	t.rateLimiterLock.Unlock()
+	defer t.rateLimiterLock.Unlock()
 
 	if downloadRateLimit <= 0 {
 		t.readLimiter = nil

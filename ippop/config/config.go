@@ -27,8 +27,10 @@ type WS struct {
 	rest.RestConf
 	//lint:ignore SA5008 go-zero allows "default" in struct tags
 	Domain string `json:",optional"`
-	// TCPTimeout int64
-	// UDPTimeout int64
+	//lint:ignore SA5008 go-zero allows "default" in struct tags
+	DownloadRateLimit int64 `json:",default=1310720"`
+	//lint:ignore SA5008 go-zero allows "default" in struct tags
+	UploadRateLimit int64 `json:",default=655360"`
 }
 
 type FilterRule struct {
