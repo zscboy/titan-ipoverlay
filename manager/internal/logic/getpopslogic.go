@@ -25,15 +25,26 @@ func NewGetPopsLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetPopsLo
 }
 
 func (l *GetPopsLogic) GetPops() (resp *types.GetPopsResp, err error) {
+	popIDs := make([]string, 0, len(l.svcCtx.Config.Pops))
 	pops := make([]*types.Pop, 0, len(l.svcCtx.Config.Pops))
 	for id, server := range l.svcCtx.Servers {
-		count, err := model.NodeCountOfPop(l.svcCtx.Redis, id)
-		if err != nil {
-			logx.Errorf("count pop %s node failed:%v", id, err.Error())
-		}
-
-		p := &types.Pop{ID: id, Area: server.Area, TotalNode: int(count), Socks5Addr: server.Socks5Addr}
+		p := &types.Pop{ID: id, Area: server.Area, Socks5Addr: server.Socks5Addr}
 		pops = append(pops, p)
+
+		popIDs = append(popIDs, id)
 	}
+
+	nodeCountMap, err := model.NodeCountOfPops(l.ctx, l.svcCtx.Redis, popIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, pop := range pops {
+		cnt, ok := nodeCountMap[pop.ID]
+		if ok {
+			pop.TotalNode = int(cnt)
+		}
+	}
+
 	return &types.GetPopsResp{Pops: pops}, nil
 }

@@ -1,6 +1,7 @@
 package model
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -68,6 +69,37 @@ func DeleteNode(redis *redis.Redis, nodeID string) error {
 	return err
 }
 
-func NodeCountOfPop(redis *redis.Redis, popID string) (int64, error) {
-	return redis.Scard(fmt.Sprintf(redisKeyPopNodes, popID))
+func NodeCountOfPops(ctx context.Context, rds *redis.Redis, popIDs []string) (map[string]int64, error) {
+	if len(popIDs) == 0 {
+		return map[string]int64{}, nil
+	}
+
+	pipe, err := rds.TxPipeline()
+	if err != nil {
+		return nil, err
+	}
+
+	cmds := make(map[string]*redis.IntCmd, len(popIDs))
+
+	for _, popID := range popIDs {
+		key := fmt.Sprintf(redisKeyPopNodes, popID)
+		cmds[popID] = pipe.SCard(ctx, key)
+	}
+
+	// 执行 pipeline
+	if _, err := pipe.Exec(ctx); err != nil {
+		return nil, err
+	}
+
+	// 读取结果
+	result := make(map[string]int64, len(popIDs))
+	for popID, cmd := range cmds {
+		cnt, err := cmd.Result()
+		if err != nil {
+			return nil, err
+		}
+		result[popID] = cnt
+	}
+
+	return result, nil
 }

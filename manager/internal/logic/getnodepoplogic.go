@@ -102,10 +102,21 @@ func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*config.Pop, er
 		return nil, fmt.Errorf("getLocalInfo failed:%v", err)
 	}
 
+	popIDs := make([]string, 0, len(l.svcCtx.Config.Pops))
+	for _, pop := range l.svcCtx.Config.Pops {
+		popIDs = append(popIDs, pop.Id)
+
+	}
+
+	nodeCountMap, err := model.NodeCountOfPops(l.ctx, l.svcCtx.Redis, popIDs)
+	if err != nil {
+		return nil, err
+	}
+
 	for _, pop := range l.svcCtx.Config.Pops {
 		if pop.Area == location.Country {
-			count, err := model.NodeCountOfPop(l.svcCtx.Redis, pop.Id)
-			if err != nil {
+			count, ok := nodeCountMap[pop.Id]
+			if !ok {
 				continue
 			}
 
