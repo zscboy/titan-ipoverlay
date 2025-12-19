@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 	"titan-ipoverlay/ippop/config"
 	"titan-ipoverlay/ippop/model"
@@ -58,6 +59,8 @@ type TunnelManager struct {
 	filterRules     *Rules
 	userSessionMap  map[string]map[string]*UserSession
 	userSessionLock sync.Mutex
+
+	socks5ConnCount atomic.Int64
 }
 
 func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
@@ -352,6 +355,10 @@ func (tm *TunnelManager) handleUserSessionWhenSocks5TCPClose(session *UserSessio
 
 func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks5.SocksTargetInfo) error {
 	logx.Debugf("HandleSocks5TCP, user %s, DomainName %s, port %d", targetInfo.Username, targetInfo.DomainName, targetInfo.Port)
+
+	tm.socks5ConnCount.Add(1)
+	defer tm.socks5ConnCount.Add(-1)
+
 	if tm.filterRules.isDeny(targetInfo.DomainName, fmt.Sprintf("%d", targetInfo.Port)) {
 		return fmt.Errorf("tcp: target %s:%d have been deny", targetInfo.DomainName, targetInfo.Port)
 	}

@@ -28,7 +28,7 @@ type WS struct {
 	//lint:ignore SA5008 go-zero allows "default" in struct tags
 	Domain string `json:",optional"`
 	//lint:ignore SA5008 go-zero allows "default" in struct tags
-	DownloadRateLimit int64 `json:",default=1310720"`
+	DownloadRateLimit int64 `json:",default=655360"`
 	//lint:ignore SA5008 go-zero allows "default" in struct tags
 	UploadRateLimit int64 `json:",default=655360"`
 }

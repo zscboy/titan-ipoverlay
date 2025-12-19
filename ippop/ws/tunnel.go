@@ -63,7 +63,7 @@ func newTunnel(conn *websocket.Conn, tunMgr *TunnelManager, opts *TunOptions) *T
 		tunMgr:          tunMgr,
 		rateLimiterLock: sync.Mutex{},
 	}
-
+	// logx.Debugf("opts:%#v", opts)
 	t.setRateLimit(opts.DownloadRateLimti, opts.UploadRateLimit)
 
 	conn.SetPingHandler(func(data string) error {
