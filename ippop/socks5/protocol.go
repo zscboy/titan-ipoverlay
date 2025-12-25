@@ -139,6 +139,8 @@ type request struct {
 	srcIP     string
 	// the user of socks5
 	user *User
+
+	connCreateTime time.Time
 }
 
 func replySocks5Client(w io.Writer, resp uint8, addr *addrSpec) error {

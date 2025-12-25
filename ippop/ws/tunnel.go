@@ -169,8 +169,8 @@ func (t *Tunnel) serve() {
 		}
 	}
 
-	t.conn = nil
 	t.onClose()
+	t.conn = nil
 	logx.Infof("Tunnel %s %s close", t.opts.Id, t.opts.IP)
 }
 
@@ -295,7 +295,8 @@ func (t *Tunnel) acceptSocks5TCPConn(conn net.Conn, targetInfo *socks5.SocksTarg
 		return fmt.Errorf("Tunnel.acceptSocks5TCPConn client create by Domain failed, addr:%s, err:%v", addr, err)
 	}
 
-	logx.Debugf("acceptSocks5TCPConn, create session cost:%d, %s:%d", time.Since(now).Milliseconds(), targetInfo.DomainName, targetInfo.Port)
+	logx.Debugf("acceptSocks5TCPConn, create session cost:%dms, %s:%d total connect cost:%dms",
+		time.Since(now).Milliseconds(), targetInfo.DomainName, targetInfo.Port, time.Since(targetInfo.ConnCreateTime).Milliseconds())
 
 	if len(targetInfo.ExtraBytes) > 0 {
 		t.onProxyDataFromProxy(sessionID, targetInfo.ExtraBytes)
@@ -398,9 +399,14 @@ func (t *Tunnel) acceptSocks5UDPData(conn socks5.UDPConn, udpInfo *socks5.Socks5
 
 func (t *Tunnel) keepalive() {
 	if t.waitPong > 3 {
-		t.conn.Close()
-		t.conn = nil
-		logx.Debugf("keepalive timeout, close tunnel %s connection", t.opts.Id)
+		if t.conn != nil {
+			t.conn.Close()
+			t.conn = nil
+			logx.Debugf("keepalive timeout, close tunnel %s connection", t.opts.Id)
+		} else {
+			logx.Debugf("keepalive timeout, tunnel %s already close", t.opts.Id)
+		}
+
 		return
 	}
 

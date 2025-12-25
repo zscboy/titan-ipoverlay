@@ -37,6 +37,8 @@ type SocksTargetInfo struct {
 	Username   string
 	Session    string
 	SessTime   int64
+
+	ConnCreateTime time.Time
 }
 
 type UDPConn interface {
@@ -132,6 +134,8 @@ func (socks5Server *Socks5Server) serveSocks5() {
 
 func (socks5Server *Socks5Server) serveSocks5Conn(conn net.Conn) {
 	logx.Debug("Socks5Server.serveSocks5Conn")
+	connCreateTime := time.Now()
+
 	var handled = false
 	defer func() {
 		if r := recover(); r != nil {
@@ -171,6 +175,8 @@ func (socks5Server *Socks5Server) serveSocks5Conn(conn net.Conn) {
 		logx.Errorf("Socks5Server.serveSocks5Conn newRequest error: %v", err)
 		return
 	}
+
+	r1.connCreateTime = connCreateTime
 
 	if user != nil {
 		r1.user = user
@@ -323,12 +329,13 @@ func (socks5Server *Socks5Server) handleSocks5Connect(req *request) error {
 
 	// cfg := socks5Server.opts
 	targetInfo := &SocksTargetInfo{
-		Port:       req.destAddr.port,
-		DomainName: req.destAddr.fqdn,
-		ExtraBytes: extraBytes,
-		Username:   req.user.username,
-		Session:    req.user.session,
-		SessTime:   int64(req.user.sessTime),
+		Port:           req.destAddr.port,
+		DomainName:     req.destAddr.fqdn,
+		ExtraBytes:     extraBytes,
+		Username:       req.user.username,
+		Session:        req.user.session,
+		SessTime:       int64(req.user.sessTime),
+		ConnCreateTime: req.connCreateTime,
 	}
 
 	tcpConn, ok := req.conn.(*net.TCPConn)

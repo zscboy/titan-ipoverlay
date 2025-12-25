@@ -354,7 +354,8 @@ func (tm *TunnelManager) handleUserSessionWhenSocks5TCPClose(session *UserSessio
 }
 
 func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks5.SocksTargetInfo) error {
-	logx.Debugf("HandleSocks5TCP, user %s, DomainName %s, port %d", targetInfo.Username, targetInfo.DomainName, targetInfo.Port)
+	logx.Debugf("HandleSocks5TCP, user %s, DomainName %s, port %d, remote:%s, connCount:%d, connTime:%d",
+		targetInfo.Username, targetInfo.DomainName, targetInfo.Port, tcpConn.RemoteAddr().String(), tm.socks5ConnCount.Load(), time.Since(targetInfo.ConnCreateTime).Milliseconds())
 
 	tm.socks5ConnCount.Add(1)
 	defer tm.socks5ConnCount.Add(-1)
