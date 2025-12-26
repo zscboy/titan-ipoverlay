@@ -141,7 +141,7 @@ func (t *Tunnel) getPop() (*Pop, error) {
 		pop := &Pop{}
 		err = json.Unmarshal(bytes, pop)
 		if err != nil {
-			logx.Errorf("Tunnel", fmt.Sprintf("Tunnel.getPop Unmarshal error:%v", err))
+			logx.Errorf("Tunnel.getPop Unmarshal error: %v", err)
 			continue
 		}
 
@@ -226,7 +226,7 @@ func (t *Tunnel) Serve() error {
 	for {
 		messageType, p, err := conn.ReadMessage()
 		if err != nil {
-			logx.Error("Error reading message:", err)
+			logx.Errorf("[DIAG] Tunnel connection lost: %v. This is likely due to NODE_不稳定 (network or ISP restriction).", err)
 			break
 		}
 
@@ -284,31 +284,39 @@ func (t *Tunnel) onProxySessionCreate(msg *pb.Message) error {
 }
 
 func (t *Tunnel) createProxySession(msg *pb.Message) error {
-	_, ok := t.proxySessions.Load(msg.GetSessionId())
-	if ok {
-		return t.createProxySessionReply(msg.GetSessionId(), nil)
-	}
-
 	destAddr := &pb.DestAddr{}
 	err := proto.Unmarshal(msg.GetPayload(), destAddr)
 	if err != nil {
 		return t.createProxySessionReply(msg.GetSessionId(), err)
 	}
 
-	conn, err := net.DialTimeout("tcp", destAddr.GetAddr(), time.Duration(t.tcpTimeout)*time.Second)
-	if err != nil {
-		logx.Errorf("dial %s, failed %s", destAddr.Addr, err.Error())
-		return t.createProxySessionReply(msg.GetSessionId(), err)
+	proxySession := &TCPProxy{
+		id:         msg.GetSessionId(),
+		writeQueue: make(chan []byte, 1024),
+		connected:  make(chan struct{}),
 	}
-
-	logx.Debugf("Tunnel.onProxySessionCreate new proxy dest %s", destAddr.Addr)
-
-	proxySession := &TCPProxy{id: msg.GetSessionId(), conn: conn}
 	t.proxySessions.Store(msg.GetSessionId(), proxySession)
 
-	t.createProxySessionReply(msg.GetSessionId(), nil)
+	logx.Debugf("Tunnel.onProxySessionCreate new proxy dest %s, session: %s", destAddr.Addr, msg.GetSessionId())
 
-	proxySession.proxyConn(t)
+	go func() {
+		conn, err := net.DialTimeout("tcp", destAddr.GetAddr(), time.Duration(t.tcpTimeout)*time.Second)
+		if err != nil {
+			// Categorize dial error
+			errorTag := "[NODE_不稳定]"
+			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				errorTag = "[NODE_时延大/超时]"
+			}
+			logx.Errorf("%s dial %s failed: %v", errorTag, destAddr.Addr, err.Error())
+			t.createProxySessionReply(msg.GetSessionId(), err)
+			t.onProxyConnClose(msg.GetSessionId())
+			return
+		}
+
+		proxySession.setConn(conn)
+		t.createProxySessionReply(msg.GetSessionId(), nil)
+		proxySession.proxyConn(t)
+	}()
 
 	return nil
 }

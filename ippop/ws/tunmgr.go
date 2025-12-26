@@ -438,7 +438,7 @@ func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks
 		}
 	}()
 
-	return tun.acceptSocks5TCPConn(tcpConn, targetInfo)
+	return tun.acceptSocks5TCPConnImproved(tcpConn, targetInfo)
 }
 
 func (tm *TunnelManager) HandleSocks5UDP(udpConn socks5.UDPConn, udpInfo *socks5.Socks5UDPInfo, data []byte) error {

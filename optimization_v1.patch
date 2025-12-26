@@ -1,0 +1,431 @@
+diff --git a/client/tunnel/tcpproxy.go b/client/tunnel/tcpproxy.go
+index 8f69d0a..4d10777 100644
+--- a/client/tunnel/tcpproxy.go
++++ b/client/tunnel/tcpproxy.go
+@@ -4,13 +4,23 @@ import (
+ 	"fmt"
+ 	"net"
+ 
++	"sync"
++
+ 	"github.com/zeromicro/go-zero/core/logx"
+ )
+ 
++var bufferPool = sync.Pool{
++	New: func() interface{} {
++		return make([]byte, 32*1024)
++	},
++}
++
+ type TCPProxy struct {
+ 	id              string
+ 	conn            net.Conn
+ 	isCloseByServer bool
++	writeQueue      chan []byte
++	connected       chan struct{}
+ }
+ 
+ func (proxy *TCPProxy) destroy() {
+@@ -32,25 +42,54 @@ func (proxy *TCPProxy) closeByServer() {
+ }
+ 
+ func (proxy *TCPProxy) write(data []byte) error {
+-	if proxy.conn == nil {
+-		return fmt.Errorf("session %s conn == nil", proxy.id)
++	dataCopy := make([]byte, len(data))
++	copy(dataCopy, data)
++
++	select {
++	case proxy.writeQueue <- dataCopy:
++		return nil
++	default:
++		logx.Errorf("session %s writeQueue full", proxy.id)
++		return fmt.Errorf("session %s writeQueue full", proxy.id)
+ 	}
++}
++
++func (proxy *TCPProxy) setConn(conn net.Conn) {
++	proxy.conn = conn
++	close(proxy.connected)
++}
+ 
+-	_, err := proxy.conn.Write(data)
+-	return err
++func (proxy *TCPProxy) startWriteLoop() {
++	<-proxy.connected
++	for data := range proxy.writeQueue {
++		if proxy.conn == nil {
++			return
++		}
++		_, err := proxy.conn.Write(data)
++		if err != nil {
++			logx.Errorf("session %s write error: %v", proxy.id, err)
++			return
++		}
++	}
+ }
+ 
+ func (proxy *TCPProxy) proxyConn(t *Tunnel) {
+ 	defer t.proxySessions.Delete(proxy.id)
++	defer close(proxy.writeQueue)
+ 
++	go proxy.startWriteLoop()
++
++	<-proxy.connected
+ 	conn := proxy.conn
+ 	defer conn.Close()
+ 
+-	buf := make([]byte, 4096)
++	buf := bufferPool.Get().([]byte)
++	defer bufferPool.Put(buf)
++
+ 	for {
+ 		n, err := conn.Read(buf)
+ 		if err != nil {
+-			logx.Debugf("TCPProxy.proxyConn: %s", err.Error())
++			logx.Debugf("TCPProxy.proxyConn: %s, id: %s", err.Error(), proxy.id)
+ 			if !proxy.isCloseByServer {
+ 				t.onProxyConnClose(proxy.id)
+ 			}
+diff --git a/client/tunnel/tunnel.go b/client/tunnel/tunnel.go
+index 16c4c7d..5184ca1 100644
+--- a/client/tunnel/tunnel.go
++++ b/client/tunnel/tunnel.go
+@@ -141,7 +141,7 @@ func (t *Tunnel) getPop() (*Pop, error) {
+ 		pop := &Pop{}
+ 		err = json.Unmarshal(bytes, pop)
+ 		if err != nil {
+-			logx.Errorf("Tunnel", fmt.Sprintf("Tunnel.getPop Unmarshal error:%v", err))
++			logx.Errorf("Tunnel.getPop Unmarshal error: %v", err)
+ 			continue
+ 		}
+ 
+@@ -284,31 +284,34 @@ func (t *Tunnel) onProxySessionCreate(msg *pb.Message) error {
+ }
+ 
+ func (t *Tunnel) createProxySession(msg *pb.Message) error {
+-	_, ok := t.proxySessions.Load(msg.GetSessionId())
+-	if ok {
+-		return t.createProxySessionReply(msg.GetSessionId(), nil)
+-	}
+-
+ 	destAddr := &pb.DestAddr{}
+ 	err := proto.Unmarshal(msg.GetPayload(), destAddr)
+ 	if err != nil {
+ 		return t.createProxySessionReply(msg.GetSessionId(), err)
+ 	}
+ 
+-	conn, err := net.DialTimeout("tcp", destAddr.GetAddr(), time.Duration(t.tcpTimeout)*time.Second)
+-	if err != nil {
+-		logx.Errorf("dial %s, failed %s", destAddr.Addr, err.Error())
+-		return t.createProxySessionReply(msg.GetSessionId(), err)
++	proxySession := &TCPProxy{
++		id:         msg.GetSessionId(),
++		writeQueue: make(chan []byte, 1024),
++		connected:  make(chan struct{}),
+ 	}
+-
+-	logx.Debugf("Tunnel.onProxySessionCreate new proxy dest %s", destAddr.Addr)
+-
+-	proxySession := &TCPProxy{id: msg.GetSessionId(), conn: conn}
+ 	t.proxySessions.Store(msg.GetSessionId(), proxySession)
+ 
+-	t.createProxySessionReply(msg.GetSessionId(), nil)
++	logx.Debugf("Tunnel.onProxySessionCreate new proxy dest %s, session: %s", destAddr.Addr, msg.GetSessionId())
++
++	go func() {
++		conn, err := net.DialTimeout("tcp", destAddr.GetAddr(), time.Duration(t.tcpTimeout)*time.Second)
++		if err != nil {
++			logx.Errorf("dial %s, failed %s", destAddr.Addr, err.Error())
++			t.createProxySessionReply(msg.GetSessionId(), err)
++			t.onProxyConnClose(msg.GetSessionId())
++			return
++		}
+ 
+-	proxySession.proxyConn(t)
++		proxySession.setConn(conn)
++		t.createProxySessionReply(msg.GetSessionId(), nil)
++		proxySession.proxyConn(t)
++	}()
+ 
+ 	return nil
+ }
+diff --git a/ippop/ws/tcpproxy.go b/ippop/ws/tcpproxy.go
+index 3a64c95..78a9682 100644
+--- a/ippop/ws/tcpproxy.go
++++ b/ippop/ws/tcpproxy.go
+@@ -5,8 +5,15 @@ import (
+ 	"net"
+ 
+ 	"github.com/zeromicro/go-zero/core/logx"
++	"sync"
+ )
+ 
++var bufferPool = sync.Pool{
++	New: func() interface{} {
++		return make([]byte, 32*1024) // 32KB buffer
++	},
++}
++
+ type TCPProxy struct {
+ 	id              string
+ 	conn            net.Conn
+@@ -47,12 +54,13 @@ func (proxy *TCPProxy) proxyConn() error {
+ 	conn := proxy.conn
+ 	defer conn.Close()
+ 
+-	// netConn := conn.NetConn()
+-	buf := make([]byte, 4096)
++	buf := bufferPool.Get().([]byte)
++	defer bufferPool.Put(buf)
++
+ 	for {
+ 		n, err := conn.Read(buf)
+ 		if err != nil {
+-			logx.Infof("proxy.proxyConn: %v", err)
++			logx.Infof("proxy.proxyConn: %v, id: %s", err, proxy.id)
+ 			if !proxy.isCloseByClient {
+ 				proxy.tunnel.onProxyTCPConnClose(proxy.id)
+ 			}
+diff --git a/ippop/ws/tunmgr.go b/ippop/ws/tunmgr.go
+index 12d7c50..babc5e1 100644
+--- a/ippop/ws/tunmgr.go
++++ b/ippop/ws/tunmgr.go
+@@ -327,23 +327,51 @@ func (tm *TunnelManager) getTunnelByUser(user *model.User) (*Tunnel, error) {
+ 	return tun, nil
+ }
+ 
+-func (tm *TunnelManager) randomTunnel() (*Tunnel, error) {
+-	var result any
+-	count := 0
+-
++func (tm *TunnelManager) selectBestTunnel() (*Tunnel, error) {
++	var candidates []*Tunnel
+ 	tm.tunnels.Range(func(_, value any) bool {
+-		count++
+-		if rand.Intn(count) == 0 {
+-			result = value
+-		}
++		candidates = append(candidates, value.(*Tunnel))
+ 		return true
+ 	})
+ 
+-	if count == 0 {
++	if len(candidates) == 0 {
+ 		return nil, fmt.Errorf("no tunnel exist")
+ 	}
+ 
+-	return result.(*Tunnel), nil
++	// Filter and find the best based on latency
++	var bestTun *Tunnel
++	minLatency := uint64(2000) // Initial threshold 2s
++
++	// First pass: find nodes with reported latency
++	for _, t := range candidates {
++		if len(t.netDelays) > 0 {
++			avg := uint64(0)
++			for _, d := range t.netDelays {
++				avg += d
++			}
++			avg /= uint64(len(t.netDelays))
++
++			if avg < minLatency {
++				minLatency = avg
++				bestTun = t
++			}
++		}
++	}
++
++	if bestTun != nil {
++		// To avoid overwhelming one best node, 20% of the time we still pick another good candidate
++		if rand.Intn(100) < 20 && len(candidates) > 1 {
++			return candidates[rand.Intn(len(candidates))], nil
++		}
++		return bestTun, nil
++	}
++
++	// Default to random
++	return candidates[rand.Intn(len(candidates))], nil
++}
++
++func (tm *TunnelManager) randomTunnel() (*Tunnel, error) {
++	return tm.selectBestTunnel()
+ }
+ func (tm *TunnelManager) handleUserSessionWhenSocks5TCPClose(session *UserSession) {
+ 	tm.userSessionLock.Lock()
+@@ -392,7 +420,7 @@ func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks
+ 		}
+ 	}()
+ 
+-	return tun.acceptSocks5TCPConn(tcpConn, targetInfo)
++	return tun.acceptSocks5TCPConnImproved(tcpConn, targetInfo)
+ }
+ 
+ func (tm *TunnelManager) HandleSocks5UDP(udpConn socks5.UDPConn, udpInfo *socks5.Socks5UDPInfo, data []byte) error {
+diff --git a/ippop/ws/tunnel.go b/ippop/ws/tunnel.go
+index 612eb9c..15882e3 100644
+--- a/ippop/ws/tunnel.go
++++ b/ippop/ws/tunnel.go
+@@ -7,6 +7,7 @@ import (
+ 	"net"
+ 	"sync"
+ 	"time"
++	"titan-ipoverlay/ippop/model"
+ 	"titan-ipoverlay/ippop/socks5"
+ 	"titan-ipoverlay/ippop/ws/pb"
+ 
+@@ -46,14 +47,16 @@ type Tunnel struct {
+ 	waitList    sync.Map
+ 	tunMgr      *TunnelManager
+ 	waitLeaseCh chan bool
+-	// netDelays   []uint64
+-	//  bytes/sec
++	netDelays   []uint64
++	// bytes/sec
+ 	readLimiter *rate.Limiter
+ 	//  bytes/sec
+ 	writeLimiter    *rate.Limiter
+ 	rateLimiterLock sync.Mutex
+ 	// if socks5 client connect with session
+ 	userSessionID string
++
++	writeChan chan []byte
+ }
+ 
+ func newTunnel(conn *websocket.Conn, tunMgr *TunnelManager, opts *TunOptions) *Tunnel {
+@@ -62,6 +65,7 @@ func newTunnel(conn *websocket.Conn, tunMgr *TunnelManager, opts *TunOptions) *T
+ 		opts:            opts,
+ 		tunMgr:          tunMgr,
+ 		rateLimiterLock: sync.Mutex{},
++		writeChan:       make(chan []byte, 2048),
+ 	}
+ 	// logx.Debugf("opts:%#v", opts)
+ 	t.setRateLimit(opts.DownloadRateLimti, opts.UploadRateLimit)
+@@ -133,29 +137,30 @@ func (t *Tunnel) onPong(data []byte) {
+ 		logx.Error("Invalid pong data")
+ 		return
+ 	}
+-	// TODO: Mass update
+-	// timestamp := int64(binary.LittleEndian.Uint64(data))
+-	// rtt := time.Since(time.UnixMicro(timestamp))
+-
+-	// if t.netDelays == nil {
+-	// 	t.netDelays = make([]uint64, 0, netDelayCount)
+-	// }
+-
+-	// t.netDelays = append(t.netDelays, uint64(rtt.Milliseconds()))
+-	// if len(t.netDelays) >= netDelayCount {
+-	// 	var delays = uint64(0)
+-	// 	for _, delay := range t.netDelays {
+-	// 		delays += delay
+-	// 	}
+-	// 	delay := delays / uint64(len(t.netDelays))
+-	// 	model.SetNodeNetDelay(t.tunMgr.redis, t.opts.Id, delay)
+-	// 	t.netDelays = make([]uint64, 0, netDelayCount)
+-	// }
++	timestamp := int64(binary.LittleEndian.Uint64(data))
++	rtt := time.Since(time.UnixMicro(timestamp))
++
++	if t.netDelays == nil {
++		t.netDelays = make([]uint64, 0, netDelayCount)
++	}
++
++	t.netDelays = append(t.netDelays, uint64(rtt.Milliseconds()))
++	if len(t.netDelays) >= netDelayCount {
++		var delays = uint64(0)
++		for _, delay := range t.netDelays {
++			delays += delay
++		}
++		delay := delays / uint64(len(t.netDelays))
++		model.SetNodeNetDelay(t.tunMgr.redis, t.opts.Id, delay)
++		t.netDelays = make([]uint64, 0, netDelayCount)
++	}
+ 
+ 	t.waitPong = 0
+ }
+ 
+ func (t *Tunnel) serve() {
++	go t.writeLoop()
++
+ 	for {
+ 		_, message, err := t.readMessageWithLimitRate()
+ 		if err != nil {
+@@ -256,7 +261,7 @@ func (t *Tunnel) onProxyTCPConnClose(sessionID string) {
+ 		return
+ 	}
+ 
+-	if err = t.write(buf); err != nil {
++	if err = t.writeAsync(buf); err != nil {
+ 		logx.Errorf("Tunnel.onProxyConnClose, write message to tunnel failed:%s", err.Error())
+ 	}
+ }
+@@ -275,27 +280,35 @@ func (t *Tunnel) onProxyDataFromProxy(sessionID string, data []byte) {
+ 		return
+ 	}
+ 
+-	if err = t.write(buf); err != nil {
++	if err = t.writeAsync(buf); err != nil {
+ 		logx.Errorf("Tunnel.onProxyDataFromProxy, write message to tunnel failed:%s", err.Error())
+ 	}
++}
+ 
+-	// logx.Debugf("Tunnel.onProxyDataFromProxy write message to tunnel success")
++func (t *Tunnel) acceptSocks5TCPConn(conn net.Conn) error {
++	logx.Info("acceptSocks5TCPConn (Legacy signature override)")
++	return nil
+ }
+ 
+-func (t *Tunnel) acceptSocks5TCPConn(conn net.Conn, targetInfo *socks5.SocksTargetInfo) error {
+-	logx.Debugf("acceptSocks5TCPConn, dest %s:%d", targetInfo.DomainName, targetInfo.Port)
++func (t *Tunnel) acceptSocks5TCPConnImproved(conn net.Conn, targetInfo *socks5.SocksTargetInfo) error {
++	logx.Debugf("acceptSocks5TCPConnImproved, dest %s:%d", targetInfo.DomainName, targetInfo.Port)
+ 
+ 	now := time.Now()
+ 
+ 	sessionID := uuid.NewString()
+ 
+ 	addr := fmt.Sprintf("%s:%d", targetInfo.DomainName, targetInfo.Port)
+-	err := t.onClientCreateByDomain(&pb.DestAddr{Addr: addr}, sessionID)
+-	if err != nil {
+-		return fmt.Errorf("Tunnel.acceptSocks5TCPConn client create by Domain failed, addr:%s, err:%v", addr, err)
+-	}
+ 
+-	logx.Debugf("acceptSocks5TCPConn, create session cost:%d, %s:%d", time.Since(now).Milliseconds(), targetInfo.DomainName, targetInfo.Port)
++	// Async Session Creation (0-RTT optimization)
++	go func() {
++		err := t.onClientCreateByDomain(&pb.DestAddr{Addr: addr}, sessionID)
++		if err != nil {
++			logx.Errorf("Async tunnel session creation failed: %v", err)
++			conn.Close()
++		}
++	}()
++
++	logx.Debugf("acceptSocks5TCPConn initiated async %dms, %s:%d", time.Since(now).Milliseconds(), targetInfo.DomainName, targetInfo.Port)
+ 
+ 	if len(targetInfo.ExtraBytes) > 0 {
+ 		t.onProxyDataFromProxy(sessionID, targetInfo.ExtraBytes)
+@@ -422,6 +435,24 @@ func (t *Tunnel) write(msg []byte) error {
+ 	return t.writeMessageWithLimitRate(websocket.BinaryMessage, msg)
+ }
+ 
++func (t *Tunnel) writeAsync(msg []byte) error {
++	select {
++	case t.writeChan <- msg:
++		return nil
++	default:
++		return fmt.Errorf("tunnel %s writeChan full", t.opts.Id)
++	}
++}
++
++func (t *Tunnel) writeLoop() {
++	for msg := range t.writeChan {
++		if err := t.write(msg); err != nil {
++			logx.Errorf("tunnel %s writeLoop error: %v", t.opts.Id, err)
++			return
++		}
++	}
++}
++
+ func (t *Tunnel) readMessageWithLimitRate() (int, []byte, error) {
+ 	if t.conn == nil {
+ 		return 0, nil, fmt.Errorf("t.conn == nil")

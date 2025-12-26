@@ -7,6 +7,7 @@ import (
 	"net"
 	"sync"
 	"time"
+	"titan-ipoverlay/ippop/model"
 	"titan-ipoverlay/ippop/socks5"
 	"titan-ipoverlay/ippop/ws/pb"
 
@@ -46,14 +47,16 @@ type Tunnel struct {
 	waitList    sync.Map
 	tunMgr      *TunnelManager
 	waitLeaseCh chan bool
-	// netDelays   []uint64
-	//  bytes/sec
+	netDelays   []uint64
+	// bytes/sec
 	readLimiter *rate.Limiter
 	//  bytes/sec
 	writeLimiter    *rate.Limiter
 	rateLimiterLock sync.Mutex
 	// if socks5 client connect with session
 	userSessionID string
+
+	writeChan chan []byte
 }
 
 func newTunnel(conn *websocket.Conn, tunMgr *TunnelManager, opts *TunOptions) *Tunnel {
@@ -62,6 +65,7 @@ func newTunnel(conn *websocket.Conn, tunMgr *TunnelManager, opts *TunOptions) *T
 		opts:            opts,
 		tunMgr:          tunMgr,
 		rateLimiterLock: sync.Mutex{},
+		writeChan:       make(chan []byte, 2048),
 	}
 	// logx.Debugf("opts:%#v", opts)
 	t.setRateLimit(opts.DownloadRateLimti, opts.UploadRateLimit)
@@ -133,29 +137,30 @@ func (t *Tunnel) onPong(data []byte) {
 		logx.Error("Invalid pong data")
 		return
 	}
-	// TODO: Mass update
-	// timestamp := int64(binary.LittleEndian.Uint64(data))
-	// rtt := time.Since(time.UnixMicro(timestamp))
+	timestamp := int64(binary.LittleEndian.Uint64(data))
+	rtt := time.Since(time.UnixMicro(timestamp))
 
-	// if t.netDelays == nil {
-	// 	t.netDelays = make([]uint64, 0, netDelayCount)
-	// }
+	if t.netDelays == nil {
+		t.netDelays = make([]uint64, 0, netDelayCount)
+	}
 
-	// t.netDelays = append(t.netDelays, uint64(rtt.Milliseconds()))
-	// if len(t.netDelays) >= netDelayCount {
-	// 	var delays = uint64(0)
-	// 	for _, delay := range t.netDelays {
-	// 		delays += delay
-	// 	}
-	// 	delay := delays / uint64(len(t.netDelays))
-	// 	model.SetNodeNetDelay(t.tunMgr.redis, t.opts.Id, delay)
-	// 	t.netDelays = make([]uint64, 0, netDelayCount)
-	// }
+	t.netDelays = append(t.netDelays, uint64(rtt.Milliseconds()))
+	if len(t.netDelays) >= netDelayCount {
+		var delays = uint64(0)
+		for _, delay := range t.netDelays {
+			delays += delay
+		}
+		delay := delays / uint64(len(t.netDelays))
+		model.SetNodeNetDelay(t.tunMgr.redis, t.opts.Id, delay)
+		t.netDelays = make([]uint64, 0, netDelayCount)
+	}
 
 	t.waitPong = 0
 }
 
 func (t *Tunnel) serve() {
+	go t.writeLoop()
+
 	for {
 		_, message, err := t.readMessageWithLimitRate()
 		if err != nil {
@@ -171,7 +176,7 @@ func (t *Tunnel) serve() {
 
 	t.onClose()
 	t.conn = nil
-	logx.Infof("Tunnel %s %s close", t.opts.Id, t.opts.IP)
+	logx.Infof("[NODE_状态] Tunnel %s (%s) disconnected. Check if the Edge Node process crashed or internet failed.", t.opts.Id, t.opts.IP)
 }
 
 func (t *Tunnel) onMessage(data []byte) error {
@@ -256,7 +261,7 @@ func (t *Tunnel) onProxyTCPConnClose(sessionID string) {
 		return
 	}
 
-	if err = t.write(buf); err != nil {
+	if err = t.writeAsync(buf); err != nil {
 		logx.Errorf("Tunnel.onProxyConnClose, write message to tunnel failed:%s", err.Error())
 	}
 }
@@ -275,28 +280,35 @@ func (t *Tunnel) onProxyDataFromProxy(sessionID string, data []byte) {
 		return
 	}
 
-	if err = t.write(buf); err != nil {
+	if err = t.writeAsync(buf); err != nil {
 		logx.Errorf("Tunnel.onProxyDataFromProxy, write message to tunnel failed:%s", err.Error())
 	}
-
-	// logx.Debugf("Tunnel.onProxyDataFromProxy write message to tunnel success")
 }
 
-func (t *Tunnel) acceptSocks5TCPConn(conn net.Conn, targetInfo *socks5.SocksTargetInfo) error {
-	logx.Debugf("acceptSocks5TCPConn, dest %s:%d", targetInfo.DomainName, targetInfo.Port)
+func (t *Tunnel) acceptSocks5TCPConn(conn net.Conn) error {
+	logx.Info("acceptSocks5TCPConn (Legacy signature override)")
+	return nil
+}
+
+func (t *Tunnel) acceptSocks5TCPConnImproved(conn net.Conn, targetInfo *socks5.SocksTargetInfo) error {
+	logx.Debugf("acceptSocks5TCPConnImproved, dest %s:%d", targetInfo.DomainName, targetInfo.Port)
 
 	now := time.Now()
 
 	sessionID := uuid.NewString()
 
 	addr := fmt.Sprintf("%s:%d", targetInfo.DomainName, targetInfo.Port)
-	err := t.onClientCreateByDomain(&pb.DestAddr{Addr: addr}, sessionID)
-	if err != nil {
-		return fmt.Errorf("Tunnel.acceptSocks5TCPConn client create by Domain failed, addr:%s, err:%v", addr, err)
-	}
 
-	logx.Debugf("acceptSocks5TCPConn, create session cost:%dms, %s:%d total connect cost:%dms",
-		time.Since(now).Milliseconds(), targetInfo.DomainName, targetInfo.Port, time.Since(targetInfo.ConnCreateTime).Milliseconds())
+	// Async Session Creation (0-RTT optimization)
+	go func() {
+		err := t.onClientCreateByDomain(&pb.DestAddr{Addr: addr}, sessionID)
+		if err != nil {
+			logx.Errorf("Async tunnel session creation failed: %v", err)
+			conn.Close()
+		}
+	}()
+
+	logx.Debugf("acceptSocks5TCPConn initiated async %dms, %s:%d", time.Since(now).Milliseconds(), targetInfo.DomainName, targetInfo.Port)
 
 	if len(targetInfo.ExtraBytes) > 0 {
 		t.onProxyDataFromProxy(sessionID, targetInfo.ExtraBytes)
@@ -426,6 +438,24 @@ func (t *Tunnel) write(msg []byte) error {
 	defer t.writeLock.Unlock()
 
 	return t.writeMessageWithLimitRate(websocket.BinaryMessage, msg)
+}
+
+func (t *Tunnel) writeAsync(msg []byte) error {
+	select {
+	case t.writeChan <- msg:
+		return nil
+	default:
+		return fmt.Errorf("tunnel %s writeChan full", t.opts.Id)
+	}
+}
+
+func (t *Tunnel) writeLoop() {
+	for msg := range t.writeChan {
+		if err := t.write(msg); err != nil {
+			logx.Errorf("tunnel %s writeLoop error: %v", t.opts.Id, err)
+			return
+		}
+	}
 }
 
 func (t *Tunnel) readMessageWithLimitRate() (int, []byte, error) {

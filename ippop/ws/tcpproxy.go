@@ -4,8 +4,16 @@ import (
 	"fmt"
 	"net"
 
+	"sync"
+
 	"github.com/zeromicro/go-zero/core/logx"
 )
+
+var bufferPool = sync.Pool{
+	New: func() interface{} {
+		return make([]byte, 32*1024) // 32KB buffer
+	},
+}
 
 type TCPProxy struct {
 	id              string
@@ -47,13 +55,16 @@ func (proxy *TCPProxy) proxyConn() error {
 	conn := proxy.conn
 	defer conn.Close()
 
-	// netConn := conn.NetConn()
-	buf := make([]byte, 4096)
+	buf := bufferPool.Get().([]byte)
+	defer bufferPool.Put(buf)
+
 	for {
 		n, err := conn.Read(buf)
 		if err != nil {
-			logx.Infof("proxy.proxyConn: %v", err)
-			if !proxy.isCloseByClient {
+			if proxy.isCloseByClient {
+				logx.Debugf("[BROWSER_INFO] Browser closed SOCKS5 connection (Normal). id: %s", proxy.id)
+			} else {
+				logx.Infof("[NODE_不稳定] SOCKS5 connection broken by local side: %v, id: %s", err, proxy.id)
 				proxy.tunnel.onProxyTCPConnClose(proxy.id)
 			}
 			return nil
