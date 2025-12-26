@@ -61,6 +61,10 @@ type TunnelManager struct {
 	userSessionLock sync.Mutex
 
 	socks5ConnCount atomic.Int64
+
+	tunnelListLock sync.RWMutex
+	tunnelList     []*Tunnel
+	rrIdx          uint64
 }
 
 func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
@@ -86,6 +90,33 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 	go tm.RecyclUserSession()
 	go routeScheduler.start()
 	return tm
+}
+
+// 添加 tunnel
+func (tm *TunnelManager) addTunnel(t *Tunnel) {
+	tm.tunnelListLock.Lock()
+	defer tm.tunnelListLock.Unlock()
+
+	tm.tunnelList = append(tm.tunnelList, t)
+	atomic.StoreUint64(&tm.rrIdx, tm.rrIdx%uint64(len(tm.tunnelList)))
+}
+
+// 删除 tunnel
+func (tm *TunnelManager) removeTunnel(id string) {
+	tm.tunnelListLock.Lock()
+	defer tm.tunnelListLock.Unlock()
+	for i, t := range tm.tunnelList {
+		if t.opts.Id == id {
+			tm.tunnelList = append(tm.tunnelList[:i], tm.tunnelList[i+1:]...)
+
+			if len(tm.tunnelList) > 0 {
+				atomic.StoreUint64(&tm.rrIdx, tm.rrIdx%uint64(len(tm.tunnelList)))
+			} else {
+				atomic.StoreUint64(&tm.rrIdx, 0)
+			}
+			return
+		}
+	}
 }
 
 func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, nodeIP string) {
@@ -127,9 +158,12 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, n
 	tun := newTunnel(conn, tm, opts)
 	tm.tunnels.Store(node.Id, tun)
 
+	tm.addTunnel(tun)
+
 	defer tun.leaseComplete()
 
 	defer tm.tunnels.Delete(node.Id)
+	defer tm.removeTunnel(node.Id)
 
 	if err := model.HandleNodeOnline(context.Background(), tm.redis, node); err != nil {
 		logx.Errorf("HandleNodeOnline:%s", err.Error())
@@ -257,7 +291,7 @@ func (tm *TunnelManager) allocateTunnelByUserSession(user *model.User, sessionID
 
 	// No sessionID provided → return a random tunnel
 	if sessionID == "" {
-		tun, err := tm.randomTunnel()
+		tun, err := tm.nextTunnel()
 		if err != nil {
 			return nil, nil, err
 		}
@@ -345,6 +379,21 @@ func (tm *TunnelManager) randomTunnel() (*Tunnel, error) {
 
 	return result.(*Tunnel), nil
 }
+
+func (tm *TunnelManager) nextTunnel() (*Tunnel, error) {
+	tm.tunnelListLock.RLock()
+	defer tm.tunnelListLock.RUnlock()
+
+	n := len(tm.tunnelList)
+	if n == 0 {
+		return nil, fmt.Errorf("no tunnel exist")
+	}
+
+	idx := atomic.AddUint64(&tm.rrIdx, 1)
+	logx.Debugf("nextTunnel:%d", idx)
+	return tm.tunnelList[idx%uint64(n)], nil
+}
+
 func (tm *TunnelManager) handleUserSessionWhenSocks5TCPClose(session *UserSession) {
 	tm.userSessionLock.Lock()
 	defer tm.userSessionLock.Unlock()
