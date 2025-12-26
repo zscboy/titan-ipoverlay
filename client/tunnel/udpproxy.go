@@ -41,7 +41,9 @@ func (proxy *UDPProxy) serve(t *Tunnel) error {
 	conn := proxy.conn
 	defer conn.Close()
 
-	buf := make([]byte, 4096)
+	buf := bufferPool.Get().([]byte)
+	defer bufferPool.Put(buf)
+
 	for {
 		if err := conn.SetDeadline(time.Now().Add(time.Duration(proxy.timeout) * time.Second)); err != nil {
 			return fmt.Errorf("UDPProxy.serve SetDeadline failed:%v", err)

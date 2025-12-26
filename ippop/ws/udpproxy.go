@@ -19,6 +19,8 @@ type UDPProxy struct {
 	timeout int
 
 	tunnel *Tunnel
+
+	srcAddr *net.UDPAddr
 }
 
 func newProxyUDP(id string, conn socks5.UDPConn, udpInfo *socks5.Socks5UDPInfo, t *Tunnel, timeout int) *UDPProxy {
@@ -29,9 +31,12 @@ func (proxy *UDPProxy) writeToSrc(data []byte) error {
 	proxy.activeTime = time.Now()
 	proxy.tunnel.tunMgr.traffic(proxy.udpInfo.UserName, int64(len(data)))
 
-	srcAddr, err := net.ResolveUDPAddr("udp", proxy.udpInfo.Src)
-	if err != nil {
-		return err
+	if proxy.srcAddr == nil {
+		addr, err := net.ResolveUDPAddr("udp", proxy.udpInfo.Src)
+		if err != nil {
+			return err
+		}
+		proxy.srcAddr = addr
 	}
 
 	datagram, err := socks5.NewDatagram(proxy.udpInfo.Dest, data)
@@ -39,7 +44,7 @@ func (proxy *UDPProxy) writeToSrc(data []byte) error {
 		return err
 	}
 
-	_, err = proxy.conn.WriteToUDP(datagram.Bytes(), srcAddr)
+	_, err = proxy.conn.WriteToUDP(datagram.Bytes(), proxy.srcAddr)
 	return err
 }
 
@@ -64,7 +69,7 @@ func (proxy *UDPProxy) writeToDest(data []byte) error {
 		return err
 	}
 
-	return proxy.tunnel.write(buf)
+	return proxy.tunnel.writeAsync(buf)
 }
 
 func (proxy *UDPProxy) waitTimeout() {
