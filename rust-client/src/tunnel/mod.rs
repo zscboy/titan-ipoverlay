@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::net::TcpStream;
 use tokio::sync::{mpsc, oneshot};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as WsMessage, MaybeTlsStream, WebSocketStream};
@@ -272,13 +272,15 @@ impl TaskTunnel {
         let sid_reply = session_id.clone();
         
         let self_clone = Arc::new(self.clone());
+        let start_time = Instant::now();
         tokio::spawn(async move {
              match tokio::time::timeout(
                 Duration::from_secs(self_clone.tcp_timeout as u64),
                 TcpStream::connect(&dest_addr.addr)
             ).await {
                 Ok(Ok(stream)) => {
-                    let _ = self_clone.create_proxy_session_reply(&sid_reply, None).await;
+                    let cost_time = start_time.elapsed().as_millis() as i64;
+                    let _ = self_clone.create_proxy_session_reply(&sid_reply, None, cost_time).await;
                     proxy.proxy_conn(stream, self_clone).await;
                 }
                 Ok(Err(e)) => {
@@ -289,12 +291,14 @@ impl TaskTunnel {
                         "[NODE_UNSTABLE]"
                     };
                     error!("{} dial {} failed: {}", error_tag, dest_addr.addr, e);
-                    let _ = self_clone.create_proxy_session_reply(&sid_reply, Some(e.to_string())).await;
+                    let cost_time = start_time.elapsed().as_millis() as i64;
+                    let _ = self_clone.create_proxy_session_reply(&sid_reply, Some(e.to_string()), cost_time).await;
                     let _ = self_clone.on_proxy_conn_close(&sid_reply).await;
                 }
                 Err(_) => {
                     error!("[NODE_TIMEOUT] dial {} failed: timeout", dest_addr.addr);
-                    let _ = self_clone.create_proxy_session_reply(&sid_reply, Some("timeout".to_string())).await;
+                    let cost_time = start_time.elapsed().as_millis() as i64;
+                    let _ = self_clone.create_proxy_session_reply(&sid_reply, Some("timeout".to_string()), cost_time).await;
                     let _ = self_clone.on_proxy_conn_close(&sid_reply).await;
                 }
             }
@@ -303,10 +307,11 @@ impl TaskTunnel {
         Ok(())
     }
 
-    async fn create_proxy_session_reply(&self, session_id: &str, err_msg: Option<String>) -> Result<()> {
+    async fn create_proxy_session_reply(&self, session_id: &str, err_msg: Option<String>, cost_time: i64) -> Result<()> {
         let reply = pb::CreateSessionReply {
             success: err_msg.is_none(),
             err_msg: err_msg.unwrap_or_default(),
+            cost_time,
         };
         let mut payload = Vec::new();
         reply.encode(&mut payload)?;

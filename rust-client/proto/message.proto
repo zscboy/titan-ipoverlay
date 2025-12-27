@@ -40,4 +40,5 @@ message Message {
 message CreateSessionReply {
     bool success = 1;
     string err_msg = 2;
+    int64 cost_time = 3;
 }
