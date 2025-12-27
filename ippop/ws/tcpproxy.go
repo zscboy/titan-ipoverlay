@@ -64,7 +64,7 @@ func (proxy *TCPProxy) proxyConn() error {
 			if proxy.isCloseByClient {
 				logx.Debugf("[BROWSER_INFO] Browser closed SOCKS5 connection (Normal). id: %s", proxy.id)
 			} else {
-				logx.Infof("[NODE_不稳定] SOCKS5 connection broken by local side: %v, id: %s", err, proxy.id)
+				logx.Infof("[NODE_UNSTABLE] SOCKS5 connection broken by local side: %v, id: %s", err, proxy.id)
 				proxy.tunnel.onProxyTCPConnClose(proxy.id)
 			}
 			return nil

@@ -226,7 +226,7 @@ func (t *Tunnel) Serve() error {
 	for {
 		messageType, p, err := conn.ReadMessage()
 		if err != nil {
-			logx.Errorf("[DIAG] Tunnel connection lost: %v. This is likely due to NODE_不稳定 (network or ISP restriction).", err)
+			logx.Errorf("[DIAG] Tunnel connection lost: %v. This is likely due to unstable node (network or ISP restriction).", err)
 			break
 		}
 
@@ -278,9 +278,7 @@ func (t *Tunnel) onTunnelMsg(message []byte) error {
 }
 
 func (t *Tunnel) onProxySessionCreate(msg *pb.Message) error {
-	go t.createProxySession(msg)
-
-	return nil
+	return t.createProxySession(msg)
 }
 
 func (t *Tunnel) createProxySession(msg *pb.Message) error {
@@ -302,14 +300,17 @@ func (t *Tunnel) createProxySession(msg *pb.Message) error {
 	go func() {
 		conn, err := net.DialTimeout("tcp", destAddr.GetAddr(), time.Duration(t.tcpTimeout)*time.Second)
 		if err != nil {
-			// Categorize dial error
-			errorTag := "[NODE_不稳定]"
+			// Categorize dial error for diagnostics
+			errorTag := "[NODE_UNSTABLE]"
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-				errorTag = "[NODE_时延大/超时]"
+				errorTag = "[NODE_TIMEOUT]"
 			}
 			logx.Errorf("%s dial %s failed: %v", errorTag, destAddr.Addr, err.Error())
 			t.createProxySessionReply(msg.GetSessionId(), err)
 			t.onProxyConnClose(msg.GetSessionId())
+			// Close connected channel to unblock waiting goroutines
+			close(proxySession.connected)
+			proxySession.conn = nil
 			return
 		}
 
