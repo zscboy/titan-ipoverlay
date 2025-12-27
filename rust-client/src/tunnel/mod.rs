@@ -182,14 +182,10 @@ impl Tunnel {
 
         match msg.r#type() {
             pb::MessageType::ProxySessionCreate => {
-                let sid = msg.session_id.clone();
-                let payload = msg.payload.clone();
                 let self_clone = Arc::new(self.clone_for_task(write_tx));
-                tokio::spawn(async move {
-                    if let Err(e) = self_clone.create_proxy_session(sid, payload).await {
-                        error!("create_proxy_session error: {}", e);
-                    }
-                });
+                if let Err(e) = self_clone.create_proxy_session(msg.session_id.clone(), msg.payload.clone()).await {
+                    error!("create_proxy_session error: {}", e);
+                }
             }
             pb::MessageType::ProxySessionData => {
                 let sessions = self.proxy_sessions.lock().unwrap();
@@ -271,19 +267,29 @@ impl TaskTunnel {
                 TcpStream::connect(&dest_addr.addr)
             ).await {
                 Ok(Ok(stream)) => {
-                    proxy.set_conn(stream);
+                    proxy.set_conn(stream).await;
                     let _ = self_clone.create_proxy_session_reply(&sid_reply, None).await;
                     proxy.proxy_conn(self_clone).await;
                 }
                 Ok(Err(e)) => {
-                    error!("dial {} failed: {}", dest_addr.addr, e);
+                    // Categorize dial error for diagnostics
+                    let error_tag = if e.kind() == std::io::ErrorKind::TimedOut {
+                        "[NODE_TIMEOUT]"
+                    } else {
+                        "[NODE_UNSTABLE]"
+                    };
+                    error!("{} dial {} failed: {}", error_tag, dest_addr.addr, e);
                     let _ = self_clone.create_proxy_session_reply(&sid_reply, Some(e.to_string())).await;
                     self_clone.on_proxy_conn_close(&sid_reply).await;
+                    // Signal connection failure to proxy
+                    proxy.signal_connection_failed().await;
                 }
                 Err(_) => {
-                    error!("[NODE_时延大/超时] dial {} failed: timeout", dest_addr.addr);
+                    error!("[NODE_TIMEOUT] dial {} failed: timeout", dest_addr.addr);
                     let _ = self_clone.create_proxy_session_reply(&sid_reply, Some("timeout".to_string())).await;
                     self_clone.on_proxy_conn_close(&sid_reply).await;
+                    // Signal connection failure to proxy
+                    proxy.signal_connection_failed().await;
                 }
             }
         });
@@ -389,4 +395,3 @@ impl Clone for TaskTunnel {
         }
     }
 }
-

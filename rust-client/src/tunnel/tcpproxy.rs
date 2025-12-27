@@ -30,9 +30,9 @@ impl TcpProxy {
                         break;
                     }
                 } else {
-                    // Wait for connection
-                    drop(guard);
-                    tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+                    // Connection is None (either not set yet or failed)
+                    error!("TCPProxy {} conn is None, exiting write loop", id_clone);
+                    return;
                 }
             }
         });
@@ -48,6 +48,12 @@ impl TcpProxy {
     pub async fn set_conn(&self, stream: TcpStream) {
         let mut guard = self.conn.lock().await;
         *guard = Some(stream);
+    }
+
+    /// Signal that connection has failed - sets conn to None to unblock waiting writers
+    pub async fn signal_connection_failed(&self) {
+        let mut guard = self.conn.lock().await;
+        *guard = None;
     }
 
     pub async fn write(&self, data: &[u8]) -> Result<()> {
