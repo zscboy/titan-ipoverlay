@@ -65,6 +65,8 @@ type TunnelManager struct {
 	tunnelListLock sync.RWMutex
 	tunnelList     []*Tunnel
 	rrIdx          uint64
+
+	rng *rand.Rand
 }
 
 func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
@@ -80,6 +82,7 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 		filterRules:     &Rules{rules: RulesToMap(config.FilterRules.Rules), defaultAction: config.FilterRules.DefaultAction},
 		userSessionMap:  make(map[string]map[string]*UserSession),
 		userSessionLock: sync.Mutex{},
+		rng:             rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 
 	routeScheduler := newUserRouteScheduler(tm)
@@ -291,7 +294,7 @@ func (tm *TunnelManager) allocateTunnelByUserSession(user *model.User, sessionID
 
 	// No sessionID provided → return a random tunnel
 	if sessionID == "" {
-		tun, err := tm.nextTunnel()
+		tun, err := tm.randomTunnel()
 		if err != nil {
 			return nil, nil, err
 		}
@@ -362,22 +365,16 @@ func (tm *TunnelManager) getTunnelByUser(user *model.User) (*Tunnel, error) {
 }
 
 func (tm *TunnelManager) randomTunnel() (*Tunnel, error) {
-	var result any
-	count := 0
+	tm.tunnelListLock.RLock()
+	defer tm.tunnelListLock.RUnlock()
 
-	tm.tunnels.Range(func(_, value any) bool {
-		count++
-		if rand.Intn(count) == 0 {
-			result = value
-		}
-		return true
-	})
-
-	if count == 0 {
+	n := len(tm.tunnelList)
+	if n == 0 {
 		return nil, fmt.Errorf("no tunnel exist")
 	}
 
-	return result.(*Tunnel), nil
+	idx := tm.rng.Intn(n)
+	return tm.tunnelList[idx], nil
 }
 
 func (tm *TunnelManager) nextTunnel() (*Tunnel, error) {
@@ -390,7 +387,6 @@ func (tm *TunnelManager) nextTunnel() (*Tunnel, error) {
 	}
 
 	idx := atomic.AddUint64(&tm.rrIdx, 1)
-	logx.Debugf("nextTunnel:%d", idx)
 	return tm.tunnelList[idx%uint64(n)], nil
 }
 
