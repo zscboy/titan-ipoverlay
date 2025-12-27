@@ -208,16 +208,28 @@ func (t *Tunnel) onMessage(data []byte) error {
 
 func (t *Tunnel) onProxySessionCreateReply(sessionID string, payload []byte) error {
 	logx.Debugf("Tunnel.onProxySessionCreateComplete")
-	out := &pb.CreateSessionReply{}
-	err := proto.Unmarshal(payload, out)
-	if err != nil {
-		return fmt.Errorf("onProxySessionCreateReply, can not unmarshal replay:%s", err.Error())
+	v, ok := t.proxys.Load(sessionID)
+	if !ok {
+		return fmt.Errorf("Tunnel.onProxySessionCreateReply session not exist", sessionID)
 	}
 
-	if out.Success {
-		logx.Debugf("session %s create success", sessionID)
+	proxy := v.(*TCPProxy)
+	targetInfo := proxy.getTargetInfo()
+
+	reply := &pb.CreateSessionReply{}
+	err := proto.Unmarshal(payload, reply)
+	if err != nil {
+		return fmt.Errorf("Tunnel.onProxySessionCreateReply, can not unmarshal replay:%s", err.Error())
+	}
+
+	addr := fmt.Sprintf("%s:%d", targetInfo.DomainName, targetInfo.Port)
+
+	if reply.Success {
+		logx.Debugf("Tunnel.onProxySessionCreateComplete, session %s create success, user:%s, target:%s, device connect target cost:%dms, target connect total cost:%dms, socks5 connect total cost:%dms",
+			sessionID, targetInfo.Username, addr, reply.CostTime, time.Since(targetInfo.TargetCreateTime).Milliseconds(), time.Since(targetInfo.Socks5CreateTime).Milliseconds())
 	} else {
-		logx.Debugf("session %s create failed:%s", sessionID, out.ErrMsg)
+		logx.Errorf("Tunnel.onProxySessionCreateComplete, session %s create success, user:%s, target:%s, device connect target cost:%dms, target connect total cost:%dms, socks5 connect total cost:%dms",
+			sessionID, targetInfo.Username, addr, reply.CostTime, time.Since(targetInfo.TargetCreateTime).Milliseconds(), time.Since(targetInfo.Socks5CreateTime).Milliseconds())
 	}
 	return nil
 	// v, ok := t.waitList.Load(sessionID)
@@ -297,18 +309,13 @@ func (t *Tunnel) onProxyDataFromProxy(sessionID string, data []byte) {
 	}
 }
 
-func (t *Tunnel) acceptSocks5TCPConn(conn net.Conn) error {
-	logx.Info("acceptSocks5TCPConn (Legacy signature override)")
-	return nil
-}
-
 func (t *Tunnel) acceptSocks5TCPConnImproved(conn net.Conn, targetInfo *socks5.SocksTargetInfo) error {
 	logx.Debugf("acceptSocks5TCPConnImproved, dest %s:%d", targetInfo.DomainName, targetInfo.Port)
 
-	// now := time.Now()
+	targetInfo.TargetCreateTime = time.Now()
 
 	sessionID := uuid.NewString()
-	proxyTCP := newTCPProxy(sessionID, conn, t, targetInfo.Username)
+	proxyTCP := newTCPProxy(sessionID, conn, t, targetInfo)
 
 	t.proxys.Store(sessionID, proxyTCP)
 	defer t.proxys.Delete(sessionID)
@@ -322,7 +329,7 @@ func (t *Tunnel) acceptSocks5TCPConnImproved(conn net.Conn, targetInfo *socks5.S
 		return err
 	}
 
-	logx.Debugf("acceptSocks5TCPConn try created session %s, %s:%d", sessionID, targetInfo.DomainName, targetInfo.Port)
+	logx.Debugf("acceptSocks5TCPConn try created session %s, %s:%d, cost time:%dms", sessionID, targetInfo.DomainName, targetInfo.Port, time.Since(targetInfo.Socks5CreateTime).Milliseconds())
 
 	if len(targetInfo.ExtraBytes) > 0 {
 		t.onProxyDataFromProxy(sessionID, targetInfo.ExtraBytes)

@@ -38,7 +38,8 @@ type SocksTargetInfo struct {
 	Session    string
 	SessTime   int64
 
-	ConnCreateTime time.Time
+	Socks5CreateTime time.Time
+	TargetCreateTime time.Time
 }
 
 type UDPConn interface {
@@ -329,13 +330,13 @@ func (socks5Server *Socks5Server) handleSocks5Connect(req *request) error {
 
 	// cfg := socks5Server.opts
 	targetInfo := &SocksTargetInfo{
-		Port:           req.destAddr.port,
-		DomainName:     req.destAddr.fqdn,
-		ExtraBytes:     extraBytes,
-		Username:       req.user.username,
-		Session:        req.user.session,
-		SessTime:       int64(req.user.sessTime),
-		ConnCreateTime: req.connCreateTime,
+		Port:             req.destAddr.port,
+		DomainName:       req.destAddr.fqdn,
+		ExtraBytes:       extraBytes,
+		Username:         req.user.username,
+		Session:          req.user.session,
+		SessTime:         int64(req.user.sessTime),
+		Socks5CreateTime: req.connCreateTime,
 	}
 
 	tcpConn, ok := req.conn.(*net.TCPConn)

@@ -9,7 +9,7 @@ use crate::tunnel::{Tunnel, TunnelOptions};
 use crate::bootstrap::BootstrapMgr;
 
 #[derive(Parser, Debug)]
-#[command(name = "titan-ipoverlay-client", version = "0.1.0", about = "vms client")]
+#[command(name = "titan-ipoverlay-client", version = "0.1.1", about = "vms client")]
 struct Args {
     #[arg(long, default_value = "./")]
     app_dir: String,

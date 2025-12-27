@@ -242,6 +242,7 @@ type CreateSessionReply struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
 	ErrMsg        string                 `protobuf:"bytes,2,opt,name=err_msg,json=errMsg,proto3" json:"err_msg,omitempty"`
+	CostTime      int64                  `protobuf:"varint,3,opt,name=cost_time,json=costTime,proto3" json:"cost_time,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -290,6 +291,13 @@ func (x *CreateSessionReply) GetErrMsg() string {
 	return ""
 }
 
+func (x *CreateSessionReply) GetCostTime() int64 {
+	if x != nil {
+		return x.CostTime
+	}
+	return 0
+}
+
 var File_message_proto protoreflect.FileDescriptor
 
 const file_message_proto_rawDesc = "" +
@@ -304,10 +312,11 @@ const file_message_proto_rawDesc = "" +
 	"\x04type\x18\x01 \x01(\x0e2\x0f.pb.MessageTypeR\x04type\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x02 \x01(\tR\tsessionId\x12\x18\n" +
-	"\apayload\x18\x03 \x01(\fR\apayload\"G\n" +
+	"\apayload\x18\x03 \x01(\fR\apayload\"d\n" +
 	"\x12CreateSessionReply\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x17\n" +
-	"\aerr_msg\x18\x02 \x01(\tR\x06errMsg*\x86\x01\n" +
+	"\aerr_msg\x18\x02 \x01(\tR\x06errMsg\x12\x1b\n" +
+	"\tcost_time\x18\x03 \x01(\x03R\bcostTime*\x86\x01\n" +
 	"\vMessageType\x12\v\n" +
 	"\aUNKNOWN\x10\x00\x12\v\n" +
 	"\aCOMMAND\x10\x01\x12\x18\n" +

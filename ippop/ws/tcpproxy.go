@@ -3,6 +3,7 @@ package ws
 import (
 	"fmt"
 	"net"
+	"titan-ipoverlay/ippop/socks5"
 
 	"sync"
 
@@ -19,12 +20,16 @@ type TCPProxy struct {
 	id              string
 	conn            net.Conn
 	tunnel          *Tunnel
-	userName        string
+	targetInfo      *socks5.SocksTargetInfo
 	isCloseByClient bool
 }
 
-func newTCPProxy(id string, conn net.Conn, t *Tunnel, userName string) *TCPProxy {
-	return &TCPProxy{id: id, conn: conn, tunnel: t, userName: userName}
+func newTCPProxy(id string, conn net.Conn, t *Tunnel, targetInfo *socks5.SocksTargetInfo) *TCPProxy {
+	return &TCPProxy{id: id, conn: conn, tunnel: t, targetInfo: targetInfo}
+}
+
+func (proxy *TCPProxy) getTargetInfo() *socks5.SocksTargetInfo {
+	return proxy.targetInfo
 }
 
 func (proxy *TCPProxy) close() {
@@ -46,7 +51,7 @@ func (proxy *TCPProxy) write(data []byte) error {
 		return fmt.Errorf("session %s conn == nil", proxy.id)
 	}
 
-	proxy.tunnel.tunMgr.traffic(proxy.userName, int64(len(data)))
+	proxy.tunnel.tunMgr.traffic(proxy.targetInfo.Username, int64(len(data)))
 	_, err := proxy.conn.Write(data)
 	return err
 }
@@ -70,7 +75,7 @@ func (proxy *TCPProxy) proxyConn() error {
 			return nil
 		}
 
-		proxy.tunnel.tunMgr.traffic(proxy.userName, int64(n))
+		proxy.tunnel.tunMgr.traffic(proxy.targetInfo.Username, int64(n))
 		proxy.tunnel.onProxyDataFromProxy(proxy.id, buf[:n])
 	}
 }
