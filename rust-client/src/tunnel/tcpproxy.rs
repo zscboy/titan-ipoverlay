@@ -1,106 +1,118 @@
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
-use tokio::sync::{mpsc, Mutex as TokioMutex};
+use tokio::sync::{mpsc, Mutex as TokioMutex, Notify};
 use log::{debug, error};
 use anyhow::Result;
 use crate::tunnel::TaskTunnel;
 
 pub struct TcpProxy {
     pub id: String,
-    conn: Arc<TokioMutex<Option<TcpStream>>>,
-    is_close_by_server: Arc<std::sync::Mutex<bool>>,
     write_tx: mpsc::Sender<Vec<u8>>,
+    write_rx: TokioMutex<Option<mpsc::Receiver<Vec<u8>>>>,
+    is_close_by_server: Arc<std::sync::Mutex<bool>>,
+    shutdown_notify: Arc<Notify>,
 }
 
 impl TcpProxy {
     pub fn new(id: String) -> Self {
-        let (write_tx, mut write_rx) = mpsc::channel::<Vec<u8>>(1024);
-        let id_clone = id.clone();
+        let (write_tx, write_rx) = mpsc::channel::<Vec<u8>>(1024);
         
-        let conn_holder = Arc::new(TokioMutex::new(None::<TcpStream>));
-        let conn_holder_clone = conn_holder.clone();
-
-        tokio::spawn(async move {
-            while let Some(data) = write_rx.recv().await {
-                let mut guard = conn_holder_clone.lock().await;
-                if let Some(ref mut stream) = *guard {
-                    if let Err(e) = stream.write_all(&data).await {
-                        error!("TCPProxy {} write error: {}", id_clone, e);
-                        break;
-                    }
-                } else {
-                    // Connection is None (either not set yet or failed)
-                    error!("TCPProxy {} conn is None, exiting write loop", id_clone);
-                    return;
-                }
-            }
-        });
-
         Self {
             id,
-            conn: conn_holder,
-            is_close_by_server: Arc::new(std::sync::Mutex::new(false)),
             write_tx,
+            write_rx: TokioMutex::new(Some(write_rx)),
+            is_close_by_server: Arc::new(std::sync::Mutex::new(false)),
+            shutdown_notify: Arc::new(Notify::new()),
         }
     }
 
-    pub async fn set_conn(&self, stream: TcpStream) {
-        let mut guard = self.conn.lock().await;
-        *guard = Some(stream);
-    }
-
-    /// Signal that connection has failed - sets conn to None to unblock waiting writers
-    pub async fn signal_connection_failed(&self) {
-        let mut guard = self.conn.lock().await;
-        *guard = None;
-    }
-
     pub async fn write(&self, data: &[u8]) -> Result<()> {
+        // If notify was triggered, don't allow more writes
         self.write_tx.send(data.to_vec()).await.map_err(|_| anyhow::anyhow!("channel closed"))
     }
 
     pub fn close_by_server(&self) {
-        let mut guard = self.is_close_by_server.lock().unwrap();
-        *guard = true;
-        // Connection will be dropped when TokioMutex is dropped
+        {
+            let mut guard = self.is_close_by_server.lock().unwrap();
+            *guard = true;
+        }
+        self.shutdown_notify.notify_waiters();
     }
 
     pub fn destroy(&self) {
-        // Connection will be dropped when Arc is dropped
+        self.shutdown_notify.notify_waiters();
     }
 
-    pub async fn proxy_conn(&self, t: Arc<TaskTunnel>) {
+    pub async fn proxy_conn(&self, stream: TcpStream, t: Arc<TaskTunnel>) {
         let id = self.id.clone();
+        let (mut reader, mut writer) = stream.into_split();
         
-        let stream = {
-            let mut guard = self.conn.lock().await;
-            guard.take()
-        };
+        // Take the receiver
+        let mut rx_guard = self.write_rx.lock().await;
+        let mut rx = rx_guard.take().expect("TcpProxy started twice or receiver gone");
+        drop(rx_guard);
 
-        if let Some(mut s) = stream {
-            let mut buf = [0u8; 32 * 1024];
+        // Notify for shutdown
+        let shutdown_write = self.shutdown_notify.clone();
+        let shutdown_read = self.shutdown_notify.clone();
+
+        // Spawn WRITER task (Tunnel -> Remote Server)
+        let id_for_writer = id.clone();
+        tokio::spawn(async move {
             loop {
-                match s.read(&mut buf).await {
-                    Ok(0) => break,
-                    Ok(n) => {
-                        if let Err(e) = t.send_session_data(&id, buf[..n].to_vec()).await {
-                            error!("TCPProxy {} send_session_data error: {}", id, e);
+                tokio::select! {
+                    msg = rx.recv() => {
+                        if let Some(data) = msg {
+                            if let Err(e) = writer.write_all(&data).await {
+                                error!("TCPProxy {} write error: {}", id_for_writer, e);
+                                break;
+                            }
+                        } else {
                             break;
                         }
                     }
-                    Err(e) => {
-                        debug!("TCPProxy.proxy_conn read error: {}, id: {}", e, id);
+                    _ = shutdown_write.notified() => {
+                        debug!("TCPProxy {} writer task shutting down", id_for_writer);
                         break;
                     }
                 }
             }
-            
-            if !*self.is_close_by_server.lock().unwrap() {
-                let _ = t.on_proxy_conn_close(&id).await;
+            // Ensure writer is closed
+            let _ = writer.shutdown().await;
+        });
+
+        // Run READER loop in current task (Remote Server -> Tunnel)
+        let mut buf = [0u8; 32 * 1024];
+        loop {
+            tokio::select! {
+                res = reader.read(&mut buf) => {
+                    match res {
+                        Ok(0) => break,
+                        Ok(n) => {
+                            if let Err(e) = t.send_session_data(&id, buf[..n].to_vec()).await {
+                                error!("TCPProxy {} send_session_data error: {}", id, e);
+                                break;
+                            }
+                        }
+                        Err(e) => {
+                            debug!("TCPProxy.proxy_conn read error: {}, id: {}", e, id);
+                            break;
+                        }
+                    }
+                }
+                _ = shutdown_read.notified() => {
+                    debug!("TCPProxy {} reader loop shutting down", id);
+                    break;
+                }
             }
-            
-            t.proxy_sessions.lock().unwrap().remove(&id);
         }
+        
+        // Final cleanup
+        if !*self.is_close_by_server.lock().unwrap() {
+            let _ = t.on_proxy_conn_close(&id).await;
+        }
+        
+        t.proxy_sessions.lock().unwrap().remove(&id);
     }
 }

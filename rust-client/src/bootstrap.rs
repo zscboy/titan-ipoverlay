@@ -8,7 +8,11 @@ use anyhow::Result;
 
 const UPDATE_INTERVALS: u64 = 12 * 60 * 60;
 const BOOTSTRAP_FILE: &str = "bootstrap.json";
-const DEFAULT_BOOTSTRAP_JSON: &str = r#"{"bootstraps":["http://bootstrap.titan.com/bootstraps"]}"#; // Fallback
+const DEFAULT_BOOTSTRAP: &[&str] = &[
+    "https://pcdn.titannet.io/test4/ipservice/bootstrap.json",
+    "http://8.209.251.146:8080/bootstrap.json",
+    "http://47.85.83.7:8080/bootstrap.json",
+]; // Fallback bootstrap URLs
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config {
@@ -31,7 +35,7 @@ impl BootstrapMgr {
         let content = if bootstrap_file_path.exists() {
             fs::read_to_string(&bootstrap_file_path)?
         } else {
-            let default_content = DEFAULT_BOOTSTRAP_JSON.to_string();
+            let default_content = serde_json::to_string(&Config { bootstraps: DEFAULT_BOOTSTRAP.iter().map(|s| s.to_string()).collect() })?;
             fs::write(&bootstrap_file_path, &default_content)?;
             default_content
         };

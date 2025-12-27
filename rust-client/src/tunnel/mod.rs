@@ -35,7 +35,7 @@ pub struct Pop {
 
 pub struct Tunnel {
     uuid: String,
-    write_tx: mpsc::Sender<WsMessage>,
+    write_tx: Arc<Mutex<mpsc::Sender<WsMessage>>>,
     proxy_sessions: Arc<Mutex<HashMap<String, Arc<TcpProxy>>>>,
     proxy_udps: Arc<Mutex<HashMap<String, Arc<UdpProxy>>>>,
     is_destroy: Arc<Mutex<bool>>,
@@ -49,10 +49,10 @@ pub struct Tunnel {
 
 impl Tunnel {
     pub fn new(opts: &TunnelOptions) -> Result<Self> {
-        let (write_tx, _) = mpsc::channel(1024); // Placeholder, will be replaced in Connect
+        let (write_tx, _) = mpsc::channel(1); 
         Ok(Self {
             uuid: opts.uuid.clone(),
-            write_tx,
+            write_tx: Arc::new(Mutex::new(write_tx)),
             proxy_sessions: Arc::new(Mutex::new(HashMap::new())),
             proxy_udps: Arc::new(Mutex::new(HashMap::new())),
             is_destroy: Arc::new(Mutex::new(false)),
@@ -68,14 +68,19 @@ impl Tunnel {
     pub async fn connect(&mut self) -> Result<Box<WebSocketStream<MaybeTlsStream<TcpStream>>>> {
         let pop = self.get_pop().await?;
         let url_str = format!("{}?id={}&os=linux&version={}", pop.server_url, self.uuid, self.version);
+        info!("Tunnel.Connect, new tun {} {}", pop.server_url, pop.access_token);
         
-        let url = reqwest::Url::parse(&url_str)?;
-        let _request = http::Request::builder()
-            .uri(url.as_str())
+        let request = http::Request::builder()
+            .uri(&url_str)
             .header("Authorization", format!("Bearer {}", pop.access_token))
+            .header("Sec-WebSocket-Key", tokio_tungstenite::tungstenite::handshake::client::generate_key())
+            .header("Host", reqwest::Url::parse(&url_str)?.host_str().unwrap_or_default())
+            .header("Upgrade", "websocket")
+            .header("Connection", "Upgrade")
+            .header("Sec-WebSocket-Version", "13")
             .body(())?;
 
-        let (ws_stream, _) = connect_async(url_str).await?;
+        let (ws_stream, _) = connect_async(request).await?;
         info!("Tunnel.Connect, new tun {}", pop.server_url);
 
         Ok(Box::new(ws_stream))
@@ -153,10 +158,16 @@ impl Tunnel {
             }
         });
 
+        // Update the shared write_tx for existing/new sessions
+        {
+            let mut w_guard = self.write_tx.lock().unwrap();
+            *w_guard = write_tx.clone();
+        }
+
         while let Some(msg_result) = read_half.next().await {
             match msg_result {
                 Ok(WsMessage::Binary(p)) => {
-                    if let Err(e) = self.on_tunnel_msg(p, write_tx.clone()).await {
+                    if let Err(e) = self.on_tunnel_msg(p).await {
                         error!("on_tunnel_msg error: {}", e);
                     }
                 }
@@ -176,13 +187,13 @@ impl Tunnel {
         Ok(())
     }
 
-    async fn on_tunnel_msg(&self, p: Vec<u8>, write_tx: mpsc::Sender<WsMessage>) -> Result<()> {
+    async fn on_tunnel_msg(&self, p: Vec<u8>) -> Result<()> {
         let msg = pb::Message::decode(&p[..])?;
         debug!("Tunnel.on_tunnel_msg type: {:?}, sid: {}", msg.r#type(), msg.session_id);
 
         match msg.r#type() {
             pb::MessageType::ProxySessionCreate => {
-                let self_clone = Arc::new(self.clone_for_task(write_tx));
+                let self_clone = Arc::new(self.clone_for_task());
                 if let Err(e) = self_clone.create_proxy_session(msg.session_id.clone(), msg.payload.clone()).await {
                     error!("create_proxy_session error: {}", e);
                 }
@@ -202,7 +213,7 @@ impl Tunnel {
             pb::MessageType::ProxyUdpData => {
                 let sid = msg.session_id.clone();
                 let payload = msg.payload.clone();
-                let self_clone = Arc::new(self.clone_for_task(write_tx.clone()));
+                let self_clone = Arc::new(self.clone_for_task());
                 tokio::spawn(async move {
                     if let Err(e) = self_clone.on_proxy_udp_data_from_tunnel(sid, payload).await {
                         error!("on_proxy_udp_data_from_tunnel error: {}", e);
@@ -215,9 +226,9 @@ impl Tunnel {
     }
 
     // Helper to clone session identifiers and timeouts
-    fn clone_for_task(&self, write_tx: mpsc::Sender<WsMessage>) -> TaskTunnel {
+    fn clone_for_task(&self) -> TaskTunnel {
         TaskTunnel {
-            write_tx,
+            write_tx: self.write_tx.clone(),
             proxy_sessions: self.proxy_sessions.clone(),
             proxy_udps: self.proxy_udps.clone(),
             tcp_timeout: self.tcp_timeout,
@@ -242,7 +253,7 @@ impl Tunnel {
 }
 
 pub struct TaskTunnel {
-    write_tx: mpsc::Sender<WsMessage>,
+    write_tx: Arc<Mutex<mpsc::Sender<WsMessage>>>,
     proxy_sessions: Arc<Mutex<HashMap<String, Arc<TcpProxy>>>>,
     proxy_udps: Arc<Mutex<HashMap<String, Arc<UdpProxy>>>>,
     tcp_timeout: i32,
@@ -267,9 +278,8 @@ impl TaskTunnel {
                 TcpStream::connect(&dest_addr.addr)
             ).await {
                 Ok(Ok(stream)) => {
-                    proxy.set_conn(stream).await;
                     let _ = self_clone.create_proxy_session_reply(&sid_reply, None).await;
-                    proxy.proxy_conn(self_clone).await;
+                    proxy.proxy_conn(stream, self_clone).await;
                 }
                 Ok(Err(e)) => {
                     // Categorize dial error for diagnostics
@@ -280,16 +290,12 @@ impl TaskTunnel {
                     };
                     error!("{} dial {} failed: {}", error_tag, dest_addr.addr, e);
                     let _ = self_clone.create_proxy_session_reply(&sid_reply, Some(e.to_string())).await;
-                    self_clone.on_proxy_conn_close(&sid_reply).await;
-                    // Signal connection failure to proxy
-                    proxy.signal_connection_failed().await;
+                    let _ = self_clone.on_proxy_conn_close(&sid_reply).await;
                 }
                 Err(_) => {
                     error!("[NODE_TIMEOUT] dial {} failed: timeout", dest_addr.addr);
                     let _ = self_clone.create_proxy_session_reply(&sid_reply, Some("timeout".to_string())).await;
-                    self_clone.on_proxy_conn_close(&sid_reply).await;
-                    // Signal connection failure to proxy
-                    proxy.signal_connection_failed().await;
+                    let _ = self_clone.on_proxy_conn_close(&sid_reply).await;
                 }
             }
         });
@@ -334,7 +340,11 @@ impl TaskTunnel {
     async fn write_pb_message(&self, msg: pb::Message) -> Result<()> {
         let mut buf = Vec::new();
         msg.encode(&mut buf)?;
-        self.write_tx.send(WsMessage::Binary(buf)).await.map_err(|_| anyhow::anyhow!("channel closed"))
+        let tx = {
+            let guard = self.write_tx.lock().unwrap();
+            guard.clone()
+        };
+        tx.send(WsMessage::Binary(buf)).await.map_err(|_| anyhow::anyhow!("channel closed"))
     }
 
     async fn on_proxy_udp_data_from_tunnel(&self, sid: String, payload: Vec<u8>) -> Result<()> {

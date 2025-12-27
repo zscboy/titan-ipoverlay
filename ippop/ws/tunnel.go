@@ -208,19 +208,31 @@ func (t *Tunnel) onMessage(data []byte) error {
 
 func (t *Tunnel) onProxySessionCreateReply(sessionID string, payload []byte) error {
 	logx.Debugf("Tunnel.onProxySessionCreateComplete")
-	v, ok := t.waitList.Load(sessionID)
-	if !ok || v == nil {
-		return fmt.Errorf("Tunnel.onProxySessionCreateComplete not found session:%s", sessionID)
+	out := &pb.CreateSessionReply{}
+	err := proto.Unmarshal(payload, out)
+	if err != nil {
+		return fmt.Errorf("onProxySessionCreateReply, can not unmarshal replay:%s", err.Error())
 	}
 
-	ch := v.(chan []byte)
-
-	select {
-	case ch <- payload:
-	default:
-		logx.Errorf("Tunnel.onProxySessionCreateComplete: channel full or no listener for session %s", sessionID)
+	if out.Success {
+		logx.Debugf("session %s create success", sessionID)
+	} else {
+		logx.Debugf("session %s create failed:%s", sessionID, out.ErrMsg)
 	}
 	return nil
+	// v, ok := t.waitList.Load(sessionID)
+	// if !ok || v == nil {
+	// 	return fmt.Errorf("Tunnel.onProxySessionCreateComplete not found session:%s", sessionID)
+	// }
+
+	// ch := v.(chan []byte)
+
+	// select {
+	// case ch <- payload:
+	// default:
+	// 	logx.Errorf("Tunnel.onProxySessionCreateComplete: channel full or no listener for session %s", sessionID)
+	// }
+	// return nil
 }
 
 func (t *Tunnel) onProxySessionClose(sessionID string) error {
@@ -240,7 +252,7 @@ func (t *Tunnel) onProxySessionDataFromTunnel(sessionID string, data []byte) err
 	logx.Debugf("Tunnel.onProxySessionDataFromTunnel session id: %s", sessionID)
 	v, ok := t.proxys.Load(sessionID)
 	if !ok {
-		t.onProxyTCPConnClose(sessionID)
+		// t.onProxyTCPConnClose(sessionID)
 		return fmt.Errorf("Tunnel.onProxySessionDataFromTunnel, can not found session %s", sessionID)
 	}
 
@@ -293,31 +305,28 @@ func (t *Tunnel) acceptSocks5TCPConn(conn net.Conn) error {
 func (t *Tunnel) acceptSocks5TCPConnImproved(conn net.Conn, targetInfo *socks5.SocksTargetInfo) error {
 	logx.Debugf("acceptSocks5TCPConnImproved, dest %s:%d", targetInfo.DomainName, targetInfo.Port)
 
-	now := time.Now()
+	// now := time.Now()
 
 	sessionID := uuid.NewString()
-
-	addr := fmt.Sprintf("%s:%d", targetInfo.DomainName, targetInfo.Port)
-
-	// Async Session Creation (0-RTT optimization)
-	go func() {
-		err := t.onClientCreateByDomain(&pb.DestAddr{Addr: addr}, sessionID)
-		if err != nil {
-			logx.Errorf("Async tunnel session creation failed: %v", err)
-			conn.Close()
-		}
-	}()
-
-	logx.Debugf("acceptSocks5TCPConn initiated async %dms, %s:%d", time.Since(now).Milliseconds(), targetInfo.DomainName, targetInfo.Port)
-
-	if len(targetInfo.ExtraBytes) > 0 {
-		t.onProxyDataFromProxy(sessionID, targetInfo.ExtraBytes)
-	}
-
 	proxyTCP := newTCPProxy(sessionID, conn, t, targetInfo.Username)
 
 	t.proxys.Store(sessionID, proxyTCP)
 	defer t.proxys.Delete(sessionID)
+
+	addr := fmt.Sprintf("%s:%d", targetInfo.DomainName, targetInfo.Port)
+
+	// Session Creation: Synchronous to ensure CREATE message is sent before any DATA message
+	err := t.onClientCreateByDomain(&pb.DestAddr{Addr: addr}, sessionID)
+	if err != nil {
+		logx.Errorf("Tunnel session creation failed: %v", err)
+		return err
+	}
+
+	logx.Debugf("acceptSocks5TCPConn try created session %s, %s:%d", sessionID, targetInfo.DomainName, targetInfo.Port)
+
+	if len(targetInfo.ExtraBytes) > 0 {
+		t.onProxyDataFromProxy(sessionID, targetInfo.ExtraBytes)
+	}
 
 	return proxyTCP.proxyConn()
 }
@@ -335,52 +344,59 @@ func (t *Tunnel) onClientCreateByDomain(dest *pb.DestAddr, sessionID string) err
 	msg.SessionId = sessionID
 	msg.Payload = buf
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(t.opts.TCPTimeout)*time.Second)
-	defer cancel()
-
-	reply, err := t.requestCreateProxySession(ctx, msg)
+	data, err := proto.Marshal(msg)
 	if err != nil {
 		return err
 	}
 
-	if !reply.Success {
-		return fmt.Errorf(reply.ErrMsg)
-	}
+	return t.writeAsync(data)
 
-	return nil
+	// ctx, cancel := context.WithTimeout(context.Background(), time.Duration(t.opts.TCPTimeout)*time.Second)
+	// defer cancel()
 
-}
+	// reply, err := t.requestCreateProxySession(ctx, msg)
+	// if err != nil {
+	// 	return err
+	// }
 
-func (t *Tunnel) requestCreateProxySession(ctx context.Context, in *pb.Message) (*pb.CreateSessionReply, error) {
-	data, err := proto.Marshal(in)
-	if err != nil {
-		return nil, err
-	}
+	// if !reply.Success {
+	// 	return fmt.Errorf(reply.ErrMsg)
+	// }
 
-	ch := make(chan []byte)
-	t.waitList.Store(in.GetSessionId(), ch)
-	defer t.waitList.Delete(in.GetSessionId())
-
-	err = t.write(data)
-	if err != nil {
-		return nil, err
-	}
-
-	for {
-		select {
-		case data := <-ch:
-			out := &pb.CreateSessionReply{}
-			err = proto.Unmarshal(data, out)
-			if err != nil {
-				return nil, fmt.Errorf("can not unmarshal replay:%s", err.Error())
-			}
-			return out, nil
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		}
-	}
+	// return nil
 
 }
+
+// func (t *Tunnel) requestCreateProxySession(ctx context.Context, in *pb.Message) (*pb.CreateSessionReply, error) {
+// 	data, err := proto.Marshal(in)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	ch := make(chan []byte)
+// 	t.waitList.Store(in.GetSessionId(), ch)
+// 	defer t.waitList.Delete(in.GetSessionId())
+
+// 	err = t.write(data)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	for {
+// 		select {
+// 		case data := <-ch:
+// 			out := &pb.CreateSessionReply{}
+// 			err = proto.Unmarshal(data, out)
+// 			if err != nil {
+// 				return nil, fmt.Errorf("can not unmarshal replay:%s", err.Error())
+// 			}
+// 			return out, nil
+// 		case <-ctx.Done():
+// 			return nil, ctx.Err()
+// 		}
+// 	}
+
+// }
 
 func (t *Tunnel) onProxyUDPDataFromTunnel(sessionID string, data []byte) error {
 	proxy, ok := t.proxys.Load(sessionID)
