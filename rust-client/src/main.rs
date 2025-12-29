@@ -9,7 +9,7 @@ use crate::tunnel::{Tunnel, TunnelOptions};
 use crate::bootstrap::BootstrapMgr;
 
 #[derive(Parser, Debug)]
-#[command(name = "titan-ipoverlay-client", version = "0.1.1", about = "vms client")]
+#[command(name = "titan-ipoverlay-client", version, about = "vms client")]
 struct Args {
     #[arg(long, default_value = "./")]
     app_dir: String,
@@ -50,7 +50,7 @@ async fn main() -> anyhow::Result<()> {
         tcp_timeout: args.tcp_timeout,
         bootstrap_mgr: None,
         direct_url: args.direct_url.clone(),
-        version: "0.1.0".to_string(),
+        version: env!("CARGO_PKG_VERSION").to_string(),
     };
 
     if args.direct_url.is_empty() {
