@@ -67,6 +67,8 @@ type TunnelManager struct {
 	rrIdx          uint64
 
 	rng *rand.Rand
+
+	HealthStatsMap sync.Map
 }
 
 func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
@@ -160,6 +162,7 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, n
 
 	tun := newTunnel(conn, tm, opts)
 	tm.tunnels.Store(node.Id, tun)
+	tm.HealthStatsMap.LoadOrStore(node.Id, &HealthStats{})
 
 	tm.addTunnel(tun)
 
@@ -373,8 +376,22 @@ func (tm *TunnelManager) randomTunnel() (*Tunnel, error) {
 		return nil, fmt.Errorf("no tunnel exist")
 	}
 
-	idx := tm.rng.Intn(n)
-	return tm.tunnelList[idx], nil
+	for i := 0; i < n; i++ {
+		idx := tm.rng.Intn(n)
+		tun := tm.tunnelList[idx]
+
+		v, ok := tm.HealthStatsMap.Load(tun.opts.Id)
+		if ok {
+			if v.(*HealthStats).checkValid() {
+				return tun, nil
+			} else {
+				logx.Errorf("node %s is invalid", tun.opts.Id)
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("all tunnel invalid")
+
 }
 
 func (tm *TunnelManager) nextTunnel() (*Tunnel, error) {
@@ -511,15 +528,25 @@ func (tm *TunnelManager) keepalive() {
 		if tick == keepaliveInterval {
 			tick = 0
 			count := 0
+			failureCount := 0
 			now := time.Now()
 			tm.tunnels.Range(func(key, value any) bool {
 				t := value.(*Tunnel)
 				t.keepalive()
+
+				v, ok := tm.HealthStatsMap.Load(key.(string))
+				if ok {
+					healthStats := v.(*HealthStats)
+					if healthStats.isInvalid() {
+						failureCount++
+					}
+				}
+
 				count++
 				return true
 			})
 
-			logx.Debugf("TunnelManager.keepalive tunnel count:%d, cost:%v", count, time.Since(now))
+			logx.Debugf("TunnelManager.keepalive tunnel count:%d, cost:%v, failureCount:%d", count, time.Since(now), failureCount)
 		}
 	}
 }

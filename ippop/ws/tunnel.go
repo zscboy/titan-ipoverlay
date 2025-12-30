@@ -18,8 +18,9 @@ import (
 )
 
 const (
-	netDelayCount  = 5
-	limitRateBurst = 128 * 1024
+	netDelayCount   = 5
+	limitRateBurst  = 128 * 1024
+	failureCostTime = 600 // 600ms
 )
 
 type TunOptions struct {
@@ -285,6 +286,12 @@ func (t *Tunnel) onProxyDataFromProxy(sessionID string, data []byte) {
 func (t *Tunnel) acceptSocks5TCPConn(conn net.Conn, targetInfo *socks5.SocksTargetInfo) error {
 	logx.Debugf("acceptSocks5TCPConn, dest %s:%d", targetInfo.DomainName, targetInfo.Port)
 
+	var healthStats *HealthStats
+	v, ok := t.tunMgr.HealthStatsMap.Load(t.opts.Id)
+	if ok {
+		healthStats = v.(*HealthStats)
+	}
+
 	now := time.Now()
 
 	sessionID := uuid.NewString()
@@ -292,11 +299,20 @@ func (t *Tunnel) acceptSocks5TCPConn(conn net.Conn, targetInfo *socks5.SocksTarg
 	addr := fmt.Sprintf("%s:%d", targetInfo.DomainName, targetInfo.Port)
 	err := t.onClientCreateByDomain(&pb.DestAddr{Addr: addr}, sessionID)
 	if err != nil {
-		return fmt.Errorf("Tunnel.acceptSocks5TCPConn client create by Domain failed, addr:%s, err:%v", addr, err)
+		healthStats.failureCount++
+		return fmt.Errorf("Tunnel.acceptSocks5TCPConn client create by Domain failed, addr:%s, err:%v, tun ip:%s, failure/success[%d/%d]", addr, err, t.opts.IP, healthStats.failureCount, healthStats.successCount)
 	}
 
-	logx.Debugf("acceptSocks5TCPConn, create session cost:%dms, %s:%d total connect cost:%dms",
-		time.Since(now).Milliseconds(), targetInfo.DomainName, targetInfo.Port, time.Since(targetInfo.ConnCreateTime).Milliseconds())
+	costTime := time.Since(now).Milliseconds()
+	// 当延时大于failureCostTime的时候，认为这个节点是失败的
+	if costTime > failureCostTime {
+		healthStats.failureCount++
+	} else {
+		healthStats.successCount++
+	}
+
+	logx.Debugf("acceptSocks5TCPConn, create session cost:%dms, %s:%d total connect cost:%dms, tun ip:%s, failure/success[%d/%d]",
+		time.Since(now).Milliseconds(), targetInfo.DomainName, targetInfo.Port, time.Since(targetInfo.ConnCreateTime).Milliseconds(), t.opts.IP, healthStats.failureCount, healthStats.successCount)
 
 	if len(targetInfo.ExtraBytes) > 0 {
 		t.onProxyDataFromProxy(sessionID, targetInfo.ExtraBytes)
