@@ -418,9 +418,9 @@ func (t *Tunnel) keepalive() {
 		if t.conn != nil {
 			t.conn.Close()
 			t.conn = nil
-			logx.Debugf("keepalive timeout, close tunnel %s connection", t.opts.Id)
+			logx.Errorf("keepalive timeout, close tunnel %s connection", t.opts.Id)
 		} else {
-			logx.Debugf("keepalive timeout, tunnel %s already close", t.opts.Id)
+			logx.Errorf("keepalive timeout, tunnel %s already close", t.opts.Id)
 		}
 
 		return
