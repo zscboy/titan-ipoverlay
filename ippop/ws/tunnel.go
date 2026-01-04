@@ -3,6 +3,7 @@ package ws
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"net"
 	"sync"
@@ -160,13 +161,19 @@ func (t *Tunnel) serve() {
 	for {
 		_, message, err := t.readMessageWithLimitRate()
 		if err != nil {
-			logx.Error("Tunnel read failed:", err)
+			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) {
+				logx.Infof("Tunnel %s %s closed: %v", t.opts.Id, t.opts.IP, err)
+			} else if errors.Is(err, net.ErrClosed) {
+				logx.Infof("Tunnel %s %s connection closed", t.opts.Id, t.opts.IP)
+			} else {
+				logx.Errorf("Tunnel %s %s read failed: %v", t.opts.Id, t.opts.IP, err)
+			}
 			break
 		}
 
 		err = t.onMessage(message)
 		if err != nil {
-			logx.Error("Tunnel.serve onMessage failed:", err)
+			logx.Errorf("Tunnel.serve onMessage failed: %v", err)
 		}
 	}
 
@@ -223,7 +230,8 @@ func (t *Tunnel) onProxySessionClose(sessionID string) error {
 	logx.Debugf("Tunnel.onProxySessionClose session id: %s", sessionID)
 	v, ok := t.proxys.Load(sessionID)
 	if !ok {
-		return fmt.Errorf("Tunnel.onProxySessionClose, can not found session %s", sessionID)
+		logx.Debugf("Tunnel.onProxySessionClose, can not found session %s", sessionID)
+		return nil
 	}
 
 	session := v.(*TCPProxy)
@@ -237,7 +245,8 @@ func (t *Tunnel) onProxySessionDataFromTunnel(sessionID string, data []byte) err
 	v, ok := t.proxys.Load(sessionID)
 	if !ok {
 		t.onProxyTCPConnClose(sessionID)
-		return fmt.Errorf("Tunnel.onProxySessionDataFromTunnel, can not found session %s", sessionID)
+		logx.Debugf("Tunnel.onProxySessionDataFromTunnel, can not found session %s", sessionID)
+		return nil
 	}
 
 	proxy := v.(*TCPProxy)
@@ -295,6 +304,10 @@ func (t *Tunnel) acceptSocks5TCPConn(conn net.Conn, targetInfo *socks5.SocksTarg
 	now := time.Now()
 
 	sessionID := uuid.NewString()
+	proxyTCP := newTCPProxy(sessionID, conn, t, targetInfo.Username)
+
+	t.proxys.Store(sessionID, proxyTCP)
+	defer t.proxys.Delete(sessionID)
 
 	addr := fmt.Sprintf("%s:%d", targetInfo.DomainName, targetInfo.Port)
 	err := t.onClientCreateByDomain(&pb.DestAddr{Addr: addr}, sessionID)
@@ -317,11 +330,6 @@ func (t *Tunnel) acceptSocks5TCPConn(conn net.Conn, targetInfo *socks5.SocksTarg
 	if len(targetInfo.ExtraBytes) > 0 {
 		t.onProxyDataFromProxy(sessionID, targetInfo.ExtraBytes)
 	}
-
-	proxyTCP := newTCPProxy(sessionID, conn, t, targetInfo.Username)
-
-	t.proxys.Store(sessionID, proxyTCP)
-	defer t.proxys.Delete(sessionID)
 
 	return proxyTCP.proxyConn()
 }
@@ -389,8 +397,8 @@ func (t *Tunnel) requestCreateProxySession(ctx context.Context, in *pb.Message) 
 func (t *Tunnel) onProxyUDPDataFromTunnel(sessionID string, data []byte) error {
 	proxy, ok := t.proxys.Load(sessionID)
 	if !ok {
-		return fmt.Errorf("Tunnel.onProxyUDPDataFromTunnel session %s not exist", sessionID)
-
+		logx.Debugf("Tunnel.onProxyUDPDataFromTunnel session %s not exist", sessionID)
+		return nil
 	}
 	udp := proxy.(*UDPProxy)
 
