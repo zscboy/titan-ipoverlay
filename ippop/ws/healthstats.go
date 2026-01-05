@@ -58,7 +58,7 @@ func (h *HealthStats) checkValid() bool {
 
 func (h *HealthStats) isTotalFailed() bool {
 	total := h.successCount + h.failureCount
-	if h.failureCount == total {
+	if total >= minSamples && h.failureCount == total {
 		return true
 	}
 	return false
