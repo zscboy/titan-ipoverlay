@@ -28,10 +28,10 @@ func NewHttProxy(tunMgr *ws.TunnelManager) *HttpProxy {
 }
 
 func (p *HttpProxy) HandleProxy(w http.ResponseWriter, r *http.Request) {
-	logx.Debug("HandleProxy")
-	usernameBytes, passwdBytes, err := p.parseUserPassword(r.Header.Get("Proxy-Authorization"))
+	logx.Debug("HttpProxy.HandleProxy")
+	user, passwdBytes, err := p.parseUserPassword(r.Header.Get("Proxy-Authorization"))
 	if err == nil {
-		err = p.tunMgr.HandleUserAuth(string(usernameBytes), string(passwdBytes))
+		err = p.tunMgr.HandleUserAuth(user.username, string(passwdBytes))
 	}
 
 	if err != nil {
@@ -42,16 +42,15 @@ func (p *HttpProxy) HandleProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	username := string(usernameBytes)
-
 	if r.Method == http.MethodConnect {
-		p.handleHTTPS(w, r, username)
+		p.handleHTTPS(w, r, user)
 	} else {
-		p.handleHTTP(w, r, username)
+		p.handleHTTP(w, r, user)
 	}
 }
 
-func (p *HttpProxy) handleHTTPS(w http.ResponseWriter, r *http.Request, username string) {
+func (p *HttpProxy) handleHTTPS(w http.ResponseWriter, r *http.Request, user *User) {
+	logx.Debug("HttpProxy.handleHTTPS")
 	host, port, err := p.parseHostPort(r.Host, 443)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -82,12 +81,15 @@ func (p *HttpProxy) handleHTTPS(w http.ResponseWriter, r *http.Request, username
 	p.tunMgr.HandleSocks5TCP(tcpConn, &socks5.SocksTargetInfo{
 		DomainName:     host,
 		Port:           port,
-		Username:       username,
+		Username:       user.username,
+		Session:        user.session,
+		SessTime:       int64(user.sessTime),
 		ConnCreateTime: time.Now(),
 	})
 }
 
-func (p *HttpProxy) handleHTTP(w http.ResponseWriter, r *http.Request, username string) {
+func (p *HttpProxy) handleHTTP(w http.ResponseWriter, r *http.Request, user *User) {
+	logx.Debug("HttpProxy.handleHTTP")
 	host, port, err := p.parseHostPort(r.Host, 80)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -126,7 +128,9 @@ func (p *HttpProxy) handleHTTP(w http.ResponseWriter, r *http.Request, username 
 	p.tunMgr.HandleSocks5TCP(tcpConn, &socks5.SocksTargetInfo{
 		DomainName:     host,
 		Port:           port,
-		Username:       username,
+		Username:       user.username,
+		Session:        user.session,
+		SessTime:       int64(user.sessTime),
 		ExtraBytes:     buf.Bytes(),
 		ConnCreateTime: time.Now(),
 	})
@@ -148,7 +152,7 @@ func (p *HttpProxy) parseHostPort(hostPort string, defaultPort int) (string, int
 }
 
 // return userName
-func (p *HttpProxy) parseUserPassword(auth string) ([]byte, []byte, error) {
+func (p *HttpProxy) parseUserPassword(auth string) (*User, []byte, error) {
 	if !strings.HasPrefix(auth, "Basic ") {
 		return nil, nil, fmt.Errorf("client not include Proxy-Authorization Basic ")
 	}
@@ -171,6 +175,11 @@ func (p *HttpProxy) parseUserPassword(auth string) ([]byte, []byte, error) {
 		return nil, nil, fmt.Errorf("invalid password")
 	}
 
-	return []byte(username), []byte(password), nil
+	uesr, err := paserUsername(username)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return uesr, []byte(password), nil
 
 }

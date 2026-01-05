@@ -549,7 +549,7 @@ func (tm *TunnelManager) keepalive() {
 				return true
 			})
 
-			logx.Debugf("TunnelManager.keepalive tunnel count:%d, cost:%v, halfFailureCount:%d, totalFailureCount:%d", count, time.Since(now), halfFailureCount, totalFailureCount)
+			logx.Infof("TunnelManager.keepalive tunnel count:%d, cost:%v, halfFailureCount:%d, totalFailureCount:%d", count, time.Since(now), halfFailureCount, totalFailureCount)
 		}
 	}
 }
