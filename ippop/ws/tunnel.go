@@ -313,16 +313,10 @@ func (t *Tunnel) acceptSocks5TCPConn(conn net.Conn, targetInfo *socks5.SocksTarg
 	err := t.onClientCreateByDomain(&pb.DestAddr{Addr: addr}, sessionID)
 	if err != nil {
 		healthStats.failureCount++
-		return fmt.Errorf("Tunnel.acceptSocks5TCPConn client create by Domain failed, addr:%s, err:%v, tun ip:%s, failure/success[%d/%d]", addr, err, t.opts.IP, healthStats.failureCount, healthStats.successCount)
+		return fmt.Errorf("Tunnel.acceptSocks5TCPConn client create by Domain failed, cost:%dms, addr:%s, err:%v, tun ip:%s, failure/success[%d/%d]", time.Since(now).Milliseconds(), addr, err, t.opts.IP, healthStats.failureCount, healthStats.successCount)
 	}
 
-	costTime := time.Since(now).Milliseconds()
-	// 当延时大于failureCostTime的时候，认为这个节点是失败的
-	if costTime > failureCostTime {
-		healthStats.failureCount++
-	} else {
-		healthStats.successCount++
-	}
+	healthStats.successCount++
 
 	logx.Debugf("acceptSocks5TCPConn, create session cost:%dms, %s:%d total connect cost:%dms, tun ip:%s, failure/success[%d/%d]",
 		time.Since(now).Milliseconds(), targetInfo.DomainName, targetInfo.Port, time.Since(targetInfo.ConnCreateTime).Milliseconds(), t.opts.IP, healthStats.failureCount, healthStats.successCount)

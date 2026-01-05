@@ -528,7 +528,8 @@ func (tm *TunnelManager) keepalive() {
 		if tick == keepaliveInterval {
 			tick = 0
 			count := 0
-			failureCount := 0
+			halfFailureCount := 0
+			totalFailureCount := 0
 			now := time.Now()
 			tm.tunnels.Range(func(key, value any) bool {
 				t := value.(*Tunnel)
@@ -537,8 +538,10 @@ func (tm *TunnelManager) keepalive() {
 				v, ok := tm.HealthStatsMap.Load(key.(string))
 				if ok {
 					healthStats := v.(*HealthStats)
-					if healthStats.isInvalid() {
-						failureCount++
+					if healthStats.isTotalFailed() {
+						totalFailureCount++
+					} else if healthStats.isHalfFailed() {
+						halfFailureCount++
 					}
 				}
 
@@ -546,7 +549,7 @@ func (tm *TunnelManager) keepalive() {
 				return true
 			})
 
-			logx.Debugf("TunnelManager.keepalive tunnel count:%d, cost:%v, failureCount:%d", count, time.Since(now), failureCount)
+			logx.Debugf("TunnelManager.keepalive tunnel count:%d, cost:%v, halfFailureCount:%d, totalFailureCount:%d", count, time.Since(now), halfFailureCount, totalFailureCount)
 		}
 	}
 }

@@ -2,6 +2,12 @@ package ws
 
 import "time"
 
+const (
+	maxFailureRate = 0.3
+	resetAfter     = 60 * time.Minute
+	minSamples     = 5
+)
+
 type HealthStats struct {
 	successCount int64
 	failureCount int64
@@ -12,12 +18,6 @@ type HealthStats struct {
 // 判断是否有效节点，失败率要小于0.4
 // 如果失败率大于0.4小于1， 则20分钟后重置
 func (h *HealthStats) checkValid() bool {
-	const (
-		maxFailureRate = 0.3
-		resetAfter     = 60 * time.Minute
-		minSamples     = 5
-	)
-
 	total := h.successCount + h.failureCount
 	if total < minSamples {
 		return true
@@ -45,7 +45,7 @@ func (h *HealthStats) checkValid() bool {
 		return false
 	}
 
-	// 超过 20 分钟，重置统计，给节点一次“重生”机会
+	// 超过 60 分钟，重置统计，给节点一次“重生”机会
 	if now.Sub(h.invalidSince) >= resetAfter {
 		h.successCount = 0
 		h.failureCount = 0
@@ -56,9 +56,17 @@ func (h *HealthStats) checkValid() bool {
 	return false
 }
 
-func (h *HealthStats) isInvalid() bool {
-	if !h.invalidSince.IsZero() {
+func (h *HealthStats) isTotalFailed() bool {
+	total := h.successCount + h.failureCount
+	if h.failureCount == total {
 		return true
 	}
 	return false
+}
+
+func (h *HealthStats) isHalfFailed() bool {
+	if h.invalidSince.IsZero() {
+		return false
+	}
+	return true
 }
