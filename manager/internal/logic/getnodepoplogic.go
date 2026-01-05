@@ -157,6 +157,11 @@ func (l *GetNodePopLogic) getPodServer(id string) *svc.Pop {
 }
 
 func (l *GetNodePopLogic) getLocalInfo(ip string) (*Location, error) {
+	loc, err := model.GetIPLocation(l.svcCtx.Redis, ip)
+	if err == nil {
+		return &Location{IP: loc.IP, City: loc.City, Province: loc.Province, Country: loc.Country}, nil
+	}
+
 	client := &http.Client{
 		Timeout: 3 * time.Second,
 	}
@@ -188,5 +193,12 @@ func (l *GetNodePopLogic) getLocalInfo(ip string) (*Location, error) {
 		return nil, fmt.Errorf("code:%d, msg:%s", locationResp.Code, locationResp.Msg)
 	}
 
-	return locationResp.Data.Location, nil
+	location := locationResp.Data.Location
+	redisIPLocation := model.IPLocation{IP: location.IP, City: location.City, Province: location.Province, Country: location.Province}
+
+	if err := model.SaveIPLocation(l.svcCtx.Redis, &redisIPLocation); err != nil {
+		logx.Errorf("SaveIPLocation:%v", err)
+	}
+
+	return location, nil
 }
