@@ -5,7 +5,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"titan-ipoverlay/ippop/config"
-	"titan-ipoverlay/ippop/httpproxy"
+	httpproxy "titan-ipoverlay/ippop/http"
 	rpc "titan-ipoverlay/ippop/rpc/export"
 	"titan-ipoverlay/ippop/socks5"
 	"titan-ipoverlay/ippop/ws"
@@ -36,6 +36,8 @@ func newWS(config config.Config, tunMgr *ws.TunnelManager) *rest.Server {
 	nodews := ws.NewNodeWS(tunMgr)
 	nodePop := ws.NewNodePop(&config)
 
+	// httpproxy := pophttp.NewHttProxy(tunMgr)
+
 	server.AddRoute(rest.Route{
 		Method:  "GET",
 		Path:    "/ws/node",
@@ -46,7 +48,6 @@ func newWS(config config.Config, tunMgr *ws.TunnelManager) *rest.Server {
 		Path:    "/node/pop",
 		Handler: nodePop.ServeNodePop,
 	})
-
 	return server
 
 }
@@ -95,7 +96,8 @@ func main() {
 	group.Add(rpcServer)
 
 	if len(c.HTTPProxy) > 0 {
-		httpProxyServer := httpproxy.NewServer(c.HTTPProxy, c.Redis)
+		// httpProxyServer := httpproxy.NewServer(c.HTTPProxy, c.Redis)
+		httpProxyServer := httpproxy.NewServer(c.HTTPProxy, tunMgr)
 		group.Add(httpProxyServer)
 	}
 
