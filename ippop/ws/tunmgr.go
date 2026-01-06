@@ -25,7 +25,7 @@ import (
 const (
 	userCacheSize = 512
 	// 30 seconds
-	keepaliveInterval         = 30
+	keepaliveInterval         = 2
 	userTrafficSaveInterval   = 300
 	setOnlineTableExpireTick  = 90
 	onlineTableExpireTime     = 2 * setOnlineTableExpireTick
@@ -85,6 +85,8 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 		userSessionMap:  make(map[string]map[string]*UserSession),
 		userSessionLock: sync.Mutex{},
 		rng:             rand.New(rand.NewSource(time.Now().UnixNano())),
+
+		tunnelList: make([]*Tunnel, 0, 100000),
 	}
 
 	routeScheduler := newUserRouteScheduler(tm)
@@ -103,22 +105,22 @@ func (tm *TunnelManager) addTunnel(t *Tunnel) {
 	defer tm.tunnelListLock.Unlock()
 
 	tm.tunnelList = append(tm.tunnelList, t)
-	atomic.StoreUint64(&tm.rrIdx, tm.rrIdx%uint64(len(tm.tunnelList)))
+	// atomic.StoreUint64(&tm.rrIdx, tm.rrIdx%uint64(len(tm.tunnelList)))
 }
 
 // 删除 tunnel
 func (tm *TunnelManager) removeTunnel(id string) {
 	tm.tunnelListLock.Lock()
 	defer tm.tunnelListLock.Unlock()
+
+	n := len(tm.tunnelList)
 	for i, t := range tm.tunnelList {
 		if t.opts.Id == id {
-			tm.tunnelList = append(tm.tunnelList[:i], tm.tunnelList[i+1:]...)
+			last := n - 1
 
-			if len(tm.tunnelList) > 0 {
-				atomic.StoreUint64(&tm.rrIdx, tm.rrIdx%uint64(len(tm.tunnelList)))
-			} else {
-				atomic.StoreUint64(&tm.rrIdx, 0)
-			}
+			tm.tunnelList[i] = tm.tunnelList[last]
+			tm.tunnelList[last] = nil
+			tm.tunnelList = tm.tunnelList[:last]
 			return
 		}
 	}
