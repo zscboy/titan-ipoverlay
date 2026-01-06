@@ -22,6 +22,7 @@ const (
 	netDelayCount   = 5
 	limitRateBurst  = 128 * 1024
 	failureCostTime = 600 // 600ms
+	waitPongTimeout = 15
 )
 
 type TunOptions struct {
@@ -56,6 +57,7 @@ type Tunnel struct {
 	rateLimiterLock sync.Mutex
 	// if socks5 client connect with session
 	userSessionID string
+	delay         int64
 }
 
 func newTunnel(conn *websocket.Conn, tunMgr *TunnelManager, opts *TunOptions) *Tunnel {
@@ -136,8 +138,8 @@ func (t *Tunnel) onPong(data []byte) {
 		return
 	}
 	// TODO: Mass update
-	// timestamp := int64(binary.LittleEndian.Uint64(data))
-	// rtt := time.Since(time.UnixMicro(timestamp))
+	timestamp := int64(binary.LittleEndian.Uint64(data))
+	t.delay = time.Since(time.UnixMicro(timestamp)).Milliseconds()
 
 	// if t.netDelays == nil {
 	// 	t.netDelays = make([]uint64, 0, netDelayCount)
@@ -416,7 +418,7 @@ func (t *Tunnel) acceptSocks5UDPData(conn socks5.UDPConn, udpInfo *socks5.Socks5
 }
 
 func (t *Tunnel) keepalive() {
-	if t.waitPong > 3 {
+	if t.waitPong > waitPongTimeout {
 		if t.conn != nil {
 			t.conn.Close()
 			t.conn = nil
@@ -434,6 +436,10 @@ func (t *Tunnel) keepalive() {
 
 	if err := t.writePing(b); err != nil {
 		logx.Errorf("Tunnel.keepalive writePing failed:%v", err.Error())
+	}
+
+	if t.waitPong > 3 {
+		logx.Debugf("tunnel %s keepalive send ping, waitPong:%d, delay:%d", t.opts.Id, t.waitPong, t.delay)
 	}
 
 	t.waitPong++

@@ -130,6 +130,9 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, n
 	v, ok := tm.tunnels.Load(req.NodeId)
 	if ok {
 		oldTun := v.(*Tunnel)
+
+		logx.Errorf("TunnelManager.acceptWebsocket force close tunnel %s ip %s", oldTun.opts.Id, oldTun.opts.IP)
+
 		oldTun.waitClose()
 	}
 
@@ -286,6 +289,7 @@ func (tm *TunnelManager) KickNode(nodeID string) error {
 	v, ok := tm.tunnels.Load(nodeID)
 	if ok {
 		tun := v.(*Tunnel)
+		logx.Errorf("kick node %s, ip %s", nodeID, tun.opts.IP)
 		tun.waitClose()
 		return nil
 	}
