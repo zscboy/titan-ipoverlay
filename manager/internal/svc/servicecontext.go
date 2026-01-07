@@ -17,6 +17,9 @@ type Pop struct {
 	Area        string
 	Name        string
 	CountryCode string
+
+	AccessSecret string
+	AccessExpire int64
 }
 
 type ServiceContext struct {
@@ -44,7 +47,15 @@ func newPops(c config.Config) map[string]*Pop {
 		if err != nil {
 			panic("Get server info failed:" + err.Error())
 		}
-		servers[pop.Id] = &Pop{API: api, Socks5Addr: resp.Socks5Addr, Area: pop.Area, Name: pop.Name, CountryCode: pop.CountryCode}
+		servers[pop.Id] = &Pop{
+			API:          api,
+			Socks5Addr:   resp.Socks5Addr,
+			Area:         pop.Area,
+			Name:         pop.Name,
+			CountryCode:  pop.CountryCode,
+			AccessSecret: resp.AccessSecret,
+			AccessExpire: resp.AccessExpire,
+		}
 	}
 	return servers
 }

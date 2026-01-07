@@ -8,12 +8,12 @@ import (
 	"net/http"
 	"time"
 
-	"titan-ipoverlay/ippop/rpc/serverapi"
 	"titan-ipoverlay/manager/internal/config"
 	"titan-ipoverlay/manager/internal/svc"
 	"titan-ipoverlay/manager/internal/types"
 	"titan-ipoverlay/manager/model"
 
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
@@ -62,13 +62,13 @@ func (l *GetNodePopLogic) GetNodePop(req *types.GetNodePopReq) (resp *types.GetN
 		return nil, fmt.Errorf("not found pop for node %s", req.NodeId)
 	}
 
-	getTokenResp, err := server.API.GetNodeAccessToken(l.ctx, &serverapi.GetNodeAccessTokenReq{NodeId: req.NodeId})
+	tokenBytes, err := l.generateJwtToken(server.AccessSecret, server.AccessExpire, req.NodeId)
 	if err != nil {
 		return nil, err
 	}
 
-	logx.Debugf("GetNodePop, %s accessPoint %s, getTokenResp:%s", req.NodeId, podConfig.WSURL, getTokenResp.Token)
-	return &types.GetNodePopResp{ServerURL: podConfig.WSURL, AccessToken: getTokenResp.Token}, nil
+	logx.Debugf("GetNodePop, %s accessPoint %s, getTokenResp:%s", req.NodeId, podConfig.WSURL, string(tokenBytes))
+	return &types.GetNodePopResp{ServerURL: podConfig.WSURL, AccessToken: string(tokenBytes)}, nil
 }
 
 func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*config.Pop, error) {
@@ -202,4 +202,20 @@ func (l *GetNodePopLogic) getLocalInfo(ip string) (*Location, error) {
 	}
 
 	return location, nil
+}
+
+func (l *GetNodePopLogic) generateJwtToken(secret string, expire int64, nodeId string) ([]byte, error) {
+	claims := jwt.MapClaims{
+		"user": nodeId,
+		"exp":  time.Now().Add(time.Second * time.Duration(expire)).Unix(),
+		"iat":  time.Now().Add(-5 * time.Minute).Unix(),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenStr, err := token.SignedString([]byte(secret))
+	if err != nil {
+		return nil, err
+	}
+
+	return []byte(tokenStr), nil
 }
