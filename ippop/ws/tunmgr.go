@@ -131,7 +131,7 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, n
 	if ok {
 		oldTun := v.(*Tunnel)
 
-		logx.Errorf("TunnelManager.acceptWebsocket force close tunnel %s ip %s", oldTun.opts.Id, oldTun.opts.IP)
+		logx.Errorf("TunnelManager.acceptWebsocket force close tunnel %s ip %s", req.NodeId, nodeIP)
 
 		oldTun.waitClose()
 	}

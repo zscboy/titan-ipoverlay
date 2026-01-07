@@ -181,7 +181,7 @@ func (t *Tunnel) serve() {
 
 	t.onClose()
 	t.conn = nil
-	logx.Infof("Tunnel %s %s close", t.opts.Id, t.opts.IP)
+	// logx.Infof("Tunnel %s %s close", t.opts.Id, t.opts.IP)
 }
 
 func (t *Tunnel) onMessage(data []byte) error {
@@ -488,7 +488,7 @@ func (t *Tunnel) waitClose() {
 		t.waitLeaseCh = make(chan bool)
 		t.conn.Close()
 		<-t.waitLeaseCh
-		logx.Debugf("tunnel close")
+		logx.Debugf("tunnel %s wait close", t.opts.Id)
 	}
 }
 

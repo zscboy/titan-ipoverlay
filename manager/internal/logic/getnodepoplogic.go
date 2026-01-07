@@ -67,7 +67,7 @@ func (l *GetNodePopLogic) GetNodePop(req *types.GetNodePopReq) (resp *types.GetN
 		return nil, err
 	}
 
-	logx.Debugf("GetNodePop, %s accessPoint %s", req.NodeId, podConfig.WSURL)
+	logx.Debugf("GetNodePop, %s accessPoint %s, getTokenResp:%s", req.NodeId, podConfig.WSURL, getTokenResp.Token)
 	return &types.GetNodePopResp{ServerURL: podConfig.WSURL, AccessToken: getTokenResp.Token}, nil
 }
 
@@ -99,6 +99,7 @@ func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*config.Pop, er
 
 	location, err := l.getLocalInfo(ip)
 	if err != nil {
+		logx.Errorf("getLocalInfo %v", err)
 		return nil, fmt.Errorf("getLocalInfo failed:%v", err)
 	}
 
@@ -194,7 +195,7 @@ func (l *GetNodePopLogic) getLocalInfo(ip string) (*Location, error) {
 	}
 
 	location := locationResp.Data.Location
-	redisIPLocation := model.IPLocation{IP: location.IP, City: location.City, Province: location.Province, Country: location.Province}
+	redisIPLocation := model.IPLocation{IP: location.IP, City: location.City, Province: location.Province, Country: location.Country}
 
 	if err := model.SaveIPLocation(l.svcCtx.Redis, &redisIPLocation); err != nil {
 		logx.Errorf("SaveIPLocation:%v", err)
