@@ -55,7 +55,7 @@ type TunnelManager struct {
 	config      config.Config
 	userTraffic *userTraffic
 	userCache   gcache.Cache
-	// userTunLock     sync.Mutex
+
 	filterRules     *Rules
 	userSessionMap  map[string]map[string]*UserSession
 	userSessionLock sync.Mutex
@@ -104,26 +104,35 @@ func (tm *TunnelManager) addTunnel(t *Tunnel) {
 	tm.tunnelListLock.Lock()
 	defer tm.tunnelListLock.Unlock()
 
+	t.index = len(tm.tunnelList)
 	tm.tunnelList = append(tm.tunnelList, t)
 	// atomic.StoreUint64(&tm.rrIdx, tm.rrIdx%uint64(len(tm.tunnelList)))
 }
 
 // 删除 tunnel
-func (tm *TunnelManager) removeTunnel(id string) {
+func (tm *TunnelManager) removeTunnel(tun *Tunnel) {
 	tm.tunnelListLock.Lock()
 	defer tm.tunnelListLock.Unlock()
 
-	n := len(tm.tunnelList)
-	for i, t := range tm.tunnelList {
-		if t.opts.Id == id {
-			last := n - 1
-
-			tm.tunnelList[i] = tm.tunnelList[last]
-			tm.tunnelList[last] = nil
-			tm.tunnelList = tm.tunnelList[:last]
-			return
-		}
+	idx := tun.index
+	last := len(tm.tunnelList) - 1
+	if idx < 0 || idx > last {
+		return
 	}
+
+	// 如果不是最后一个，交换
+	if idx != last {
+		lastTunnel := tm.tunnelList[last]
+		tm.tunnelList[idx] = lastTunnel
+		lastTunnel.index = idx
+	}
+
+	// 删除最后一个
+	tm.tunnelList[last] = nil
+	tm.tunnelList = tm.tunnelList[:last]
+
+	// 标记已移除（防止重复 remove）
+	tun.index = -1
 }
 
 func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, nodeIP string) {
@@ -174,7 +183,7 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, n
 	defer tun.leaseComplete()
 
 	defer tm.tunnels.Delete(node.Id)
-	defer tm.removeTunnel(node.Id)
+	defer tm.removeTunnel(tun)
 
 	if err := model.HandleNodeOnline(context.Background(), tm.redis, node); err != nil {
 		logx.Errorf("HandleNodeOnline:%s", err.Error())

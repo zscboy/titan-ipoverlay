@@ -38,7 +38,7 @@ func (proxy *TCPProxy) write(data []byte) error {
 		return fmt.Errorf("session %s conn == nil", proxy.id)
 	}
 
-	proxy.tunnel.tunMgr.traffic(proxy.userName, int64(len(data)))
+	// proxy.tunnel.tunMgr.traffic(proxy.userName, int64(len(data)))
 	_, err := proxy.conn.Write(data)
 	return err
 }
@@ -48,7 +48,7 @@ func (proxy *TCPProxy) proxyConn() error {
 	defer conn.Close()
 
 	// netConn := conn.NetConn()
-	buf := make([]byte, 4096)
+	buf := make([]byte, 32*1024)
 	for {
 		n, err := conn.Read(buf)
 		if err != nil {
@@ -59,7 +59,7 @@ func (proxy *TCPProxy) proxyConn() error {
 			return nil
 		}
 
-		proxy.tunnel.tunMgr.traffic(proxy.userName, int64(n))
+		// proxy.tunnel.tunMgr.traffic(proxy.userName, int64(n))
 		proxy.tunnel.onProxyDataFromProxy(proxy.id, buf[:n])
 	}
 }

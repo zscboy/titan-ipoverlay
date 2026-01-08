@@ -58,6 +58,8 @@ type Tunnel struct {
 	// if socks5 client connect with session
 	userSessionID string
 	delay         int64
+
+	index int
 }
 
 func newTunnel(conn *websocket.Conn, tunMgr *TunnelManager, opts *TunOptions) *Tunnel {
@@ -185,7 +187,7 @@ func (t *Tunnel) serve() {
 }
 
 func (t *Tunnel) onMessage(data []byte) error {
-	logx.Debugf("Tunnel.onMessage")
+	// logx.Debugf("Tunnel.onMessage")
 
 	msg := &pb.Message{}
 	err := proto.Unmarshal(data, msg)
@@ -243,7 +245,7 @@ func (t *Tunnel) onProxySessionClose(sessionID string) error {
 }
 
 func (t *Tunnel) onProxySessionDataFromTunnel(sessionID string, data []byte) error {
-	logx.Debugf("Tunnel.onProxySessionDataFromTunnel session id: %s", sessionID)
+	// logx.Debugf("Tunnel.onProxySessionDataFromTunnel session id: %s", sessionID)
 	v, ok := t.proxys.Load(sessionID)
 	if !ok {
 		t.onProxyTCPConnClose(sessionID)
@@ -274,7 +276,7 @@ func (t *Tunnel) onProxyTCPConnClose(sessionID string) {
 }
 
 func (t *Tunnel) onProxyDataFromProxy(sessionID string, data []byte) {
-	logx.Debugf("Tunnel.onProxyDataFromProxy, data len: %d", len(data))
+	// logx.Debugf("Tunnel.onProxyDataFromProxy, data len: %d", len(data))
 
 	msg := &pb.Message{}
 	msg.Type = pb.MessageType_PROXY_SESSION_DATA
