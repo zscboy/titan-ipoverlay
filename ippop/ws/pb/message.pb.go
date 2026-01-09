@@ -25,12 +25,13 @@ const (
 type MessageType int32
 
 const (
-	MessageType_UNKNOWN              MessageType = 0
-	MessageType_COMMAND              MessageType = 1
-	MessageType_PROXY_SESSION_CREATE MessageType = 2
-	MessageType_PROXY_SESSION_DATA   MessageType = 3
-	MessageType_PROXY_SESSION_CLOSE  MessageType = 4
-	MessageType_PROXY_UDP_DATA       MessageType = 5
+	MessageType_UNKNOWN                  MessageType = 0
+	MessageType_COMMAND                  MessageType = 1
+	MessageType_PROXY_SESSION_CREATE     MessageType = 2
+	MessageType_PROXY_SESSION_DATA       MessageType = 3
+	MessageType_PROXY_SESSION_CLOSE      MessageType = 4
+	MessageType_PROXY_UDP_DATA           MessageType = 5
+	MessageType_PROXY_SESSION_HALF_CLOSE MessageType = 6
 )
 
 // Enum value maps for MessageType.
@@ -42,14 +43,16 @@ var (
 		3: "PROXY_SESSION_DATA",
 		4: "PROXY_SESSION_CLOSE",
 		5: "PROXY_UDP_DATA",
+		6: "PROXY_SESSION_HALF_CLOSE",
 	}
 	MessageType_value = map[string]int32{
-		"UNKNOWN":              0,
-		"COMMAND":              1,
-		"PROXY_SESSION_CREATE": 2,
-		"PROXY_SESSION_DATA":   3,
-		"PROXY_SESSION_CLOSE":  4,
-		"PROXY_UDP_DATA":       5,
+		"UNKNOWN":                  0,
+		"COMMAND":                  1,
+		"PROXY_SESSION_CREATE":     2,
+		"PROXY_SESSION_DATA":       3,
+		"PROXY_SESSION_CLOSE":      4,
+		"PROXY_UDP_DATA":           5,
+		"PROXY_SESSION_HALF_CLOSE": 6,
 	}
 )
 
@@ -307,14 +310,15 @@ const file_message_proto_rawDesc = "" +
 	"\apayload\x18\x03 \x01(\fR\apayload\"G\n" +
 	"\x12CreateSessionReply\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x17\n" +
-	"\aerr_msg\x18\x02 \x01(\tR\x06errMsg*\x86\x01\n" +
+	"\aerr_msg\x18\x02 \x01(\tR\x06errMsg*\xa4\x01\n" +
 	"\vMessageType\x12\v\n" +
 	"\aUNKNOWN\x10\x00\x12\v\n" +
 	"\aCOMMAND\x10\x01\x12\x18\n" +
 	"\x14PROXY_SESSION_CREATE\x10\x02\x12\x16\n" +
 	"\x12PROXY_SESSION_DATA\x10\x03\x12\x17\n" +
 	"\x13PROXY_SESSION_CLOSE\x10\x04\x12\x12\n" +
-	"\x0ePROXY_UDP_DATA\x10\x052\t\n" +
+	"\x0ePROXY_UDP_DATA\x10\x05\x12\x1c\n" +
+	"\x18PROXY_SESSION_HALF_CLOSE\x10\x062\t\n" +
 	"\amessageB\aZ\x05../pbb\x06proto3"
 
 var (
