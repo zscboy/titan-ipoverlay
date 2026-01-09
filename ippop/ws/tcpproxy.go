@@ -40,7 +40,7 @@ func (proxy *TCPProxy) write(data []byte) error {
 	}
 
 	startTime := time.Now()
-	// proxy.tunnel.tunMgr.traffic(proxy.userName, int64(len(data)))
+
 	_, err := proxy.conn.Write(data)
 	if err != nil {
 		return err

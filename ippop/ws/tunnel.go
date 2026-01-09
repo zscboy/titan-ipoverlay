@@ -193,8 +193,6 @@ func (t *Tunnel) serve() {
 }
 
 func (t *Tunnel) onMessage(data []byte) error {
-	// logx.Debugf("Tunnel.onMessage")
-
 	msg := &pb.Message{}
 	err := proto.Unmarshal(data, msg)
 	if err != nil {
@@ -220,7 +218,7 @@ func (t *Tunnel) onMessage(data []byte) error {
 }
 
 func (t *Tunnel) onProxySessionCreateReply(sessionID string, payload []byte) error {
-	logx.Debugf("Tunnel.onProxySessionCreateComplete")
+	// logx.Debugf("Tunnel.onProxySessionCreateComplete")
 	v, ok := t.waitList.Load(sessionID)
 	if !ok || v == nil {
 		return fmt.Errorf("Tunnel.onProxySessionCreateComplete not found session:%s", sessionID)
@@ -237,7 +235,7 @@ func (t *Tunnel) onProxySessionCreateReply(sessionID string, payload []byte) err
 }
 
 func (t *Tunnel) onProxySessionClose(sessionID string) error {
-	logx.Debugf("Tunnel.onProxySessionClose session id: %s", sessionID)
+	// logx.Debugf("Tunnel.onProxySessionClose session id: %s", sessionID)
 	v, ok := t.proxys.Load(sessionID)
 	if !ok {
 		logx.Debugf("Tunnel.onProxySessionClose, can not found session %s", sessionID)
@@ -282,8 +280,6 @@ func (t *Tunnel) onProxyTCPConnClose(sessionID string) {
 }
 
 func (t *Tunnel) onProxyDataFromProxy(sessionID string, data []byte) {
-	// logx.Debugf("Tunnel.onProxyDataFromProxy, data len: %d", len(data))
-
 	msg := &pb.Message{}
 	msg.Type = pb.MessageType_PROXY_SESSION_DATA
 	msg.SessionId = sessionID
@@ -299,7 +295,6 @@ func (t *Tunnel) onProxyDataFromProxy(sessionID string, data []byte) {
 		logx.Errorf("Tunnel.onProxyDataFromProxy, write message to tunnel failed:%s", err.Error())
 	}
 
-	// logx.Debugf("Tunnel.onProxyDataFromProxy write message to tunnel success")
 }
 
 func (t *Tunnel) acceptSocks5TCPConn(conn net.Conn, targetInfo *socks5.SocksTargetInfo) error {
@@ -328,8 +323,8 @@ func (t *Tunnel) acceptSocks5TCPConn(conn net.Conn, targetInfo *socks5.SocksTarg
 
 	healthStats.successCount++
 
-	logx.Debugf("acceptSocks5TCPConn, create session cost:%dms, %s:%d total connect cost:%dms, tun ip:%s, failure/success[%d/%d]",
-		time.Since(now).Milliseconds(), targetInfo.DomainName, targetInfo.Port, time.Since(targetInfo.ConnCreateTime).Milliseconds(), t.opts.IP, healthStats.failureCount, healthStats.successCount)
+	// logx.Debugf("acceptSocks5TCPConn, create session cost:%dms, %s:%d total connect cost:%dms, tun ip:%s, failure/success[%d/%d]",
+	// 	time.Since(now).Milliseconds(), targetInfo.DomainName, targetInfo.Port, time.Since(targetInfo.ConnCreateTime).Milliseconds(), t.opts.IP, healthStats.failureCount, healthStats.successCount)
 
 	if len(targetInfo.ExtraBytes) > 0 {
 		t.onProxyDataFromProxy(sessionID, targetInfo.ExtraBytes)
@@ -466,13 +461,12 @@ func (t *Tunnel) readMessageWithLimitRate() (int, []byte, error) {
 	}
 
 	startTime := time.Now()
-	// t.currentTrafficStats = &TrafficStats{StartTime: startTime}
 
 	messageType, data, err := t.conn.ReadMessage()
 	if err != nil {
 		return 0, nil, err
 	}
-	// logx.Debugf("read bytes:%d time:%d", len(data), time.Now().Sub(startTime))
+
 	// TODO: need to sub idle time
 	t.trafficStats.ReadDuration += time.Now().Sub(startTime)
 	t.trafficStats.RreadBytes += int64(len(data))
