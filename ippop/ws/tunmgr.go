@@ -106,7 +106,7 @@ func (tm *TunnelManager) addTunnel(t *Tunnel) {
 
 	t.index = len(tm.tunnelList)
 	tm.tunnelList = append(tm.tunnelList, t)
-	// atomic.StoreUint64(&tm.rrIdx, tm.rrIdx%uint64(len(tm.tunnelList)))
+	atomic.StoreUint64(&tm.rrIdx, tm.rrIdx%uint64(len(tm.tunnelList)))
 }
 
 // 删除 tunnel
@@ -133,6 +133,12 @@ func (tm *TunnelManager) removeTunnel(tun *Tunnel) {
 
 	// 标记已移除（防止重复 remove）
 	tun.index = -1
+
+	if len(tm.tunnelList) > 0 {
+		atomic.StoreUint64(&tm.rrIdx, tm.rrIdx%uint64(len(tm.tunnelList)))
+	} else {
+		atomic.StoreUint64(&tm.rrIdx, 0)
+	}
 }
 
 func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, nodeIP string) {
@@ -312,7 +318,7 @@ func (tm *TunnelManager) allocateTunnelByUserSession(user *model.User, sessionID
 
 	// No sessionID provided → return a random tunnel
 	if sessionID == "" {
-		tun, err := tm.randomTunnel()
+		tun, err := tm.nextTunnel()
 		if err != nil {
 			return nil, nil, err
 		}
