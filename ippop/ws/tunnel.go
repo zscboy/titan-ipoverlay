@@ -37,6 +37,21 @@ type TunOptions struct {
 	UploadRateLimit   int64
 }
 
+type TrafficStats struct {
+	ReadDuration time.Duration
+	RreadBytes   int64
+
+	DataProcessStartTime time.Time
+	DataProcessDuration  time.Duration
+	// IdleDuration time.Duration
+
+	WriteDuration time.Duration
+	WriteBytes    int64
+
+	StartTime time.Time
+	EndTime   time.Time
+}
+
 // Tunnel Tunnel
 type Tunnel struct {
 	conn      *websocket.Conn
@@ -58,8 +73,12 @@ type Tunnel struct {
 	// if socks5 client connect with session
 	userSessionID string
 	delay         int64
-
+	// This must be performed as a locking operation within addTunnel or swap tunnel
 	index int
+
+	trafficStats *TrafficStats
+
+	IdleStartTime *time.Time
 }
 
 func newTunnel(conn *websocket.Conn, tunMgr *TunnelManager, opts *TunOptions) *Tunnel {
@@ -68,6 +87,7 @@ func newTunnel(conn *websocket.Conn, tunMgr *TunnelManager, opts *TunOptions) *T
 		opts:            opts,
 		tunMgr:          tunMgr,
 		rateLimiterLock: sync.Mutex{},
+		trafficStats:    &TrafficStats{},
 	}
 	// logx.Debugf("opts:%#v", opts)
 	t.setRateLimit(opts.DownloadRateLimti, opts.UploadRateLimit)
@@ -445,10 +465,18 @@ func (t *Tunnel) readMessageWithLimitRate() (int, []byte, error) {
 		return 0, nil, fmt.Errorf("t.conn == nil")
 	}
 
+	startTime := time.Now()
+	// t.currentTrafficStats = &TrafficStats{StartTime: startTime}
+
 	messageType, data, err := t.conn.ReadMessage()
 	if err != nil {
 		return 0, nil, err
 	}
+	// logx.Debugf("read bytes:%d time:%d", len(data), time.Now().Sub(startTime))
+	// TODO: need to sub idle time
+	t.trafficStats.ReadDuration += time.Now().Sub(startTime)
+	t.trafficStats.RreadBytes += int64(len(data))
+	t.trafficStats.DataProcessStartTime = time.Now()
 
 	t.waitPong = 0
 
@@ -501,4 +529,14 @@ func (t *Tunnel) leaseComplete() {
 	if t.waitLeaseCh != nil {
 		t.waitLeaseCh <- true
 	}
+}
+
+func (t *Tunnel) getTrafficStats() *TrafficStats {
+	return t.trafficStats
+}
+
+func (t *Tunnel) addTrafficStats(lenOfBytes int, duration time.Duration) {
+	t.trafficStats.WriteBytes += int64(lenOfBytes)
+	t.trafficStats.WriteDuration += duration
+	t.trafficStats.DataProcessDuration = time.Now().Sub(t.trafficStats.DataProcessStartTime) - t.trafficStats.WriteDuration
 }

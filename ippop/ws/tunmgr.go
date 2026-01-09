@@ -27,6 +27,8 @@ const (
 	// 30 seconds
 	keepaliveInterval         = 2
 	userTrafficSaveInterval   = 300
+	tunnelTrafficSaveInterval = 2
+
 	setOnlineTableExpireTick  = 90
 	onlineTableExpireTime     = 2 * setOnlineTableExpireTick
 	userSessionExpireInterval = 120
@@ -94,6 +96,7 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 	go tm.keepalive()
 	go tm.setNodeOnlineDataExpire()
 	go tm.startUserTrafficTimer()
+	go tm.startTunnelTrafficTimer()
 	go tm.RecyclUserSession()
 	go routeScheduler.start()
 	return tm
@@ -625,6 +628,25 @@ func (tm *TunnelManager) startUserTrafficTimer() {
 		if err := model.AddUsersTotalTraffic(context.TODO(), tm.redis, trafficMap); err != nil {
 			logx.Errorf("AddUsersTotalTraffic failed:%v", err)
 		}
+
+	}
+}
+
+func (tm *TunnelManager) startTunnelTrafficTimer() {
+	ticker := time.NewTicker(tunnelTrafficSaveInterval * time.Second)
+	defer ticker.Stop()
+
+	for {
+		<-ticker.C
+		tm.tunnels.Range(func(key, value any) bool {
+			// tun := value.(*Tunnel)
+			// trafficStats := tun.getLastTrafficStats()
+			// if trafficStats != nil && trafficStats.RreadBytes > 0 {
+			// 	logx.Debugf("tun %s , RreadBytes:%d,RreadDuration:%d writeBytes:%d, WriteDuration:%d", tun.opts.Id,
+			// 		trafficStats.RreadBytes, trafficStats.ReadDuration, trafficStats.WriteBytes, trafficStats.WriteDuration)
+			// }
+			return true
+		})
 
 	}
 }

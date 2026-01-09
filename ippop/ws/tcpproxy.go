@@ -3,6 +3,7 @@ package ws
 import (
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -38,9 +39,16 @@ func (proxy *TCPProxy) write(data []byte) error {
 		return fmt.Errorf("session %s conn == nil", proxy.id)
 	}
 
+	startTime := time.Now()
 	// proxy.tunnel.tunMgr.traffic(proxy.userName, int64(len(data)))
 	_, err := proxy.conn.Write(data)
-	return err
+	if err != nil {
+		return err
+	}
+
+	proxy.tunnel.addTrafficStats(len(data), time.Now().Sub(startTime))
+
+	return nil
 }
 
 func (proxy *TCPProxy) proxyConn() error {
