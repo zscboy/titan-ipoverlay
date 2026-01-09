@@ -58,7 +58,7 @@ type Tunnel struct {
 	writeLock sync.Mutex
 	waitPong  int
 
-	proxys sync.Map
+	proxys ProxyMap
 
 	opts        *TunOptions
 	waitList    sync.Map
