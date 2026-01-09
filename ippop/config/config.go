@@ -8,6 +8,13 @@ import (
 	"github.com/zeromicro/go-zero/rest"
 )
 
+type TunnelSelectPolicy string
+
+const (
+	TunnelSelectRandom TunnelSelectPolicy = "random"
+	TunnelSelectRound  TunnelSelectPolicy = "round"
+)
+
 type JwtAuth struct {
 	AccessSecret string
 	AccessExpire int64
@@ -31,6 +38,8 @@ type WS struct {
 	DownloadRateLimit int64 `json:",default=655360"`
 	//lint:ignore SA5008 go-zero allows "default" in struct tags
 	UploadRateLimit int64 `json:",default=655360"`
+	//lint:ignore SA5008 go-zero allows "default" in struct tags
+	TunnelSelectPolicy TunnelSelectPolicy `json:",default=random"`
 }
 
 type FilterRule struct {

@@ -318,7 +318,7 @@ func (tm *TunnelManager) allocateTunnelByUserSession(user *model.User, sessionID
 
 	// No sessionID provided → return a random tunnel
 	if sessionID == "" {
-		tun, err := tm.nextTunnel()
+		tun, err := tm.allocateTunnelWithoutSession()
 		if err != nil {
 			return nil, nil, err
 		}
@@ -386,6 +386,17 @@ func (tm *TunnelManager) getTunnelByUser(user *model.User) (*Tunnel, error) {
 	tun.setRateLimit(user.DownloadRateLimit, user.UploadRateLimit)
 
 	return tun, nil
+}
+
+func (tm *TunnelManager) allocateTunnelWithoutSession() (*Tunnel, error) {
+	switch tm.config.WS.TunnelSelectPolicy {
+	case config.TunnelSelectRandom:
+		return tm.randomTunnel()
+	case config.TunnelSelectRound:
+		return tm.nextTunnel()
+	default:
+		return nil, fmt.Errorf("unknown tunnel select policy: %s", tm.config.WS.TunnelSelectPolicy)
+	}
 }
 
 func (tm *TunnelManager) randomTunnel() (*Tunnel, error) {
@@ -541,10 +552,14 @@ func (tm *TunnelManager) HandleUserAuth(userName, password string) error {
 }
 
 func (tm *TunnelManager) keepalive() {
+	const logInterval = 60
+	logTick := 0
+
 	tick := 0
 	for {
 		time.Sleep(time.Second * 1)
 		tick++
+		logTick++
 
 		if tick == keepaliveInterval {
 			tick = 0
@@ -570,7 +585,10 @@ func (tm *TunnelManager) keepalive() {
 				return true
 			})
 
-			logx.Infof("TunnelManager.keepalive tunnel count:%d, cost:%v, halfFailureCount:%d, totalFailureCount:%d", count, time.Since(now), halfFailureCount, totalFailureCount)
+			if logTick%logInterval == 0 {
+				logTick = 0
+				logx.Infof("TunnelManager.keepalive tunnel count:%d, cost:%v, halfFailureCount:%d, totalFailureCount:%d", count, time.Since(now), halfFailureCount, totalFailureCount)
+			}
 		}
 	}
 }
