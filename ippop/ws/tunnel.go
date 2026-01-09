@@ -204,6 +204,8 @@ func (t *Tunnel) onMessage(data []byte) error {
 		return t.onProxySessionDataFromTunnel(msg.GetSessionId(), msg.Payload)
 	case pb.MessageType_PROXY_SESSION_CLOSE:
 		return t.onProxySessionClose(msg.GetSessionId())
+	case pb.MessageType_PROXY_SESSION_HALF_CLOSE:
+		return t.onProxySessionHalfClose(msg.GetSessionId())
 	case pb.MessageType_PROXY_UDP_DATA:
 		return t.onProxyUDPDataFromTunnel(msg.GetSessionId(), msg.Payload)
 	default:
@@ -242,6 +244,27 @@ func (t *Tunnel) onProxySessionClose(sessionID string) error {
 	return nil
 }
 
+// onProxySessionHalfClose 处理 Client 发来的半关闭请求
+func (t *Tunnel) onProxySessionHalfClose(sessionID string) error {
+	v, ok := t.proxys.Load(sessionID)
+	if !ok {
+		logx.Errorf("Tunnel.onProxySessionHalfClose not found session:%s", sessionID)
+		return nil
+	}
+
+	proxy := v.(*TCPProxy)
+
+	// 通知 SOCKS5，目标服务器不会再发送数据
+	if tcpConn, ok := proxy.conn.(*net.TCPConn); ok {
+		if err := tcpConn.CloseWrite(); err != nil {
+			logx.Errorf("session %s CloseWrite failed: %v", sessionID, err)
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (t *Tunnel) onProxySessionDataFromTunnel(sessionID string, data []byte) error {
 	v, ok := t.proxys.Load(sessionID)
 	if !ok {
@@ -268,6 +291,26 @@ func (t *Tunnel) onProxyTCPConnClose(sessionID string) {
 
 	if err = t.write(buf); err != nil {
 		logx.Errorf("Tunnel %s %s onProxyConnClose, write message to tunnel failed:%s", t.opts.Id, t.opts.IP, err.Error())
+	}
+
+	t.proxys.Delete(sessionID)
+}
+
+// onProxyTCPConnHalfClose 处理 SOCKS5半关闭
+func (t *Tunnel) onProxyTCPConnHalfClose(sessionID string) {
+	msg := &pb.Message{}
+	msg.Type = pb.MessageType_PROXY_SESSION_HALF_CLOSE
+	msg.SessionId = sessionID
+	msg.Payload = nil
+
+	buf, err := proto.Marshal(msg)
+	if err != nil {
+		logx.Errorf("Tunnel.onProxyTCPConnHalfClose, EncodeMessage failed:%s", err.Error())
+		return
+	}
+
+	if err = t.write(buf); err != nil {
+		logx.Errorf("Tunnel.onProxyTCPConnHalfClose, write message to tunnel failed:%s", err.Error())
 	}
 }
 

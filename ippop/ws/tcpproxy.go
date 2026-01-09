@@ -2,6 +2,7 @@ package ws
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"time"
 
@@ -53,21 +54,41 @@ func (proxy *TCPProxy) write(data []byte) error {
 
 func (proxy *TCPProxy) proxyConn() error {
 	conn := proxy.conn
-	defer conn.Close()
 
-	// netConn := conn.NetConn()
 	buf := make([]byte, 32*1024)
 	for {
 		n, err := conn.Read(buf)
 		if err != nil {
-			logx.Infof("proxy %s proxyConn: %v", proxy.id, err)
+			// 检查是否是 EOF (SOCKS5 关闭写方向)
+			if err == io.EOF {
+				logx.Infof("session %s: SOCKS5 client closed write direction (EOF)", proxy.id)
+
+				// 1. 通知 Client 发送 HALF_CLOSE
+				proxy.tunnel.onProxyTCPConnHalfClose(proxy.id)
+
+				// 2. 关闭读方向（不再读取 SOCKS5）
+				if tcpConn, ok := conn.(*net.TCPConn); ok {
+					if err := tcpConn.CloseRead(); err != nil {
+						logx.Errorf("session %s CloseRead failed: %v", proxy.id, err)
+					} else {
+						logx.Infof("session %s: closed read direction, write still open", proxy.id)
+					}
+				}
+
+				// 3. 退出读循环，但保持写方向（可能还需要发送数据）
+				return nil
+			}
+
+			// 其他错误：完全关闭
+			logx.Infof("proxy.proxyConn error: %v", err)
 			if !proxy.isCloseByClient {
 				proxy.tunnel.onProxyTCPConnClose(proxy.id)
 			}
+			conn.Close()
 			return nil
 		}
 
-		// proxy.tunnel.tunMgr.traffic(proxy.userName, int64(n))
+		// 正常数据，转发
 		proxy.tunnel.onProxyDataFromProxy(proxy.id, buf[:n])
 	}
 }
