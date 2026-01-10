@@ -640,10 +640,10 @@ func (tm *TunnelManager) startTunnelTrafficTimer() {
 		<-ticker.C
 		tm.tunnels.Range(func(key, value any) bool {
 			// tun := value.(*Tunnel)
-			// trafficStats := tun.getLastTrafficStats()
-			// if trafficStats != nil && trafficStats.RreadBytes > 0 {
-			// 	logx.Debugf("tun %s , RreadBytes:%d,RreadDuration:%d writeBytes:%d, WriteDuration:%d", tun.opts.Id,
-			// 		trafficStats.RreadBytes, trafficStats.ReadDuration, trafficStats.WriteBytes, trafficStats.WriteDuration)
+			// trafficStats := tun.getTrafficStats()
+			// if trafficStats != nil && trafficStats.ReadBytes > 0 {
+			// 	logx.Debugf("tun %s , RreadBytes:%d,RreadDuration:%f writeBytes:%d, WriteDuration:%d", tun.opts.Id,
+			// 		trafficStats.ReadBytes, float64(trafficStats.ReadDuration.Seconds()), trafficStats.WriteBytes, trafficStats.WriteDuration)
 			// }
 			return true
 		})

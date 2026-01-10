@@ -38,8 +38,9 @@ type TunOptions struct {
 }
 
 type TrafficStats struct {
-	ReadDuration time.Duration
-	RreadBytes   int64
+	ReadStartTime time.Time
+	ReadDuration  time.Duration
+	ReadBytes     int64
 
 	DataProcessStartTime time.Time
 	DataProcessDuration  time.Duration
@@ -47,9 +48,6 @@ type TrafficStats struct {
 
 	WriteDuration time.Duration
 	WriteBytes    int64
-
-	StartTime time.Time
-	EndTime   time.Time
 }
 
 // Tunnel Tunnel
@@ -306,6 +304,10 @@ func (t *Tunnel) acceptSocks5TCPConn(conn net.Conn, targetInfo *socks5.SocksTarg
 		healthStats = v.(*HealthStats)
 	}
 
+	if t.proxys.Count() == 0 {
+		t.trafficStats.ReadStartTime = time.Now()
+	}
+
 	now := time.Now()
 
 	sessionID := uuid.NewString()
@@ -460,7 +462,8 @@ func (t *Tunnel) readMessageWithLimitRate() (int, []byte, error) {
 		return 0, nil, fmt.Errorf("t.conn == nil")
 	}
 
-	startTime := time.Now()
+	// will reset when proxy is empty
+	t.trafficStats.ReadStartTime = time.Now()
 
 	messageType, data, err := t.conn.ReadMessage()
 	if err != nil {
@@ -468,8 +471,8 @@ func (t *Tunnel) readMessageWithLimitRate() (int, []byte, error) {
 	}
 
 	// TODO: need to sub idle time
-	t.trafficStats.ReadDuration += time.Now().Sub(startTime)
-	t.trafficStats.RreadBytes += int64(len(data))
+	t.trafficStats.ReadDuration += time.Now().Sub(t.trafficStats.ReadStartTime)
+	t.trafficStats.ReadBytes += int64(len(data))
 	t.trafficStats.DataProcessStartTime = time.Now()
 
 	t.waitPong = 0
@@ -529,8 +532,8 @@ func (t *Tunnel) getTrafficStats() *TrafficStats {
 	return t.trafficStats
 }
 
-func (t *Tunnel) addTrafficStats(lenOfBytes int, duration time.Duration) {
-	t.trafficStats.WriteBytes += int64(lenOfBytes)
-	t.trafficStats.WriteDuration += duration
-	t.trafficStats.DataProcessDuration = time.Now().Sub(t.trafficStats.DataProcessStartTime) - t.trafficStats.WriteDuration
+func (t *Tunnel) addTrafficStats(writeBytes int, writeDuration time.Duration) {
+	t.trafficStats.WriteBytes += int64(writeBytes)
+	t.trafficStats.WriteDuration += writeDuration
+	t.trafficStats.DataProcessDuration = time.Now().Sub(t.trafficStats.DataProcessStartTime) - writeDuration
 }
