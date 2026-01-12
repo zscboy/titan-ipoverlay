@@ -27,7 +27,7 @@ const (
 	// 30 seconds
 	keepaliveInterval         = 2
 	userTrafficSaveInterval   = 300
-	tunnelTrafficSaveInterval = 2
+	tunnelTrafficSaveInterval = 10
 
 	setOnlineTableExpireTick  = 90
 	onlineTableExpireTime     = 2 * setOnlineTableExpireTick
@@ -638,15 +638,15 @@ func (tm *TunnelManager) startTunnelTrafficTimer() {
 
 	for {
 		<-ticker.C
-		tm.tunnels.Range(func(key, value any) bool {
-			// tun := value.(*Tunnel)
-			// trafficStats := tun.getTrafficStats()
-			// if trafficStats != nil && trafficStats.ReadBytes > 0 {
-			// 	logx.Debugf("tun %s , RreadBytes:%d,RreadDuration:%f writeBytes:%d, WriteDuration:%d", tun.opts.Id,
-			// 		trafficStats.ReadBytes, float64(trafficStats.ReadDuration.Seconds()), trafficStats.WriteBytes, trafficStats.WriteDuration)
-			// }
-			return true
-		})
+		// tm.tunnels.Range(func(key, value any) bool {
+		// 	tun := value.(*Tunnel)
+		// 	trafficStats := tun.getTrafficStats()
+		// 	if trafficStats != nil && trafficStats.ReadBytes > 0 {
+		// 		logx.Debugf("tun %s , RreadBytes:%d,RreadDuration:%fms writeBytes:%d, WriteDuration:%f, processDataDuration:%f", tun.opts.Id,
+		// 			trafficStats.ReadBytes, float64(trafficStats.ReadDuration.Milliseconds()), trafficStats.WriteBytes, float64(trafficStats.WriteDuration.Milliseconds()), float64(trafficStats.DataProcessDuration.Milliseconds()))
+		// 	}
+		// 	return true
+		// })
 
 	}
 }

@@ -250,7 +250,7 @@ func (t *Tunnel) onProxySessionDataFromTunnel(sessionID string, data []byte) err
 	// logx.Debugf("Tunnel.onProxySessionDataFromTunnel session id: %s", sessionID)
 	v, ok := t.proxys.Load(sessionID)
 	if !ok {
-		t.onProxyTCPConnClose(sessionID)
+		// t.onProxyTCPConnClose(sessionID)
 		logx.Debugf("Tunnel.onProxySessionDataFromTunnel, can not found session %s", sessionID)
 		return nil
 	}
