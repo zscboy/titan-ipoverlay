@@ -34,6 +34,23 @@ func (proxy *TCPProxy) closeByClient() {
 	proxy.close()
 }
 
+func (proxy *TCPProxy) closeWrite() error {
+	if proxy.conn == nil {
+		logx.Errorf("session %s conn == nil", proxy.id)
+		return fmt.Errorf("session %s conn == nil", proxy.id)
+	}
+
+	conn := proxy.conn
+	if tcpConn, ok := conn.(*net.TCPConn); ok {
+		if err := tcpConn.CloseWrite(); err != nil {
+			logx.Errorf("session %s CloseWrite failed: %v", proxy.id, err)
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (proxy *TCPProxy) write(data []byte) error {
 	if proxy.conn == nil {
 		return fmt.Errorf("session %s conn == nil", proxy.id)
@@ -59,13 +76,13 @@ func (proxy *TCPProxy) proxyConn() error {
 				proxy.tunnel.onProxyTCPConnHalfClose(proxy.id)
 
 				// 2. 关闭读方向（不再读取 SOCKS5）
-				if tcpConn, ok := conn.(*net.TCPConn); ok {
-					if err := tcpConn.CloseRead(); err != nil {
-						logx.Errorf("session %s CloseRead failed: %v", proxy.id, err)
-					} else {
-						logx.Infof("session %s: closed read direction, write still open", proxy.id)
-					}
-				}
+				// if tcpConn, ok := conn.(*net.TCPConn); ok {
+				// 	if err := tcpConn.CloseRead(); err != nil {
+				// 		logx.Errorf("session %s CloseRead failed: %v", proxy.id, err)
+				// 	} else {
+				// 		logx.Infof("session %s: closed read direction, write still open", proxy.id)
+				// 	}
+				// }
 
 				// 3. 退出读循环，但保持写方向（可能还需要发送数据）
 				return nil

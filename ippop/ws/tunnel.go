@@ -228,6 +228,8 @@ func (t *Tunnel) onProxySessionClose(sessionID string) error {
 	session := v.(*TCPProxy)
 	session.closeByClient()
 
+	t.proxys.Delete(sessionID)
+
 	return nil
 }
 
@@ -240,16 +242,7 @@ func (t *Tunnel) onProxySessionHalfClose(sessionID string) error {
 	}
 
 	proxy := v.(*TCPProxy)
-
-	// 通知 SOCKS5，目标服务器不会再发送数据
-	if tcpConn, ok := proxy.conn.(*net.TCPConn); ok {
-		if err := tcpConn.CloseWrite(); err != nil {
-			logx.Errorf("session %s CloseWrite failed: %v", sessionID, err)
-			return err
-		}
-	}
-
-	return nil
+	return proxy.closeWrite()
 }
 
 func (t *Tunnel) onProxySessionDataFromTunnel(sessionID string, data []byte) error {
@@ -339,7 +332,7 @@ func (t *Tunnel) acceptSocks5TCPConn(conn net.Conn, targetInfo *socks5.SocksTarg
 	proxyTCP := newTCPProxy(sessionID, conn, t, targetInfo.Username)
 
 	t.proxys.Store(sessionID, proxyTCP)
-	defer t.proxys.Delete(sessionID)
+	// defer t.proxys.Delete(sessionID)
 
 	addr := fmt.Sprintf("%s:%d", targetInfo.DomainName, targetInfo.Port)
 	err := t.onClientCreateByDomain(&pb.DestAddr{Addr: addr}, sessionID)
