@@ -278,7 +278,7 @@ func (t *Tunnel) onProxySessionDataFromTunnel(sessionID string, data []byte) err
 	// logx.Debugf("Tunnel.onProxySessionDataFromTunnel session id: %s", sessionID)
 	v, ok := t.proxys.Load(sessionID)
 	if !ok {
-		t.onProxyTCPConnClose(sessionID)
+		// t.onProxyTCPConnClose(sessionID)
 		logx.Debugf("Tunnel.onProxySessionDataFromTunnel, can not found session %s", sessionID)
 		return nil
 	}
@@ -296,12 +296,12 @@ func (t *Tunnel) onProxyTCPConnClose(sessionID string) {
 
 	buf, err := proto.Marshal(msg)
 	if err != nil {
-		logx.Errorf("Tunnel.onProxyConnClose, EncodeMessage failed:%s", err.Error())
+		logx.Errorf("Tunnel.onProxyTCPConnClose, EncodeMessage failed:%s", err.Error())
 		return
 	}
 
 	if err = t.write(buf); err != nil {
-		logx.Errorf("Tunnel.onProxyConnClose, write message to tunnel failed:%s", err.Error())
+		logx.Errorf("Tunnel.onProxyTCPConnClose, write message to tunnel failed:%s", err.Error())
 	}
 
 	t.proxys.Delete(sessionID)
