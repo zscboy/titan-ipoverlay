@@ -73,6 +73,8 @@ func newTunnel(conn *websocket.Conn, tunMgr *TunnelManager, opts *TunOptions) *T
 	t.setRateLimit(opts.DownloadRateLimti, opts.UploadRateLimit)
 
 	conn.SetPingHandler(func(data string) error {
+		t.waitPong = 0
+
 		if err := t.writePong([]byte(data)); err != nil {
 			logx.Errorf("writePong error:%s", err.Error())
 		}
@@ -117,7 +119,6 @@ func (t *Tunnel) writePong(msg []byte) error {
 	if t.conn == nil {
 		return fmt.Errorf("writePong, t.conn == nil, id:%s", t.opts.Id)
 	}
-
 	// t.conn.SetWriteDeadline(time.Now().Add(30 * time.Second))
 	return t.conn.WriteMessage(websocket.PongMessage, msg)
 }
@@ -139,24 +140,9 @@ func (t *Tunnel) onPong(data []byte) {
 		logx.Error("Invalid pong data")
 		return
 	}
-	// TODO: Mass update
+
 	timestamp := int64(binary.LittleEndian.Uint64(data))
 	t.delay = time.Since(time.UnixMicro(timestamp)).Milliseconds()
-
-	// if t.netDelays == nil {
-	// 	t.netDelays = make([]uint64, 0, netDelayCount)
-	// }
-
-	// t.netDelays = append(t.netDelays, uint64(rtt.Milliseconds()))
-	// if len(t.netDelays) >= netDelayCount {
-	// 	var delays = uint64(0)
-	// 	for _, delay := range t.netDelays {
-	// 		delays += delay
-	// 	}
-	// 	delay := delays / uint64(len(t.netDelays))
-	// 	model.SetNodeNetDelay(t.tunMgr.redis, t.opts.Id, delay)
-	// 	t.netDelays = make([]uint64, 0, netDelayCount)
-	// }
 
 	t.waitPong = 0
 }
@@ -463,6 +449,8 @@ func (t *Tunnel) readMessageWithLimitRate() (int, []byte, error) {
 	if err != nil {
 		return 0, nil, err
 	}
+
+	t.waitPong = 0
 
 	readLimiter := t.readLimiter
 	if readLimiter != nil {
