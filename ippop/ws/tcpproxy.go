@@ -69,22 +69,11 @@ func (proxy *TCPProxy) proxyConn() error {
 		n, err := conn.Read(buf)
 		if err != nil {
 			// 检查是否是 EOF (SOCKS5 关闭写方向)
-			if err == io.EOF {
+			if err == io.EOF && proxy.tunnel.isNodeVersionGreatThanV011() {
 				logx.Infof("session %s: SOCKS5 client closed write direction (EOF)", proxy.id)
 
 				// 1. 通知 Client 发送 HALF_CLOSE
 				proxy.tunnel.onProxyTCPConnHalfClose(proxy.id)
-
-				// 2. 关闭读方向（不再读取 SOCKS5）
-				// if tcpConn, ok := conn.(*net.TCPConn); ok {
-				// 	if err := tcpConn.CloseRead(); err != nil {
-				// 		logx.Errorf("session %s CloseRead failed: %v", proxy.id, err)
-				// 	} else {
-				// 		logx.Infof("session %s: closed read direction, write still open", proxy.id)
-				// 	}
-				// }
-
-				// 3. 退出读循环，但保持写方向（可能还需要发送数据）
 				return nil
 			}
 

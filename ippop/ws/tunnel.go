@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/zeromicro/go-zero/core/logx"
+	"golang.org/x/mod/semver"
 	"golang.org/x/time/rate"
 	"google.golang.org/protobuf/proto"
 )
@@ -26,10 +27,11 @@ const (
 )
 
 type TunOptions struct {
-	Id    string
-	OS    string
-	VMAPI string
-	IP    string
+	Id      string
+	OS      string
+	VMAPI   string
+	IP      string
+	Version string
 	// seconds
 	UDPTimeout        int
 	TCPTimeout        int
@@ -87,6 +89,10 @@ func newTunnel(conn *websocket.Conn, tunMgr *TunnelManager, opts *TunOptions) *T
 	})
 
 	return t
+}
+
+func (t *Tunnel) version() string {
+	return t.opts.Version
 }
 
 func (t *Tunnel) setRateLimit(downloadRateLimit, uploadRateLimit int64) {
@@ -200,19 +206,42 @@ func (t *Tunnel) onMessage(data []byte) error {
 	return nil
 }
 
-func (t *Tunnel) onProxySessionCreateReply(sessionID string, payload []byte) error {
-	logx.Debugf("Tunnel.onProxySessionCreateComplete")
+func (t *Tunnel) notifySessionCreateRequest(sessionID string, payload []byte) error {
 	v, ok := t.waitList.Load(sessionID)
 	if !ok || v == nil {
-		return fmt.Errorf("Tunnel.onProxySessionCreateComplete not found session:%s", sessionID)
+		return fmt.Errorf("Tunnel.onProxySessionCreateReply not found session:%s", sessionID)
 	}
 
 	ch := v.(chan []byte)
-
 	select {
 	case ch <- payload:
 	default:
-		logx.Errorf("Tunnel.onProxySessionCreateComplete: channel full or no listener for session %s", sessionID)
+		logx.Errorf("Tunnel.onProxySessionCreateReply: channel full or no listener for session %s", sessionID)
+	}
+	return nil
+}
+
+func (t *Tunnel) onProxySessionCreateReply(sessionID string, payload []byte) error {
+	// logx.Debugf("Tunnel.onProxySessionCreateReply")
+	if !t.isNodeVersionGreatThanV011() {
+		return t.notifySessionCreateRequest(sessionID, payload)
+	}
+
+	v, ok := t.proxys.Load(sessionID)
+	if !ok || v == nil {
+		return fmt.Errorf("Tunnel.onProxySessionCreateReply not found session:%s", sessionID)
+	}
+
+	reply := &pb.CreateSessionReply{}
+	err := proto.Unmarshal(payload, reply)
+	if err != nil {
+		return fmt.Errorf("can not unmarshal CreateSessionReply:%s", err.Error())
+	}
+
+	if reply.Success {
+		logx.Debugf("onProxySessionCreateReply, create session %s success", sessionID)
+	} else {
+		logx.Errorf("onProxySessionCreateReply, create session %s success", sessionID)
 	}
 	return nil
 }
@@ -319,32 +348,18 @@ func (t *Tunnel) onProxyDataFromProxy(sessionID string, data []byte) {
 
 func (t *Tunnel) acceptSocks5TCPConn(conn net.Conn, targetInfo *socks5.SocksTargetInfo) error {
 	logx.Debugf("acceptSocks5TCPConn, dest %s:%d", targetInfo.DomainName, targetInfo.Port)
-
-	var healthStats *HealthStats
-	v, ok := t.tunMgr.HealthStatsMap.Load(t.opts.Id)
-	if ok {
-		healthStats = v.(*HealthStats)
-	}
-
 	now := time.Now()
 
 	sessionID := uuid.NewString()
 	proxyTCP := newTCPProxy(sessionID, conn, t, targetInfo.Username)
 
 	t.proxys.Store(sessionID, proxyTCP)
-	// defer t.proxys.Delete(sessionID)
 
 	addr := fmt.Sprintf("%s:%d", targetInfo.DomainName, targetInfo.Port)
-	err := t.onClientCreateByDomain(&pb.DestAddr{Addr: addr}, sessionID)
+	err := t.createClientWithDest(&pb.DestAddr{Addr: addr}, sessionID)
 	if err != nil {
-		healthStats.failureCount++
-		return fmt.Errorf("Tunnel.acceptSocks5TCPConn client create by Domain failed, cost:%dms, addr:%s, err:%v, tun ip:%s, failure/success[%d/%d]", time.Since(now).Milliseconds(), addr, err, t.opts.IP, healthStats.failureCount, healthStats.successCount)
+		return fmt.Errorf("Tunnel.acceptSocks5TCPConn client create by Domain failed, cost:%dms, addr:%s, err:%v, tun ip:%s", time.Since(now).Milliseconds(), addr, err, t.opts.IP)
 	}
-
-	healthStats.successCount++
-
-	logx.Debugf("acceptSocks5TCPConn, create session cost:%dms, %s:%d total connect cost:%dms, tun ip:%s, failure/success[%d/%d]",
-		time.Since(now).Milliseconds(), targetInfo.DomainName, targetInfo.Port, time.Since(targetInfo.ConnCreateTime).Milliseconds(), t.opts.IP, healthStats.failureCount, healthStats.successCount)
 
 	if len(targetInfo.ExtraBytes) > 0 {
 		t.onProxyDataFromProxy(sessionID, targetInfo.ExtraBytes)
@@ -353,7 +368,33 @@ func (t *Tunnel) acceptSocks5TCPConn(conn net.Conn, targetInfo *socks5.SocksTarg
 	return proxyTCP.proxyConn()
 }
 
-func (t *Tunnel) onClientCreateByDomain(dest *pb.DestAddr, sessionID string) error {
+func (t *Tunnel) createClientWithDest(dest *pb.DestAddr, sessionID string) error {
+	if t.isNodeVersionGreatThanV011() {
+		return t.createClientWithDestV2(dest, sessionID)
+	}
+	return t.createClientWithDestV1(dest, sessionID)
+}
+
+func (t *Tunnel) createClientWithDestV2(dest *pb.DestAddr, sessionID string) error {
+	buf, err := proto.Marshal(dest)
+	if err != nil {
+		return err
+	}
+
+	msg := &pb.Message{}
+	msg.Type = pb.MessageType_PROXY_SESSION_CREATE
+	msg.SessionId = sessionID
+	msg.Payload = buf
+
+	data, err := proto.Marshal(msg)
+	if err != nil {
+		return err
+	}
+
+	return t.write(data)
+}
+
+func (t *Tunnel) createClientWithDestV1(dest *pb.DestAddr, sessionID string) error {
 	logx.Debugf("Tunnel.onClientCreateByDomain, dest %s", dest.Addr)
 
 	buf, err := proto.Marshal(dest)
@@ -536,4 +577,9 @@ func (t *Tunnel) leaseComplete() {
 	if t.waitLeaseCh != nil {
 		t.waitLeaseCh <- true
 	}
+}
+
+// great than 0.1.1
+func (t *Tunnel) isNodeVersionGreatThanV011() bool {
+	return semver.Compare("v"+t.opts.Version, "v0.1.1") > 0
 }
