@@ -76,16 +76,13 @@ func (proxy *TCPProxy) proxyConn() error {
 	for {
 		n, err := conn.Read(buf)
 		if err != nil {
-			// 检查是否是 EOF (SOCKS5 关闭写方向)
 			if err == io.EOF && proxy.tunnel.isNodeVersionGreatThanV011() {
 				logx.Infof("session %s: SOCKS5 client closed write direction (EOF)", proxy.id)
 
-				// 1. 通知 Client 发送 HALF_CLOSE
 				proxy.tunnel.onProxyTCPConnHalfClose(proxy.id)
 				return nil
 			}
 
-			// 其他错误：完全关闭
 			logx.Infof("proxy.proxyConn error: %v", err)
 			if !proxy.isCloseByClient {
 				proxy.tunnel.onProxyTCPConnClose(proxy.id)
@@ -94,7 +91,6 @@ func (proxy *TCPProxy) proxyConn() error {
 			return nil
 		}
 
-		// 正常数据，转发
 		proxy.tunnel.onProxyDataFromProxy(proxy.id, buf[:n])
 	}
 }
