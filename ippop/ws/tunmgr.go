@@ -175,6 +175,7 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, n
 		Id:                node.Id,
 		OS:                node.OS,
 		IP:                node.IP,
+		Version:           node.Version,
 		UDPTimeout:        int(config.Socks5.UDPTimeout),
 		TCPTimeout:        int(config.Socks5.TCPTimeout),
 		DownloadRateLimti: config.WS.DownloadRateLimit,
