@@ -10,6 +10,7 @@ import (
 	"titan-ipoverlay/ippop/socks5"
 	"titan-ipoverlay/ippop/ws"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/service"
@@ -20,14 +21,16 @@ import (
 var configFile = flag.String("f", "etc/server.yaml", "the config file")
 
 func initPprof(listenAddr string) {
+	http.Handle("/metrics", promhttp.Handler())
+
 	go func() {
-		logx.Info("pprof listening on ", listenAddr)
+		logx.Infof("pprof listening on http://%s", listenAddr)
+		logx.Infof("Prometheus metrics available at http://%s/metrics", listenAddr)
 		if err := http.ListenAndServe(listenAddr, nil); err != nil {
 			logx.Error(err)
 		}
 	}()
 }
-
 func newWS(config config.Config, tunMgr *ws.TunnelManager) *rest.Server {
 	server := rest.MustNewServer(config.WS.RestConf)
 

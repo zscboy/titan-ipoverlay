@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 	"titan-ipoverlay/ippop/config"
+	"titan-ipoverlay/ippop/metrics"
 	"titan-ipoverlay/ippop/model"
 	"titan-ipoverlay/ippop/socks5"
 
@@ -174,6 +175,9 @@ func (tm *TunnelManager) removeTunnel(tun *Tunnel) {
 	} else {
 		atomic.StoreUint64(&tm.rrIdx, 0)
 	}
+
+	// Prometheus 指标：减少活跃隧道数
+	metrics.ActiveTunnels.Dec()
 }
 
 func (tm *TunnelManager) getShardIndex(nodeID string) uint32 {
@@ -352,6 +356,21 @@ func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks
 
 	tm.socks5ConnCount.Add(1)
 	defer tm.socks5ConnCount.Add(-1)
+
+	// Prometheus 指标：SOCKS5 连接总数
+	metrics.SOCKS5Connections.Inc()
+	// Prometheus 指标：总会话数
+	metrics.TotalSessions.Inc()
+	// Prometheus 指标：活跃会话数
+	metrics.ActiveSessions.Inc()
+	defer metrics.ActiveSessions.Dec()
+
+	// 记录会话开始时间，用于计算持续时间
+	sessionStart := time.Now()
+	defer func() {
+		duration := time.Since(sessionStart).Seconds()
+		metrics.SessionDuration.Observe(duration)
+	}()
 
 	if tm.filterRules.isDeny(targetInfo.DomainName, fmt.Sprintf("%d", targetInfo.Port)) {
 		return fmt.Errorf("tcp: target %s:%d have been deny", targetInfo.DomainName, targetInfo.Port)
