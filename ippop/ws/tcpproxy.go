@@ -24,7 +24,7 @@ func newTCPProxy(id string, conn net.Conn, t *Tunnel, userName string) *TCPProxy
 		conn:      conn,
 		tunnel:    t,
 		userName:  userName,
-		perfStats: NewSessionPerfStats(id, userName, &t.tunMgr.config.PerfMonitoring),
+		perfStats: NewSessionPerfStats(id, userName, &t.tunMgr.config.PerfMonitoring, t.tunMgr.perfCollector),
 	}
 }
 

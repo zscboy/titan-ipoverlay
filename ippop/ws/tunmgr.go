@@ -72,6 +72,9 @@ type TunnelManager struct {
 	rng *rand.Rand
 
 	HealthStatsMap sync.Map
+
+	// 会话性能数据收集器
+	perfCollector *SessionPerfCollector
 }
 
 func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
@@ -89,7 +92,8 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 		userSessionLock: sync.Mutex{},
 		rng:             rand.New(rand.NewSource(time.Now().UnixNano())),
 
-		tunnelList: make([]*Tunnel, 0, 100000),
+		tunnelList:    make([]*Tunnel, 0, 100000),
+		perfCollector: NewSessionPerfCollector(redis),
 	}
 
 	routeScheduler := newUserRouteScheduler(tm)
@@ -100,6 +104,7 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 	go tm.startTunnelTrafficTimer()
 	go tm.RecyclUserSession()
 	go routeScheduler.start()
+	go tm.perfCollector.Start()
 	return tm
 }
 
