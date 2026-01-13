@@ -6,11 +6,11 @@ import (
 	_ "net/http/pprof"
 	"titan-ipoverlay/ippop/config"
 	httpproxy "titan-ipoverlay/ippop/http"
+	"titan-ipoverlay/ippop/metrics"
 	rpc "titan-ipoverlay/ippop/rpc/export"
 	"titan-ipoverlay/ippop/socks5"
 	"titan-ipoverlay/ippop/ws"
 
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/service"
@@ -21,7 +21,6 @@ import (
 var configFile = flag.String("f", "etc/server.yaml", "the config file")
 
 func initPprof(listenAddr string) {
-	http.Handle("/metrics", promhttp.Handler())
 
 	go func() {
 		logx.Infof("pprof listening on http://%s", listenAddr)
@@ -98,6 +97,10 @@ func main() {
 
 	if c.Pprof.Enable {
 		initPprof(c.Pprof.ListenAddr)
+	}
+
+	if c.Metrics.Enable {
+		metrics.StartMetricsServer(c.Metrics.ListenAddr)
 	}
 
 	var rdb = redis.MustNewRedis(c.Redis)
