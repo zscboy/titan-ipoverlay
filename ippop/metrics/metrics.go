@@ -29,9 +29,9 @@ var (
 	})
 
 	SessionDuration = promauto.NewHistogram(prometheus.HistogramOpts{
-		Name:    "ippop_session_duration_seconds",
-		Help:    "会话持续时间（秒）",
-		Buckets: prometheus.DefBuckets, // [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]
+		Name:    "ippop_session_duration_ms",
+		Help:    "会话持续时间（毫秒）",
+		Buckets: []float64{10, 50, 100, 500, 1000, 5000, 10000, 30000, 60000, 300000}, // 10ms ~ 5min
 	})
 
 	// 连接指标
