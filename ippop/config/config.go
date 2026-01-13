@@ -62,6 +62,11 @@ type Pprof struct {
 	ListenAddr string
 }
 
+type Metrics struct {
+	Enable     bool
+	ListenAddr string
+}
+
 type Config struct {
 	// APIServer api.APIServerConfig
 	WS        WS
@@ -72,6 +77,8 @@ type Config struct {
 	HTTPProxy string `json:",optional"`
 	//lint:ignore SA5008 go-zero allows "optional" in struct tags
 	Pprof Pprof `json:",optional"`
+	//lint:ignore SA5008 go-zero allows "optional" in struct tags
+	Metrics Metrics `json:",optional"`
 
 	JwtAuth JwtAuth
 	Socks5  Socks5
