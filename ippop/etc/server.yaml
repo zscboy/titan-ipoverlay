@@ -44,3 +44,10 @@ Socks5:
   ### udp proxy timeout if no data transfer
   ### client udp proxy timeout is 60s
   UDPTimeout: 120
+PerfMonitoring:
+  # 日志采样率（0.01 = 1%，0.1 = 10%，1.0 = 100%）
+  LogSampleRate: 0.01
+  # 是否启用详细日志（生产环境建议 false）
+  EnableVerboseLog: false
+  # 异常会话阈值（秒）
+  AbnormalDurationSeconds: 60

@@ -90,4 +90,42 @@ var (
 		Name: "ippop_half_close_events_total",
 		Help: "TCP 半关闭事件总数",
 	}, []string{"direction"}) // direction: client_to_server/server_to_client
+
+	// T1/T2/T3 性能指标
+	// T1: Client → POP (SOCKS5 读取)
+	T1Throughput = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "ippop_t1_throughput_mbps",
+		Help:    "T1 吞吐量 (Client→POP) MB/s",
+		Buckets: []float64{0.1, 0.5, 1, 5, 10, 20, 50, 100, 200, 500},
+	}, []string{"user"})
+
+	T1Bytes = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "ippop_t1_bytes_total",
+		Help: "T1 总字节数 (Client→POP)",
+	}, []string{"user"})
+
+	// T2: 内部处理
+	T2ProcessingTime = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "ippop_t2_processing_microseconds",
+		Help:    "T2 内部处理时间 (微秒)",
+		Buckets: []float64{10, 50, 100, 500, 1000, 5000, 10000, 50000},
+	}, []string{"user"})
+
+	// T3: POP → Target
+	T3Throughput = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "ippop_t3_throughput_mbps",
+		Help:    "T3 吞吐量 (POP→Target) MB/s",
+		Buckets: []float64{0.1, 0.5, 1, 5, 10, 20, 50, 100, 200, 500},
+	}, []string{"user"})
+
+	T3Bytes = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "ippop_t3_bytes_total",
+		Help: "T3 总字节数 (POP→Target)",
+	}, []string{"user"})
+
+	// 瓶颈检测
+	BottleneckDetection = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "ippop_bottleneck_detection_total",
+		Help: "瓶颈检测统计",
+	}, []string{"type", "user"}) // type: t1_slow/t2_slow/t3_slow/balanced
 )
