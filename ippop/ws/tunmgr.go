@@ -372,7 +372,7 @@ func (tm *TunnelManager) allocateTunnelByUserSession(user *model.User, sessionID
 
 	tunnel := v.(*Tunnel)
 	tunnel.userSessionID = sessionID
-	tunnel.setRateLimit(user.DownloadRateLimit, user.UploadRateLimit)
+	// tunnel.setRateLimit(user.DownloadRateLimit, user.UploadRateLimit)
 
 	return tunnel, session, nil
 }

@@ -104,7 +104,6 @@ func (t *Tunnel) setRateLimit(downloadRateLimit, uploadRateLimit int64) {
 	} else {
 		if t.readLimiter == nil || t.readLimiter.Limit() != rate.Limit(downloadRateLimit) {
 			t.readLimiter = rate.NewLimiter(rate.Limit(downloadRateLimit), limitRateBurst)
-			logx.Debugf("tun %s new readLimiter", t.opts.Id)
 		}
 	}
 
@@ -113,7 +112,6 @@ func (t *Tunnel) setRateLimit(downloadRateLimit, uploadRateLimit int64) {
 	} else {
 		if t.writeLimiter == nil || t.writeLimiter.Limit() != rate.Limit(uploadRateLimit) {
 			t.writeLimiter = rate.NewLimiter(rate.Limit(uploadRateLimit), limitRateBurst)
-			logx.Debugf("tun %s new writerLimiter for", t.opts.Id)
 		}
 	}
 }
