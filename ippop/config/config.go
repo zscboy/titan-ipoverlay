@@ -76,6 +76,15 @@ type Metrics struct {
 	ListenAddr string
 }
 
+type PerfMonitoring struct {
+	//lint:ignore SA5008 go-zero allows "default" in struct tags
+	LogSampleRate float64 `json:",default=0.01"` // 日志采样率（0.01 = 1%，0.1 = 10%，1.0 = 100%）
+	//lint:ignore SA5008 go-zero allows "default" in struct tags
+	EnableVerboseLog bool `json:",default=false"` // 是否启用详细日志（生产环境建议 false）
+	//lint:ignore SA5008 go-zero allows "default" in struct tags
+	AbnormalDurationSeconds int64 `json:",default=60"` // 异常会话阈值（秒）
+}
+
 type Config struct {
 	// APIServer api.APIServerConfig
 	WS        WS
@@ -88,6 +97,9 @@ type Config struct {
 	Pprof Pprof `json:",optional"`
 	//lint:ignore SA5008 go-zero allows "optional" in struct tags
 	Metrics Metrics `json:",optional"`
+
+	//lint:ignore SA5008 go-zero allows "optional" in struct tags
+	PerfMonitoring PerfMonitoring `json:",optional"`
 
 	JwtAuth JwtAuth
 	Socks5  Socks5
