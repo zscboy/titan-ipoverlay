@@ -24,6 +24,9 @@ type SessionPerfStats struct {
 	// 配置
 	perfConfig *config.PerfMonitoring
 
+	// 收集器引用（用于存储到 Redis）
+	collector *SessionPerfCollector
+
 	// T1: Client → POP (SOCKS5 读取)
 	T1BytesReceived int64
 	T1Duration      time.Duration
@@ -40,12 +43,13 @@ type SessionPerfStats struct {
 }
 
 // NewSessionPerfStats 创建新的会话性能统计
-func NewSessionPerfStats(sessionID, userName string, perfConfig *config.PerfMonitoring) *SessionPerfStats {
+func NewSessionPerfStats(sessionID, userName string, perfConfig *config.PerfMonitoring, collector *SessionPerfCollector) *SessionPerfStats {
 	return &SessionPerfStats{
 		SessionID:  sessionID,
 		UserName:   userName,
 		StartTime:  time.Now(),
 		perfConfig: perfConfig,
+		collector:  collector,
 	}
 }
 
@@ -144,6 +148,26 @@ func (s *SessionPerfStats) Close() {
 			s.T3Count,
 			bottleneck,
 		)
+	}
+
+	// 提交到收集器存储到 Redis
+	if s.collector != nil && (s.T1BytesReceived > 0 || s.T3BytesSent > 0) {
+		s.collector.Collect(SessionPerfRecord{
+			SessionID:   s.SessionID,
+			UserName:    s.UserName,
+			DurationSec: totalDuration.Seconds(),
+			T1BytesMB:   float64(s.T1BytesReceived) / 1024 / 1024,
+			T1SpeedMBps: t1Speed,
+			T1Count:     s.T1Count,
+			T2AvgUs:     t2AvgUs,
+			T2TotalMs:   s.T2Duration.Milliseconds(),
+			T2Count:     s.T2Count,
+			T3BytesMB:   float64(s.T3BytesSent) / 1024 / 1024,
+			T3SpeedMBps: t3Speed,
+			T3Count:     s.T3Count,
+			Bottleneck:  bottleneck,
+			Timestamp:   time.Now().Unix(),
+		})
 	}
 }
 

@@ -62,6 +62,8 @@ type TunnelManager struct {
 	ipPool *IPPool
 
 	acceptLocks []sync.Mutex
+	// 会话性能数据收集器
+	perfCollector *SessionPerfCollector
 }
 
 func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
@@ -77,9 +79,10 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 		filterRules: &Rules{rules: RulesToMap(config.FilterRules.Rules), defaultAction: config.FilterRules.DefaultAction},
 		rng:         rand.New(&lockedSource{s: rand.NewSource(time.Now().UnixNano())}),
 
-		tunnelList:  make([]*Tunnel, 0, 100000),
-		ipPool:      NewIPPool(),
-		acceptLocks: make([]sync.Mutex, acceptLockShards),
+		tunnelList:    make([]*Tunnel, 0, 100000),
+		ipPool:        NewIPPool(),
+		acceptLocks:   make([]sync.Mutex, acceptLockShards),
+		perfCollector: NewSessionPerfCollector(redis),
 	}
 
 	tm.sessionManager = NewSessionManager(tm, userSessionExpireDuration)
@@ -94,6 +97,7 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 	go tm.keepalive()
 	go tm.setNodeOnlineDataExpire()
 	go tm.startUserTrafficTimer()
+	go tm.perfCollector.Start()
 	return tm
 }
 
