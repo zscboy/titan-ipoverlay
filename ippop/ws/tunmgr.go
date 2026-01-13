@@ -62,6 +62,8 @@ type TunnelManager struct {
 
 	// HealthStatsMap sync.Map
 	ipPool *IPPool
+	// 会话性能数据收集器
+	perfCollector *SessionPerfCollector
 }
 
 func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
@@ -79,8 +81,9 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 		userSessionLock: sync.Mutex{},
 		rng:             rand.New(rand.NewSource(time.Now().UnixNano())),
 
-		tunnelList: make([]*Tunnel, 0, 100000),
-		ipPool:     NewIPPool(),
+		tunnelList:    make([]*Tunnel, 0, 100000),
+		ipPool:        NewIPPool(),
+		perfCollector: NewSessionPerfCollector(redis),
 	}
 
 	tm.sessionManager = NewSessionManager(tm, userSessionExpireDuration)
@@ -96,6 +99,7 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 	go tm.setNodeOnlineDataExpire()
 	go tm.startUserTrafficTimer()
 	go tm.startTunnelTrafficTimer()
+	go tm.perfCollector.Start()
 	return tm
 }
 
