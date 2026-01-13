@@ -58,7 +58,9 @@ func (udp *UDPServer) serve() {
 			continue
 		}
 
-		udp.handleUDPConn(src, buf[:n])
+		if err := udp.handleUDPConn(src, buf[:n]); err != nil {
+			logx.Errorf("handle udp failed:%v", err)
+		}
 	}
 
 	logx.Infof("user %s udp server %d close", udp.user, udp.port)
@@ -74,7 +76,7 @@ func (udp *UDPServer) handleUDPConn(src *net.UDPAddr, data []byte) error {
 	srcIP := src.IP.String()
 	keyUserIPCount := fmt.Sprintf("%s:%s", udp.user, srcIP)
 	if udp.server.userIPCount.get(keyUserIPCount) <= 0 {
-		return fmt.Errorf("user %s ip %s not associate", udp.user, srcIP)
+		return fmt.Errorf("%s not associate", keyUserIPCount)
 	}
 
 	datagram, err := newDatagramFromBytes(data)
