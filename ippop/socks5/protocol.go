@@ -86,30 +86,6 @@ func userPassAuthSuccess(conn io.Writer) error {
 	return err
 }
 
-// func replyAuthMethod(conn io.Writer, method uint8) error {
-// 	_, err := conn.Write([]byte{socks5Version, method})
-// 	return err
-// }
-
-// func authenticate(conn io.Writer, bufConn io.Reader) error {
-// 	// Get the methods
-// 	methods, err := readAuthMethods(bufConn)
-// 	if err != nil {
-// 		return fmt.Errorf("failed to get auth methods: %v", err)
-// 	}
-
-// 	// Select a usable method
-// 	for _, method := range methods {
-// 		found := method == noAuth
-// 		if found {
-// 			return noAuthAuthenticator{}.authenticate(conn)
-// 		}
-// 	}
-
-// 	// No usable method found
-// 	return noAcceptableAuth(conn)
-// }
-
 type addrSpec struct {
 	fqdn string
 	ip   net.IP
@@ -350,30 +326,12 @@ func newDatagramFromBytes(bb []byte) (*datagram, error) {
 	return d, nil
 }
 
-// NewDatagram return datagram packet can be writed into client, dstaddr should not have domain length
-// func NewDatagram(atyp byte, dstaddr []byte, dstport []byte, data []byte) *datagram {
-// 	if atyp == fqdnAddress {
-// 		dstaddr = append([]byte{byte(len(dstaddr))}, dstaddr...)
-// 	}
-// 	return &datagram{
-// 		rsv:     []byte{0x00, 0x00},
-// 		frag:    0x00,
-// 		atyp:    atyp,
-// 		dstAddr: dstaddr,
-// 		dstPort: dstport,
-// 		data:    data,
-// 	}
-// }
-
 func NewDatagram(addr string, data []byte) (*datagram, error) {
 	atyp, dstaddr, dstport, err := parseAddress(addr)
 	if err != nil {
 		return nil, err
 	}
 
-	if atyp == fqdnAddress {
-		dstaddr = append([]byte{byte(len(dstaddr))}, dstaddr...)
-	}
 	return &datagram{
 		rsv:     []byte{0x00, 0x00},
 		frag:    0x00,

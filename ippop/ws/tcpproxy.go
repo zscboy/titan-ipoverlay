@@ -60,7 +60,7 @@ func (proxy *TCPProxy) proxyConn() error {
 	for {
 		n, err := conn.Read(buf)
 		if err != nil {
-			logx.Infof("proxy.proxyConn: %v", err)
+			logx.Infof("proxy %s proxyConn: %v", proxy.id, err)
 			if !proxy.isCloseByClient {
 				proxy.tunnel.onProxyTCPConnClose(proxy.id)
 			}

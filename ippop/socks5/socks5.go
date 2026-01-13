@@ -2,6 +2,7 @@ package socks5
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -124,6 +125,9 @@ func (socks5Server *Socks5Server) serveSocks5() {
 	for {
 		conn, err := socks5Server.listener.Accept()
 		if err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				return
+			}
 			logx.Errorf("localsocks5.Socks5Server serveSocks5 error:%s", err)
 			return
 		}

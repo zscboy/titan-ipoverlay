@@ -87,7 +87,6 @@ func newTunnel(conn *websocket.Conn, tunMgr *TunnelManager, opts *TunOptions) *T
 		rateLimiterLock: sync.Mutex{},
 		trafficStats:    &TrafficStats{},
 	}
-	// logx.Debugf("opts:%#v", opts)
 	t.setRateLimit(opts.DownloadRateLimti, opts.UploadRateLimit)
 
 	conn.SetPingHandler(func(data string) error {
@@ -125,7 +124,7 @@ func (t *Tunnel) setRateLimit(downloadRateLimit, uploadRateLimit int64) {
 	} else {
 		if t.writeLimiter == nil || t.writeLimiter.Limit() != rate.Limit(uploadRateLimit) {
 			t.writeLimiter = rate.NewLimiter(rate.Limit(uploadRateLimit), limitRateBurst)
-			logx.Debugf("tun %s new writerLimiter for", t.opts.Id)
+			logx.Debugf("tun %s new writeLimiter", t.opts.Id)
 		}
 	}
 }
@@ -146,7 +145,7 @@ func (t *Tunnel) writePing(msg []byte) error {
 	defer t.writeLock.Unlock()
 
 	if t.conn == nil {
-		return fmt.Errorf("writePong, t.conn == nil, id:%s", t.opts.Id)
+		return fmt.Errorf("writePing, t.conn == nil, id:%s", t.opts.Id)
 	}
 
 	// t.conn.SetWriteDeadline(time.Now().Add(30 * time.Second))
@@ -155,7 +154,7 @@ func (t *Tunnel) writePing(msg []byte) error {
 
 func (t *Tunnel) onPong(data []byte) {
 	if len(data) != 8 {
-		logx.Error("Invalid pong data")
+		logx.Errorf("Tunnel %s %s Invalid pong data", t.opts.Id, t.opts.IP)
 		return
 	}
 
@@ -181,13 +180,12 @@ func (t *Tunnel) serve() {
 
 		err = t.onMessage(message)
 		if err != nil {
-			logx.Errorf("Tunnel.serve onMessage failed: %v", err)
+			logx.Errorf("Tunnel %s %s onMessage failed: %v", t.opts.Id, t.opts.IP, err)
 		}
 	}
 
 	t.onClose()
 	t.conn = nil
-	// logx.Infof("Tunnel %s %s close", t.opts.Id, t.opts.IP)
 }
 
 func (t *Tunnel) onMessage(data []byte) error {
@@ -209,7 +207,7 @@ func (t *Tunnel) onMessage(data []byte) error {
 	case pb.MessageType_PROXY_UDP_DATA:
 		return t.onProxyUDPDataFromTunnel(msg.GetSessionId(), msg.Payload)
 	default:
-		logx.Errorf("Tunnel.onMessage, unsupport message type:%d", msg.Type)
+		logx.Errorf("Tunnel %s %s onMessage, unsupported message type:%d", t.opts.Id, t.opts.IP, msg.Type)
 
 	}
 	return nil
@@ -219,7 +217,7 @@ func (t *Tunnel) onProxySessionCreateReply(sessionID string, payload []byte) err
 	// logx.Debugf("Tunnel.onProxySessionCreateComplete")
 	v, ok := t.waitList.Load(sessionID)
 	if !ok || v == nil {
-		return fmt.Errorf("Tunnel.onProxySessionCreateComplete not found session:%s", sessionID)
+		return fmt.Errorf("Tunnel %s %s onProxySessionCreateReply not found session:%s", t.opts.Id, t.opts.IP, sessionID)
 	}
 
 	ch := v.(chan []byte)
@@ -227,16 +225,14 @@ func (t *Tunnel) onProxySessionCreateReply(sessionID string, payload []byte) err
 	select {
 	case ch <- payload:
 	default:
-		logx.Errorf("Tunnel.onProxySessionCreateComplete: channel full or no listener for session %s", sessionID)
+		logx.Errorf("Tunnel %s %s onProxySessionCreateReply: channel full or no listener for session %s", t.opts.Id, t.opts.IP, sessionID)
 	}
 	return nil
 }
-
 func (t *Tunnel) onProxySessionClose(sessionID string) error {
-	// logx.Debugf("Tunnel.onProxySessionClose session id: %s", sessionID)
 	v, ok := t.proxys.Load(sessionID)
 	if !ok {
-		logx.Debugf("Tunnel.onProxySessionClose, can not found session %s", sessionID)
+		logx.Debugf("Tunnel %s %s onProxySessionClose, can not found session %s", t.opts.Id, t.opts.IP, sessionID)
 		return nil
 	}
 
@@ -247,11 +243,9 @@ func (t *Tunnel) onProxySessionClose(sessionID string) error {
 }
 
 func (t *Tunnel) onProxySessionDataFromTunnel(sessionID string, data []byte) error {
-	// logx.Debugf("Tunnel.onProxySessionDataFromTunnel session id: %s", sessionID)
 	v, ok := t.proxys.Load(sessionID)
 	if !ok {
-		// t.onProxyTCPConnClose(sessionID)
-		logx.Debugf("Tunnel.onProxySessionDataFromTunnel, can not found session %s", sessionID)
+		logx.Debugf("Tunnel %s %s onProxySessionDataFromTunnel, can not found session %s", t.opts.Id, t.opts.IP, sessionID)
 		return nil
 	}
 
@@ -260,7 +254,7 @@ func (t *Tunnel) onProxySessionDataFromTunnel(sessionID string, data []byte) err
 }
 
 func (t *Tunnel) onProxyTCPConnClose(sessionID string) {
-	logx.Debugf("Tunnel.onProxyTCPConnClose, session id: %s", sessionID)
+	logx.Debugf("Tunnel %s %s onProxyTCPConnClose, session id: %s", t.opts.Id, t.opts.IP, sessionID)
 	msg := &pb.Message{}
 	msg.Type = pb.MessageType_PROXY_SESSION_CLOSE
 	msg.SessionId = sessionID
@@ -268,12 +262,12 @@ func (t *Tunnel) onProxyTCPConnClose(sessionID string) {
 
 	buf, err := proto.Marshal(msg)
 	if err != nil {
-		logx.Errorf("Tunnel.onProxyConnClose, EncodeMessage failed:%s", err.Error())
+		logx.Errorf("Tunnel %s %s onProxyConnClose, EncodeMessage failed:%s", t.opts.Id, t.opts.IP, err.Error())
 		return
 	}
 
 	if err = t.write(buf); err != nil {
-		logx.Errorf("Tunnel.onProxyConnClose, write message to tunnel failed:%s", err.Error())
+		logx.Errorf("Tunnel %s %s onProxyConnClose, write message to tunnel failed:%s", t.opts.Id, t.opts.IP, err.Error())
 	}
 }
 
@@ -285,12 +279,12 @@ func (t *Tunnel) onProxyDataFromProxy(sessionID string, data []byte) {
 
 	buf, err := proto.Marshal(msg)
 	if err != nil {
-		logx.Errorf("Tunnel.onProxyDataFromProxy proto message failed:%s", err.Error())
+		logx.Errorf("Tunnel %s %s onProxyDataFromProxy proto message failed:%s", t.opts.Id, t.opts.IP, err.Error())
 		return
 	}
 
 	if err = t.write(buf); err != nil {
-		logx.Errorf("Tunnel.onProxyDataFromProxy, write message to tunnel failed:%s", err.Error())
+		logx.Errorf("Tunnel %s %s onProxyDataFromProxy, write message to tunnel failed:%s", t.opts.Id, t.opts.IP, err.Error())
 	}
 
 }
@@ -398,7 +392,7 @@ func (t *Tunnel) requestCreateProxySession(ctx context.Context, in *pb.Message) 
 func (t *Tunnel) onProxyUDPDataFromTunnel(sessionID string, data []byte) error {
 	proxy, ok := t.proxys.Load(sessionID)
 	if !ok {
-		logx.Debugf("Tunnel.onProxyUDPDataFromTunnel session %s not exist", sessionID)
+		logx.Debugf("Tunnel %s %s onProxyUDPDataFromTunnel session %s not exist", t.opts.Id, t.opts.IP, sessionID)
 		return nil
 	}
 	udp := proxy.(*UDPProxy)
@@ -416,7 +410,7 @@ func (t *Tunnel) acceptSocks5UDPData(conn socks5.UDPConn, udpInfo *socks5.Socks5
 	udp := newProxyUDP(sessionID, conn, udpInfo, t, t.opts.UDPTimeout)
 	go udp.waitTimeout()
 
-	logx.Debugf("Tunnel.acceptSocks5UDPData new UDPProxy %s", sessionID)
+	logx.Debugf("Tunnel %s %s acceptSocks5UDPData new UDPProxy %s", t.opts.Id, t.opts.IP, sessionID)
 
 	t.proxys.Store(sessionID, udp)
 	return udp.writeToDest(data)
@@ -470,8 +464,7 @@ func (t *Tunnel) readMessageWithLimitRate() (int, []byte, error) {
 		return 0, nil, err
 	}
 
-	// TODO: need to sub idle time
-	t.trafficStats.ReadDuration += time.Now().Sub(t.trafficStats.ReadStartTime)
+	t.trafficStats.ReadDuration += time.Since(t.trafficStats.ReadStartTime)
 	t.trafficStats.ReadBytes += int64(len(data))
 	t.trafficStats.DataProcessStartTime = time.Now()
 
@@ -479,7 +472,7 @@ func (t *Tunnel) readMessageWithLimitRate() (int, []byte, error) {
 
 	readLimiter := t.readLimiter
 	if readLimiter != nil {
-		t.readLimiter.WaitN(context.TODO(), len(data))
+		readLimiter.WaitN(context.TODO(), len(data))
 	}
 
 	return messageType, data, nil

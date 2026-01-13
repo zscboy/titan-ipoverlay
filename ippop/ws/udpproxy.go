@@ -31,11 +31,13 @@ func (proxy *UDPProxy) writeToSrc(data []byte) error {
 
 	srcAddr, err := net.ResolveUDPAddr("udp", proxy.udpInfo.Src)
 	if err != nil {
+		logx.Errorf("UDPProxy %s writeToSrc ResolveUDPAddr failed: %v", proxy.id, err)
 		return err
 	}
 
 	datagram, err := socks5.NewDatagram(proxy.udpInfo.Dest, data)
 	if err != nil {
+		logx.Errorf("UDPProxy %s writeToSrc NewDatagram failed: %v", proxy.id, err)
 		return err
 	}
 
@@ -60,7 +62,7 @@ func (proxy *UDPProxy) writeToDest(data []byte) error {
 
 	buf, err := proto.Marshal(msg)
 	if err != nil {
-		logx.Errorf("onProxyData proto message failed:%s", err.Error())
+		logx.Errorf("UDPProxy %s onProxyData proto message failed:%s", proxy.id, err.Error())
 		return err
 	}
 

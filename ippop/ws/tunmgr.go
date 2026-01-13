@@ -148,9 +148,7 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, n
 	v, ok := tm.tunnels.Load(req.NodeId)
 	if ok {
 		oldTun := v.(*Tunnel)
-
-		logx.Errorf("TunnelManager.acceptWebsocket force close tunnel %s ip %s", req.NodeId, nodeIP)
-
+		logx.Infof("TunnelManager.acceptWebsocket force close tunnel %s ip %s", req.NodeId, nodeIP)
 		oldTun.waitClose()
 	}
 
@@ -242,7 +240,7 @@ func (tm *TunnelManager) handleNodeOffline(nodeID string) {
 			return
 		}
 
-		logx.Debugf("node %s offline, user %s trigger siwth node", node.Id, node.BindUser)
+		logx.Debugf("node %s offline, user %s trigger switch node", node.Id, node.BindUser)
 		if err := tm.switchNodeForUser(user); err != nil {
 			logx.Errorf("handleNodeOffline switchNodeForUser %s failed: %v", node.BindUser, err)
 		}
@@ -295,7 +293,6 @@ func (tm *TunnelManager) getUserFromCache(userName string) (*model.User, error) 
 
 		return user, nil
 	}
-	// logx.Debugf("getUserFromCache v:%v", v)
 	return v.(*model.User), nil
 }
 
@@ -520,7 +517,7 @@ func (tm *TunnelManager) HandleSocks5UDP(udpConn socks5.UDPConn, udpInfo *socks5
 }
 
 func (tm *TunnelManager) HandleUserAuth(userName, password string) error {
-	logx.Debugf("HandleUserAuth username %s password %s", userName, password)
+	logx.Debugf("HandleUserAuth username %s", userName)
 	user, err := tm.getUserFromCache(userName)
 	if err != nil {
 		return fmt.Errorf("get user from redis error %v", err)
@@ -638,16 +635,6 @@ func (tm *TunnelManager) startTunnelTrafficTimer() {
 
 	for {
 		<-ticker.C
-		// tm.tunnels.Range(func(key, value any) bool {
-		// 	tun := value.(*Tunnel)
-		// 	trafficStats := tun.getTrafficStats()
-		// 	if trafficStats != nil && trafficStats.ReadBytes > 0 {
-		// 		logx.Debugf("tun %s , RreadBytes:%d,RreadDuration:%fms writeBytes:%d, WriteDuration:%f, processDataDuration:%f", tun.opts.Id,
-		// 			trafficStats.ReadBytes, float64(trafficStats.ReadDuration.Milliseconds()), trafficStats.WriteBytes, float64(trafficStats.WriteDuration.Milliseconds()), float64(trafficStats.DataProcessDuration.Milliseconds()))
-		// 	}
-		// 	return true
-		// })
-
 	}
 }
 
@@ -674,15 +661,12 @@ func (tm *TunnelManager) collectExpiredSessions() map[string]*ExpiredSession {
 	expiredSessions := make(map[string]*ExpiredSession)
 
 	for username, userSessions := range tm.userSessionMap {
-		logx.Debugf("user %s session count %d", username, len(userSessions))
 		for sessionID, session := range userSessions {
 			if session.connectCount > 0 {
-				logx.Debugf("session %s connectCount %d", sessionID, session.connectCount)
 				continue
 			}
 
 			if time.Since(session.disconnectTime) <= userSessionExpireDuration {
-				// logx.Debugf("session %s is free later %fs  count %d", sessionID, (userSessionExpireDuration - time.Since(session.disconnectTime)).Seconds(), session.connectCount)
 				continue
 			}
 
@@ -705,9 +689,10 @@ func (tm *TunnelManager) collectExpiredSessions() map[string]*ExpiredSession {
 }
 
 func (tm *TunnelManager) removeSessions(expiredSessions map[string]*ExpiredSession) {
-	// logx.Debugf("remove expire session count %d", len(expiredSessions))
+	if len(expiredSessions) > 0 {
+		logx.Debugf("remove expire session count %d", len(expiredSessions))
+	}
 	for _, sess := range expiredSessions {
-		// logx.Debugf("remove session %#v", sess)
 		sessions := tm.userSessionMap[sess.username]
 		delete(sessions, sess.sessionID)
 
