@@ -109,7 +109,9 @@ func (tm *TunnelManager) addTunnel(t *Tunnel) {
 
 	t.index = len(tm.tunnelList)
 	tm.tunnelList = append(tm.tunnelList, t)
-	atomic.StoreUint64(&tm.rrIdx, tm.rrIdx%uint64(len(tm.tunnelList)))
+
+	rrIdx := atomic.LoadUint64(&tm.rrIdx)
+	atomic.StoreUint64(&tm.rrIdx, rrIdx%uint64(len(tm.tunnelList)))
 }
 
 // 删除 tunnel
@@ -222,7 +224,7 @@ func (tm *TunnelManager) handleNodeOffline(nodeID string) {
 	if len(node.BindUser) > 0 {
 		user, err := model.GetUser(tm.redis, node.BindUser)
 		if err != nil {
-			logx.Errorf("handleNodeOffline, get user %s for node %s faild:%v", node.BindUser, node.Id, err)
+			logx.Errorf("handleNodeOffline, get user %s for node %s failed: %v", node.BindUser, node.Id, err)
 			return
 		}
 

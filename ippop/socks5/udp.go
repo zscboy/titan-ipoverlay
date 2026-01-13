@@ -81,6 +81,7 @@ func (udp *UDPServer) handleUDPConn(src *net.UDPAddr, data []byte) error {
 
 	datagram, err := newDatagramFromBytes(data)
 	if err != nil {
+		logx.Errorf("UDPServer %s handleUDPConn: newDatagramFromBytes failed: %v", udp.id, err)
 		return err
 	}
 
@@ -88,6 +89,7 @@ func (udp *UDPServer) handleUDPConn(src *net.UDPAddr, data []byte) error {
 
 	udpAddr, err := net.ResolveUDPAddr("udp", dest)
 	if err != nil {
+		logx.Errorf("UDPServer %s handleUDPConn: ResolveUDPAddr %s failed: %v", udp.id, dest, err)
 		return err
 	}
 

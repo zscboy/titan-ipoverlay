@@ -137,7 +137,6 @@ func (socks5Server *Socks5Server) serveSocks5() {
 }
 
 func (socks5Server *Socks5Server) serveSocks5Conn(conn net.Conn) {
-	logx.Debug("Socks5Server.serveSocks5Conn")
 	connCreateTime := time.Now()
 
 	var handled = false
@@ -148,8 +147,6 @@ func (socks5Server *Socks5Server) serveSocks5Conn(conn net.Conn) {
 
 		if !handled {
 			conn.Close()
-
-			logx.Debug("Socks5Server.serveSocks5Conn conn close")
 		}
 	}()
 

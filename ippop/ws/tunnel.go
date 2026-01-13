@@ -95,7 +95,7 @@ func newTunnel(conn *websocket.Conn, tunMgr *TunnelManager, opts *TunOptions) *T
 		t.waitPong = 0
 
 		if err := t.writePong([]byte(data)); err != nil {
-			logx.Errorf("writePong error:%s", err.Error())
+			logx.Errorf("Tunnel %s %s writePong error:%s", t.opts.Id, t.opts.IP, err.Error())
 		}
 		return nil
 	})
@@ -129,10 +129,7 @@ func (t *Tunnel) setRateLimit(downloadRateLimit, uploadRateLimit int64) {
 	} else {
 		if t.writeLimiter == nil || t.writeLimiter.Limit() != rate.Limit(uploadRateLimit) {
 			t.writeLimiter = rate.NewLimiter(rate.Limit(uploadRateLimit), limitRateBurst)
-<<<<<<< HEAD
 			logx.Debugf("tun %s new writeLimiter", t.opts.Id)
-=======
->>>>>>> 63239d7 (Println udp associate failed)
 		}
 	}
 }
@@ -255,9 +252,9 @@ func (t *Tunnel) onProxySessionCreateReply(sessionID string, payload []byte) err
 	}
 
 	if reply.Success {
-		logx.Debugf("onProxySessionCreateReply, create session %s success", sessionID)
+		logx.Debugf("Tunnel %s %s onProxySessionCreateReply, create session %s success", t.opts.Id, t.opts.IP, sessionID)
 	} else {
-		logx.Errorf("onProxySessionCreateReply, create session %s success", sessionID)
+		logx.Errorf("Tunnel %s %s onProxySessionCreateReply, create session %s failed: %s", t.opts.Id, t.opts.IP, sessionID, reply.ErrMsg)
 	}
 	return nil
 }
@@ -512,7 +509,7 @@ func (t *Tunnel) keepalive() {
 	binary.LittleEndian.PutUint64(b, uint64(now))
 
 	if err := t.writePing(b); err != nil {
-		logx.Errorf("Tunnel.keepalive writePing failed:%v", err.Error())
+		logx.Errorf("Tunnel %s %s keepalive writePing failed:%v", t.opts.Id, t.opts.IP, err.Error())
 	}
 
 	if t.waitPong > 3 {
