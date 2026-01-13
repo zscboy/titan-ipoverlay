@@ -40,3 +40,14 @@ func StartMetricsServer(listenAddr string) {
 		}
 	}()
 }
+
+// StartPprofServer 启动 pprof HTTP 服务器
+func StartPprofServer(listenAddr string) {
+	go func() {
+		logx.Infof("pprof listening on http://%s", listenAddr)
+		// 使用默认的 http.DefaultServeMux，pprof 会自动注册到上面
+		if err := http.ListenAndServe(listenAddr, nil); err != nil {
+			logx.Errorf("pprof server error: %v", err)
+		}
+	}()
+}

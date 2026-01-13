@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"net/http"
 	_ "net/http/pprof"
 	"titan-ipoverlay/ippop/config"
 	httpproxy "titan-ipoverlay/ippop/http"
@@ -20,16 +19,6 @@ import (
 
 var configFile = flag.String("f", "etc/server.yaml", "the config file")
 
-func initPprof(listenAddr string) {
-
-	go func() {
-		logx.Infof("pprof listening on http://%s", listenAddr)
-		logx.Infof("Prometheus metrics available at http://%s/metrics", listenAddr)
-		if err := http.ListenAndServe(listenAddr, nil); err != nil {
-			logx.Error(err)
-		}
-	}()
-}
 func newWS(config config.Config, tunMgr *ws.TunnelManager) *rest.Server {
 	server := rest.MustNewServer(config.WS.RestConf)
 
@@ -96,7 +85,7 @@ func main() {
 	logx.MustSetup(c.Log)
 
 	if c.Pprof.Enable {
-		initPprof(c.Pprof.ListenAddr)
+		metrics.StartPprofServer(c.Pprof.ListenAddr)
 	}
 
 	if c.Metrics.Enable {
