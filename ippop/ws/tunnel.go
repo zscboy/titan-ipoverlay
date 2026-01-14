@@ -193,6 +193,9 @@ func (t *Tunnel) onPong(data []byte) {
 
 func (t *Tunnel) serve() {
 	for {
+		// T1 开始：WebSocket 读取开始
+		t1StartTime := time.Now()
+
 		_, message, err := t.readMessageWithLimitRate()
 		if err != nil {
 			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) {
@@ -205,7 +208,12 @@ func (t *Tunnel) serve() {
 			break
 		}
 
-		err = t.onMessage(message)
+		// T1 结束：WebSocket 读取完成（包含原始消息大小）
+		t1EndTime := time.Now()
+		rawMessageSize := int64(len(message))
+
+		// T2 开始：protobuf 解码和消息处理
+		err = t.onMessage(message, t1StartTime, t1EndTime, rawMessageSize)
 		if err != nil {
 			logx.Errorf("Tunnel %s %s onMessage failed: %v", t.opts.Id, t.opts.IP, err)
 		}
@@ -214,7 +222,7 @@ func (t *Tunnel) serve() {
 	t.close()
 }
 
-func (t *Tunnel) onMessage(data []byte) error {
+func (t *Tunnel) onMessage(data []byte, t1StartTime time.Time, t1EndTime time.Time, rawMessageSize int64) error {
 	// msg := &pb.Message{}
 	// err := proto.Unmarshal(data, msg)
 	// if err != nil {
@@ -269,7 +277,7 @@ func (t *Tunnel) onMessage(data []byte) error {
 	case pb.MessageType_PROXY_SESSION_CREATE:
 		return t.onProxySessionCreateReply(sessionID, payload)
 	case pb.MessageType_PROXY_SESSION_DATA:
-		return t.onProxySessionDataFromTunnel(sessionID, payload)
+		return t.onProxySessionDataFromTunnel(sessionID, payload, t1StartTime, t1EndTime, rawMessageSize)
 	case pb.MessageType_PROXY_SESSION_CLOSE:
 		return t.onProxySessionClose(sessionID)
 	case pb.MessageType_PROXY_SESSION_HALF_CLOSE:
@@ -351,7 +359,7 @@ func (t *Tunnel) onProxySessionHalfClose(sessionID string) error {
 	return proxy.closeWrite()
 }
 
-func (t *Tunnel) onProxySessionDataFromTunnel(sessionID string, data []byte) error {
+func (t *Tunnel) onProxySessionDataFromTunnel(sessionID string, data []byte, t1StartTime, t1EndTime time.Time, rawMessageSize int64) error {
 	v, ok := t.proxys.Load(sessionID)
 	if !ok {
 		logx.Debugf("Tunnel %s %s onProxySessionDataFromTunnel, can not found session %s", t.opts.Id, t.opts.IP, sessionID)
@@ -359,7 +367,18 @@ func (t *Tunnel) onProxySessionDataFromTunnel(sessionID string, data []byte) err
 	}
 
 	proxy := v.(*TCPProxy)
-	return proxy.write(data)
+
+	// 记录 T1 统计（Client → IPPop，WebSocket 读取）
+	// 使用原始 WebSocket 消息大小（包含 protobuf 编码）
+	if proxy.perfStats != nil {
+		t1Duration := t1EndTime.Sub(t1StartTime)
+		proxy.perfStats.AddT1Read(rawMessageSize, t1Duration)
+	}
+
+	// T2 开始时间 = T1 结束时间（WebSocket 读取完成）
+	// T2 包括：protobuf 解码、消息路由、查找 session
+	// proxy.write() 会记录 T2 和 T3
+	return proxy.write(data, t1EndTime)
 }
 
 func (t *Tunnel) onProxyTCPConnClose(sessionID string) {
