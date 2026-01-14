@@ -133,6 +133,9 @@ func (tm *TunnelManager) addTunnel(t *Tunnel) {
 
 	rrIdx := atomic.LoadUint64(&tm.rrIdx)
 	atomic.StoreUint64(&tm.rrIdx, rrIdx%uint64(len(tm.tunnelList)))
+
+	// Prometheus 指标：增加活跃隧道数
+	metrics.ActiveTunnels.Inc()
 }
 
 // 删除 tunnel
