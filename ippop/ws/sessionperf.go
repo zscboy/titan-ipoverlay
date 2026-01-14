@@ -12,9 +12,9 @@ import (
 )
 
 // SessionPerfStats 会话性能统计
-// T1: Source (Client → POP) - SOCKS5 客户端到 IPPop
-// T2: Process (内部处理) - IPPop 内部处理时间
-// T3: Target (POP → 目标) - IPPop 到目标服务器
+// T1: Client → IPPop (WebSocket 接收) - 从远程客户端接收数据
+// T2: 内部处理 - WebSocket 读取完成到 SOCKS5 写入开始之间的处理时间
+// T3: IPPop → 用户 (SOCKS5 发送) - 发送数据到本地 SOCKS5 用户
 type SessionPerfStats struct {
 	SessionID string
 	UserName  string
@@ -27,7 +27,7 @@ type SessionPerfStats struct {
 	// 收集器引用（用于存储到 Redis）
 	collector *SessionPerfCollector
 
-	// T1: Client → POP (SOCKS5 读取)
+	// T1: Client → IPPop (WebSocket 接收)
 	T1BytesReceived int64
 	T1Duration      time.Duration
 	T1Count         int64
@@ -36,7 +36,7 @@ type SessionPerfStats struct {
 	T2Duration time.Duration
 	T2Count    int64
 
-	// T3: POP → Target (写入目标)
+	// T3: IPPop → 用户 (SOCKS5 发送)
 	T3BytesSent int64
 	T3Duration  time.Duration
 	T3Count     int64
