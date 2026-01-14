@@ -411,22 +411,8 @@ func (tm *TunnelManager) randomTunnel() (*Tunnel, error) {
 		return nil, fmt.Errorf("no tunnel exist")
 	}
 
-	for i := 0; i < n; i++ {
-		idx := tm.rng.Intn(n)
-		tun := tm.tunnelList[idx]
-
-		v, ok := tm.HealthStatsMap.Load(tun.opts.Id)
-		if ok {
-			if v.(*HealthStats).checkValid() {
-				return tun, nil
-			} else {
-				logx.Errorf("node %s is invalid", tun.opts.Id)
-			}
-		}
-	}
-
-	return nil, fmt.Errorf("all tunnel invalid")
-
+	idx := tm.rng.Intn(n)
+	return tm.tunnelList[idx], nil
 }
 
 func (tm *TunnelManager) nextTunnel() (*Tunnel, error) {

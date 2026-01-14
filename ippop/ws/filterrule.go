@@ -16,8 +16,9 @@ const (
 
 func RulesToMap(rules []config.FilterRule) map[string]*config.FilterRule {
 	ruleMap := make(map[string]*config.FilterRule)
-	for _, rule := range rules {
-		ruleMap[rule.Value] = &rule
+	for i := range rules {
+		rule := &rules[i]
+		ruleMap[rule.Value] = rule
 	}
 	return ruleMap
 }
