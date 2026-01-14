@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/zeromicro/go-zero/core/logx"
@@ -16,6 +17,7 @@ type TCPProxy struct {
 	userName        string
 	isCloseByClient bool
 	perfStats       *SessionPerfStats // 性能统计
+	closeOnce       sync.Once         // 确保只关闭一次
 }
 
 func newTCPProxy(id string, conn net.Conn, t *Tunnel, userName string) *TCPProxy {
@@ -29,17 +31,20 @@ func newTCPProxy(id string, conn net.Conn, t *Tunnel, userName string) *TCPProxy
 }
 
 func (proxy *TCPProxy) close() {
-	if proxy.conn == nil {
-		logx.Errorf("session %s conn == nil", proxy.id)
-		return
-	}
+	proxy.closeOnce.Do(func() {
+		if proxy.conn == nil {
+			logx.Errorf("session %s conn == nil", proxy.id)
+			return
+		}
 
-	// 输出性能统计
-	if proxy.perfStats != nil {
-		proxy.perfStats.Close()
-	}
+		// 触发统计汇总并上报 (写入 Redis 和 Prometheus)
+		if proxy.perfStats != nil {
+			proxy.perfStats.Close()
+		}
 
-	proxy.conn.Close()
+		proxy.conn.Close()
+		logx.Debugf("session %s: resources released and stats reported", proxy.id)
+	})
 }
 
 func (proxy *TCPProxy) closeByClient() {
@@ -101,8 +106,10 @@ func (proxy *TCPProxy) proxyConn() error {
 	conn := proxy.conn
 
 	buf := make([]byte, 32*1024)
+	defer proxy.close() // 确保函数退出时执行 close() 上报数据
+
 	for {
-		// 从 SOCKS5 用户读取数据（这是反向流量，不是 T1）
+		// 从 SOCKS5 用户读取数据
 		n, err := conn.Read(buf)
 
 		if err != nil {
