@@ -92,35 +92,35 @@ var (
 	}, []string{"direction"}) // direction: client_to_server/server_to_client
 
 	// T1/T2/T3 性能指标
-	// T1: Client → POP (SOCKS5 读取)
+	// T1: Client → IPPop (WebSocket 接收) - 从远程客户端接收数据
 	T1Throughput = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "ippop_t1_throughput_mbps",
-		Help:    "T1 吞吐量 (Client→POP) MB/s",
+		Help:    "T1 吞吐量 (Client→IPPop via WebSocket) MB/s",
 		Buckets: []float64{0.1, 0.5, 1, 5, 10, 20, 50, 100, 200, 500},
 	}, []string{"user"})
 
 	T1Bytes = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "ippop_t1_bytes_total",
-		Help: "T1 总字节数 (Client→POP)",
+		Help: "T1 总字节数 (Client→IPPop via WebSocket)",
 	}, []string{"user"})
 
-	// T2: 内部处理
+	// T2: 内部处理 - WebSocket 读取完成到 SOCKS5 写入开始
 	T2ProcessingTime = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "ippop_t2_processing_microseconds",
 		Help:    "T2 内部处理时间 (微秒)",
 		Buckets: []float64{10, 50, 100, 500, 1000, 5000, 10000, 50000},
 	}, []string{"user"})
 
-	// T3: POP → Target
+	// T3: IPPop → 用户 (SOCKS5 发送)
 	T3Throughput = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "ippop_t3_throughput_mbps",
-		Help:    "T3 吞吐量 (POP→Target) MB/s",
+		Help:    "T3 吞吐量 (IPPop→User via SOCKS5) MB/s",
 		Buckets: []float64{0.1, 0.5, 1, 5, 10, 20, 50, 100, 200, 500},
 	}, []string{"user"})
 
 	T3Bytes = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "ippop_t3_bytes_total",
-		Help: "T3 总字节数 (POP→Target)",
+		Help: "T3 总字节数 (IPPop→User via SOCKS5)",
 	}, []string{"user"})
 
 	// 瓶颈检测

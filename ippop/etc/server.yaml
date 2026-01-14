@@ -44,6 +44,9 @@ Socks5:
   ### udp proxy timeout if no data transfer
   ### client udp proxy timeout is 60s
   UDPTimeout: 120
+Metrics:
+  Enable: true
+  ListenAddr: 0.0.0.0:8888
 PerfMonitoring:
   # 日志采样率（0.01 = 1%，0.1 = 10%，1.0 = 100%）
   LogSampleRate: 0.01
