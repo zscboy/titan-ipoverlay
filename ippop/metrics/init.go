@@ -3,34 +3,13 @@ package metrics
 import (
 	"net/http"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
-// Init 注册所有指标到默认的 Prometheus Registry
-func Init() {
-	prometheus.MustRegister(ActiveTunnels)
-	prometheus.MustRegister(TunnelDelay)
-	prometheus.MustRegister(ActiveSessions)
-	prometheus.MustRegister(TotalSessions)
-	prometheus.MustRegister(SessionDuration)
-	prometheus.MustRegister(SOCKS5Connections)
-	prometheus.MustRegister(SOCKS5Errors)
-	prometheus.MustRegister(BytesReceived)
-	prometheus.MustRegister(BytesSent)
-	prometheus.MustRegister(ActiveUsers)
-	prometheus.MustRegister(UserAuthFailures)
-	prometheus.MustRegister(UserTraffic)
-	prometheus.MustRegister(RequestDuration)
-	prometheus.MustRegister(WebSocketMessages)
-	prometheus.MustRegister(HalfCloseEvents)
-
-}
-
 // StartMetricsServer 启动 Prometheus HTTP 服务器
+// 注意：不需要手动注册指标，promauto.NewXXX() 已经自动注册了
 func StartMetricsServer(listenAddr string) {
-	Init()
 	go func() {
 		mux := http.NewServeMux()
 		mux.Handle("/metrics", promhttp.Handler())

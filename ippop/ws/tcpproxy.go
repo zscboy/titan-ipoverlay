@@ -69,28 +69,36 @@ func (proxy *TCPProxy) closeWrite() error {
 	return nil
 }
 
-func (proxy *TCPProxy) write(data []byte) error {
+func (proxy *TCPProxy) write(data []byte, t2StartTime time.Time) error {
 	if proxy.conn == nil {
 		return fmt.Errorf("session %s conn == nil", proxy.id)
 	}
 
-	startTime := time.Now()
-	proxy.activeTime = startTime
+	// T3 开始时间（准备写入 SOCKS5 用户）
+	t3StartTime := time.Now()
+	proxy.activeTime = t3StartTime
 
+	// T2: 内部处理时间（从 WebSocket 读取完成到 SOCKS5 写入开始）
+	t2Duration := t3StartTime.Sub(t2StartTime)
+	if proxy.perfStats != nil {
+		proxy.perfStats.AddT2Process(t2Duration)
+	}
+
+	// T3: IPPop → 用户（SOCKS5 写入）
 	_, err := proxy.conn.Write(data)
 	if err != nil {
 		return err
 	}
 
-	writeDuration := time.Since(startTime)
+	t3Duration := time.Since(t3StartTime)
 
-	// T3: POP → Target 写入统计
+	// 记录 T3 统计（IPPop → 用户）
 	if proxy.perfStats != nil {
-		proxy.perfStats.AddT3Write(int64(len(data)), writeDuration)
+		proxy.perfStats.AddT3Write(int64(len(data)), t3Duration)
 	}
 
-	// Tunnel 级别的统计（保留原有逻辑）
-	proxy.tunnel.addTrafficStats(len(data), writeDuration)
+	// Tunnel 级别的统计
+	proxy.tunnel.addTrafficStats(len(data), t3Duration)
 
 	return nil
 }
@@ -125,10 +133,8 @@ func (proxy *TCPProxy) proxyConn() error {
 
 	buf := make([]byte, 32*1024)
 	for {
-		// T1: Client → POP 读取
-		t1Start := time.Now()
+		// 从 SOCKS5 用户读取数据（这是反向流量，不是 T1）
 		n, err := conn.Read(buf)
-		t1Duration := time.Since(t1Start)
 
 		if err != nil {
 			if err == io.EOF && proxy.tunnel.isNodeVersionGreatThanV011() {
@@ -147,20 +153,7 @@ func (proxy *TCPProxy) proxyConn() error {
 			return nil
 		}
 
-		// 记录 T1 统计
-		if proxy.perfStats != nil {
-			proxy.perfStats.AddT1Read(int64(n), t1Duration)
-		}
-
-		// T2: 内部处理（转发数据）
-		t2Start := time.Now()
-		// proxy.tunnel.tunMgr.traffic(proxy.userName, int64(n))
+		// 转发数据到 WebSocket（发送给 Client）
 		proxy.tunnel.onProxyDataFromProxy(proxy.id, buf[:n])
-		t2Duration := time.Since(t2Start)
-
-		// 记录 T2 统计
-		if proxy.perfStats != nil {
-			proxy.perfStats.AddT2Process(t2Duration)
-		}
 	}
 }
