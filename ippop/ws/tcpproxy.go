@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/zeromicro/go-zero/core/logx"
@@ -15,19 +16,22 @@ type TCPProxy struct {
 	tunnel          *Tunnel
 	userName        string
 	isCloseByClient bool
+	activeTime      time.Time
+	done            chan struct{}
+	closeOnce       sync.Once
 }
 
 func newTCPProxy(id string, conn net.Conn, t *Tunnel, userName string) *TCPProxy {
-	return &TCPProxy{id: id, conn: conn, tunnel: t, userName: userName}
+	return &TCPProxy{id: id, conn: conn, tunnel: t, userName: userName, activeTime: time.Now(), done: make(chan struct{})}
 }
 
 func (proxy *TCPProxy) close() {
-	if proxy.conn == nil {
-		logx.Errorf("session %s conn == nil", proxy.id)
-		return
-	}
-
-	proxy.conn.Close()
+	proxy.closeOnce.Do(func() {
+		if proxy.conn != nil {
+			proxy.conn.Close()
+		}
+		close(proxy.done)
+	})
 }
 
 func (proxy *TCPProxy) closeByClient() {
@@ -64,9 +68,35 @@ func (proxy *TCPProxy) write(data []byte) error {
 		return err
 	}
 
+	proxy.activeTime = time.Now()
 	proxy.tunnel.addTrafficStats(len(data), time.Now().Sub(startTime))
 
 	return nil
+}
+
+func (proxy *TCPProxy) waitHalfCloseTimeout() {
+	timeout := time.Duration(proxy.tunnel.opts.TCPTimeout) * time.Second
+	if timeout <= 0 {
+		timeout = 3 * time.Minute
+	}
+
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-proxy.done:
+			logx.Debugf("proxy waitHalfCloseTimeout exit")
+			return
+		case <-ticker.C:
+			if time.Since(proxy.activeTime) > timeout {
+				logx.Errorf("session %s half-close idle timeout %f, will delete it", proxy.id, time.Since(proxy.activeTime).Seconds())
+				proxy.tunnel.onProxyTCPConnClose(proxy.id)
+				proxy.close()
+				return
+			}
+		}
+	}
 }
 
 func (proxy *TCPProxy) proxyConn() error {
@@ -80,6 +110,7 @@ func (proxy *TCPProxy) proxyConn() error {
 				logx.Infof("session %s: SOCKS5 client closed write direction (EOF)", proxy.id)
 
 				proxy.tunnel.onProxyTCPConnHalfClose(proxy.id)
+				go proxy.waitHalfCloseTimeout()
 				return nil
 			}
 
@@ -87,7 +118,7 @@ func (proxy *TCPProxy) proxyConn() error {
 			if !proxy.isCloseByClient {
 				proxy.tunnel.onProxyTCPConnClose(proxy.id)
 			}
-			conn.Close()
+			proxy.close()
 			return nil
 		}
 

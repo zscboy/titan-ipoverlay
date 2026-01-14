@@ -259,17 +259,15 @@ func (t *Tunnel) onProxySessionCreateReply(sessionID string, payload []byte) err
 	return nil
 }
 func (t *Tunnel) onProxySessionClose(sessionID string) error {
-	v, ok := t.proxys.Load(sessionID)
-	if !ok {
+	logx.Debugf("Tunnel %s %s onProxySessionClose, session id: %s", t.opts.Id, t.opts.IP, sessionID)
+	v, load := t.proxys.LoadAndDelete(sessionID)
+	if !load {
 		logx.Debugf("Tunnel %s %s onProxySessionClose, can not found session %s", t.opts.Id, t.opts.IP, sessionID)
 		return nil
 	}
 
 	session := v.(*TCPProxy)
 	session.closeByClient()
-
-	t.proxys.Delete(sessionID)
-
 	return nil
 }
 
@@ -298,6 +296,10 @@ func (t *Tunnel) onProxySessionDataFromTunnel(sessionID string, data []byte) err
 
 func (t *Tunnel) onProxyTCPConnClose(sessionID string) {
 	logx.Debugf("Tunnel %s %s onProxyTCPConnClose, session id: %s", t.opts.Id, t.opts.IP, sessionID)
+	if _, loaded := t.proxys.LoadAndDelete(sessionID); !loaded {
+		return // already closed
+	}
+
 	msg := &pb.Message{}
 	msg.Type = pb.MessageType_PROXY_SESSION_CLOSE
 	msg.SessionId = sessionID
@@ -312,8 +314,6 @@ func (t *Tunnel) onProxyTCPConnClose(sessionID string) {
 	if err = t.write(buf); err != nil {
 		logx.Errorf("Tunnel %s %s onProxyConnClose, write message to tunnel failed:%s", t.opts.Id, t.opts.IP, err.Error())
 	}
-
-	t.proxys.Delete(sessionID)
 }
 
 // onProxyTCPConnHalfClose 处理 SOCKS5半关闭
@@ -368,6 +368,7 @@ func (t *Tunnel) acceptSocks5TCPConn(conn net.Conn, targetInfo *socks5.SocksTarg
 	addr := fmt.Sprintf("%s:%d", targetInfo.DomainName, targetInfo.Port)
 	err := t.createClientWithDest(&pb.DestAddr{Addr: addr}, sessionID)
 	if err != nil {
+		t.proxys.Delete(sessionID)
 		return fmt.Errorf("Tunnel.acceptSocks5TCPConn client create by Domain failed, cost:%dms, addr:%s, err:%v, tun ip:%s", time.Since(now).Milliseconds(), addr, err, t.opts.IP)
 	}
 
