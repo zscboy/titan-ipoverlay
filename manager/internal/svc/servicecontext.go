@@ -5,6 +5,7 @@ import (
 	"titan-ipoverlay/ippop/rpc/serverapi"
 	"titan-ipoverlay/manager/internal/config"
 
+	"github.com/golang/groupcache/singleflight"
 	"github.com/zeromicro/go-zero/core/stores/redis"
 	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/zrpc"
@@ -27,14 +28,16 @@ type ServiceContext struct {
 	Redis         *redis.Redis
 	JwtMiddleware rest.Middleware
 	Pops          map[string]*Pop
+	IPGroup       *singleflight.Group
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
 	redis := redis.MustNewRedis(c.Redis)
 	return &ServiceContext{
-		Config: c,
-		Redis:  redis,
-		Pops:   newPops(c),
+		Config:  c,
+		Redis:   redis,
+		Pops:    newPops(c),
+		IPGroup: &singleflight.Group{},
 	}
 }
 

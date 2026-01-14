@@ -163,11 +163,37 @@ func (l *GetNodePopLogic) getLocalInfo(ip string) (*Location, error) {
 		return &Location{IP: loc.IP, City: loc.City, Province: loc.Province, Country: loc.Country}, nil
 	}
 
+	v, err := l.svcCtx.IPGroup.Do(ip, func() (interface{}, error) {
+
+		location, err := l.httpGetLocationInfo(ip)
+		if err != nil {
+			return nil, err
+		}
+
+		redisIPLocation := model.IPLocation{IP: location.IP, City: location.City, Province: location.Province, Country: location.Country}
+		if err := model.SaveIPLocation(l.svcCtx.Redis, &redisIPLocation); err != nil {
+			logx.Errorf("SaveIPLocation:%v", err)
+		}
+
+		return location, nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return v.(*Location), nil
+}
+
+func (l *GetNodePopLogic) httpGetLocationInfo(ip string) (*Location, error) {
+	logx.Infof("get %s local info from %s", ip, l.svcCtx.Config.Geo.API)
+
+	url := fmt.Sprintf("%s?key=%s&ip=%s&language=en", l.svcCtx.Config.Geo.API, l.svcCtx.Config.Geo.Key, ip)
+
 	client := &http.Client{
 		Timeout: 3 * time.Second,
 	}
 
-	url := fmt.Sprintf("%s?key=%s&ip=%s&language=en", l.svcCtx.Config.Geo.API, l.svcCtx.Config.Geo.Key, ip)
 	resp, err := client.Get(url)
 	if err != nil {
 		return nil, err
@@ -195,11 +221,6 @@ func (l *GetNodePopLogic) getLocalInfo(ip string) (*Location, error) {
 	}
 
 	location := locationResp.Data.Location
-	redisIPLocation := model.IPLocation{IP: location.IP, City: location.City, Province: location.Province, Country: location.Country}
-
-	if err := model.SaveIPLocation(l.svcCtx.Redis, &redisIPLocation); err != nil {
-		logx.Errorf("SaveIPLocation:%v", err)
-	}
 
 	return location, nil
 }
