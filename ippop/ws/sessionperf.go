@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"titan-ipoverlay/ippop/config"
-	"titan-ipoverlay/ippop/metrics"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -102,11 +101,6 @@ func (s *SessionPerfStats) Close() {
 	// 检测瓶颈
 	bottleneck := s.DetectBottleneck(t1Speed, t3Speed, t2AvgUs)
 
-	// 上报 Prometheus 指标
-	if s.T1BytesReceived > 0 || s.T3BytesSent > 0 {
-		s.reportToPrometheus(t1Speed, t3Speed, t2AvgUs, bottleneck)
-	}
-
 	// 日志输出策略（优化性能）
 	shouldLog := false
 
@@ -152,8 +146,8 @@ func (s *SessionPerfStats) Close() {
 		)
 	}
 
-	// 提交到收集器存储到 Redis
-	if s.collector != nil && (s.T1BytesReceived > 0 || s.T3BytesSent > 0) {
+	// 提交到收集器异步处理（必做：用于平衡活跃会话数等指标）
+	if s.collector != nil {
 		s.collector.Collect(SessionPerfRecord{
 			SessionID:    s.SessionID,
 			UserName:     s.UserName,
@@ -172,29 +166,6 @@ func (s *SessionPerfStats) Close() {
 			Timestamp:    time.Now().Unix(),
 		})
 	}
-}
-
-// reportToPrometheus 上报指标到 Prometheus
-func (s *SessionPerfStats) reportToPrometheus(t1Speed, t3Speed float64, t2AvgUs int64, bottleneck string) {
-	// T1 指标
-	if t1Speed > 0 {
-		metrics.T1Throughput.WithLabelValues(s.UserName).Observe(t1Speed)
-		metrics.T1Bytes.WithLabelValues(s.UserName).Add(float64(s.T1BytesReceived))
-	}
-
-	// T2 指标
-	if t2AvgUs > 0 {
-		metrics.T2ProcessingTime.WithLabelValues(s.UserName).Observe(float64(t2AvgUs))
-	}
-
-	// T3 指标
-	if t3Speed > 0 {
-		metrics.T3Throughput.WithLabelValues(s.UserName).Observe(t3Speed)
-		metrics.T3Bytes.WithLabelValues(s.UserName).Add(float64(s.T3BytesSent))
-	}
-
-	// 瓶颈检测
-	metrics.BottleneckDetection.WithLabelValues(bottleneck, s.UserName).Inc()
 }
 
 // DetectBottleneck 检测性能瓶颈
