@@ -24,20 +24,21 @@ const (
 
 // SessionPerfRecord 会话性能记录（存储到 Redis 的结构）
 type SessionPerfRecord struct {
-	SessionID   string  `json:"sid"`
-	UserName    string  `json:"user"`
-	DurationSec float64 `json:"dur"`
-	T1BytesMB   float64 `json:"t1_mb"`
-	T1SpeedMBps float64 `json:"t1_spd"`
-	T1Count     int64   `json:"t1_cnt"`
-	T2AvgUs     int64   `json:"t2_us"`
-	T2TotalMs   int64   `json:"t2_ms"`
-	T2Count     int64   `json:"t2_cnt"`
-	T3BytesMB   float64 `json:"t3_mb"`
-	T3SpeedMBps float64 `json:"t3_spd"`
-	T3Count     int64   `json:"t3_cnt"`
-	Bottleneck  string  `json:"btn"`
-	Timestamp   int64   `json:"ts"`
+	SessionID    string  `json:"sid"`
+	UserName     string  `json:"user"`
+	TargetDomain string  `json:"domain"`
+	DurationSec  float64 `json:"dur"`
+	T1BytesMB    float64 `json:"t1_mb"`
+	T1SpeedMBps  float64 `json:"t1_spd"`
+	T1Count      int64   `json:"t1_cnt"`
+	T2AvgUs      int64   `json:"t2_us"`
+	T2TotalMs    int64   `json:"t2_ms"`
+	T2Count      int64   `json:"t2_cnt"`
+	T3BytesMB    float64 `json:"t3_mb"`
+	T3SpeedMBps  float64 `json:"t3_spd"`
+	T3Count      int64   `json:"t3_cnt"`
+	Bottleneck   string  `json:"btn"`
+	Timestamp    int64   `json:"ts"`
 }
 
 // SessionPerfCollector 会话性能数据批量收集器
