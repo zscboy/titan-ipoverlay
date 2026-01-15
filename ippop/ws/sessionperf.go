@@ -16,10 +16,11 @@ import (
 // T2: 内部处理 - WebSocket 读取完成到 SOCKS5 写入开始之间的处理时间
 // T3: IPPop → 用户 (SOCKS5 发送) - 发送数据到本地 SOCKS5 用户
 type SessionPerfStats struct {
-	SessionID string
-	UserName  string
-	StartTime time.Time
-	EndTime   time.Time
+	SessionID    string
+	UserName     string
+	TargetDomain string // 目标域名
+	StartTime    time.Time
+	EndTime      time.Time
 
 	// 配置
 	perfConfig *config.PerfMonitoring
@@ -43,13 +44,14 @@ type SessionPerfStats struct {
 }
 
 // NewSessionPerfStats 创建新的会话性能统计
-func NewSessionPerfStats(sessionID, userName string, perfConfig *config.PerfMonitoring, collector *SessionPerfCollector) *SessionPerfStats {
+func NewSessionPerfStats(sessionID, userName, targetDomain string, perfConfig *config.PerfMonitoring, collector *SessionPerfCollector) *SessionPerfStats {
 	return &SessionPerfStats{
-		SessionID:  sessionID,
-		UserName:   userName,
-		StartTime:  time.Now(),
-		perfConfig: perfConfig,
-		collector:  collector,
+		SessionID:    sessionID,
+		UserName:     userName,
+		TargetDomain: targetDomain,
+		StartTime:    time.Now(),
+		perfConfig:   perfConfig,
+		collector:    collector,
 	}
 }
 
@@ -153,20 +155,21 @@ func (s *SessionPerfStats) Close() {
 	// 提交到收集器存储到 Redis
 	if s.collector != nil && (s.T1BytesReceived > 0 || s.T3BytesSent > 0) {
 		s.collector.Collect(SessionPerfRecord{
-			SessionID:   s.SessionID,
-			UserName:    s.UserName,
-			DurationSec: totalDuration.Seconds(),
-			T1BytesMB:   float64(s.T1BytesReceived) / 1024 / 1024,
-			T1SpeedMBps: t1Speed,
-			T1Count:     s.T1Count,
-			T2AvgUs:     t2AvgUs,
-			T2TotalMs:   s.T2Duration.Milliseconds(),
-			T2Count:     s.T2Count,
-			T3BytesMB:   float64(s.T3BytesSent) / 1024 / 1024,
-			T3SpeedMBps: t3Speed,
-			T3Count:     s.T3Count,
-			Bottleneck:  bottleneck,
-			Timestamp:   time.Now().Unix(),
+			SessionID:    s.SessionID,
+			UserName:     s.UserName,
+			TargetDomain: s.TargetDomain,
+			DurationSec:  totalDuration.Seconds(),
+			T1BytesMB:    float64(s.T1BytesReceived) / 1024 / 1024,
+			T1SpeedMBps:  t1Speed,
+			T1Count:      s.T1Count,
+			T2AvgUs:      t2AvgUs,
+			T2TotalMs:    s.T2Duration.Milliseconds(),
+			T2Count:      s.T2Count,
+			T3BytesMB:    float64(s.T3BytesSent) / 1024 / 1024,
+			T3SpeedMBps:  t3Speed,
+			T3Count:      s.T3Count,
+			Bottleneck:   bottleneck,
+			Timestamp:    time.Now().Unix(),
 		})
 	}
 }

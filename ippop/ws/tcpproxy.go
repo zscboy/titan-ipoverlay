@@ -15,6 +15,7 @@ type TCPProxy struct {
 	conn            net.Conn
 	tunnel          *Tunnel
 	userName        string
+	targetDomain    string // 目标域名
 	isCloseByClient bool
 	activeTime      time.Time
 	done            chan struct{}
@@ -22,15 +23,16 @@ type TCPProxy struct {
 	perfStats       *SessionPerfStats // 性能统计
 }
 
-func newTCPProxy(id string, conn net.Conn, t *Tunnel, userName string) *TCPProxy {
+func newTCPProxy(id string, conn net.Conn, t *Tunnel, userName, targetDomain string) *TCPProxy {
 	return &TCPProxy{
-		id:         id,
-		conn:       conn,
-		tunnel:     t,
-		userName:   userName,
-		perfStats:  NewSessionPerfStats(id, userName, &t.tunMgr.config.PerfMonitoring),
-		activeTime: time.Now(),
-		done:       make(chan struct{}),
+		id:           id,
+		conn:         conn,
+		tunnel:       t,
+		userName:     userName,
+		targetDomain: targetDomain,
+		perfStats:    NewSessionPerfStats(id, userName, &t.tunMgr.config.PerfMonitoring),
+		activeTime:   time.Now(),
+		done:         make(chan struct{}),
 	}
 }
 
