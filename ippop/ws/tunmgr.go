@@ -93,7 +93,7 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 		rng:             rand.New(rand.NewSource(time.Now().UnixNano())),
 
 		tunnelList:    make([]*Tunnel, 0, 100000),
-		perfCollector: NewSessionPerfCollector(redis),
+		perfCollector: NewSessionPerfCollector(config.ClickHouse),
 	}
 
 	routeScheduler := newUserRouteScheduler(tm)
