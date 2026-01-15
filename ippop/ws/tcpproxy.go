@@ -30,7 +30,7 @@ func newTCPProxy(id string, conn net.Conn, t *Tunnel, userName, targetDomain str
 		tunnel:       t,
 		userName:     userName,
 		targetDomain: targetDomain,
-		perfStats:    NewSessionPerfStats(id, userName, &t.tunMgr.config.PerfMonitoring),
+		perfStats:    NewSessionPerfStats(id, userName, targetDomain, &t.tunMgr.config.PerfMonitoring, t.tunMgr.perfCollector),
 		activeTime:   time.Now(),
 		done:         make(chan struct{}),
 	}

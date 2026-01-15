@@ -83,7 +83,7 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 
 		tunnelList:    make([]*Tunnel, 0, 100000),
 		ipPool:        NewIPPool(),
-		perfCollector: NewSessionPerfCollector(redis),
+		perfCollector: NewSessionPerfCollector(config.ClickHouse),
 	}
 
 	tm.sessionManager = NewSessionManager(tm, userSessionExpireDuration)
