@@ -2,29 +2,49 @@ package ws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
 
+	"titan-ipoverlay/ippop/config"
 	"titan-ipoverlay/ippop/metrics"
 
-	goredis "github.com/redis/go-redis/v9"
+	"github.com/ClickHouse/clickhouse-go/v2"
+	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	"github.com/zeromicro/go-zero/core/logx"
-	"github.com/zeromicro/go-zero/core/stores/redis"
 )
 
 const (
 	// 批量刷新配置
-	maxBufferSize        = 100              // 缓冲区满时触发写入
-	flushInterval        = 10 * time.Second // 定时刷新间隔
-	sessionPerfRetention = 72 * time.Hour   // 数据保留时间 (3天)
-
-	// Redis key 格式
-	redisKeySessionPerf = "session:perf:%s" // session:perf:{YYYYMMDD}
+	maxBufferSize = 100              // 缓冲区满时触发写入
+	flushInterval = 10 * time.Second // 定时刷新间隔
 )
 
-// SessionPerfRecord 会话性能记录（存储到 Redis 的结构）
+// ClickHouse 建表 SQL (按小时分区，3天TTL)
+const createTableSQL = `
+CREATE TABLE IF NOT EXISTS session_perf (
+    session_id    String,
+    user_name     String,
+    target_domain String,
+    duration_sec  Float64,
+    t1_bytes_mb   Float64,
+    t1_speed_mbps Float64,
+    t1_count      Int64,
+    t2_avg_us     Int64,
+    t2_total_ms   Int64,
+    t2_count      Int64,
+    t3_bytes_mb   Float64,
+    t3_speed_mbps Float64,
+    t3_count      Int64,
+    bottleneck    String,
+    created_at    DateTime DEFAULT now()
+) ENGINE = MergeTree()
+PARTITION BY toYYYYMMDDhh(created_at)
+ORDER BY (user_name, created_at)
+TTL created_at + INTERVAL 3 DAY
+`
+
+// SessionPerfRecord 会话性能记录
 type SessionPerfRecord struct {
 	SessionID    string  `json:"sid"`
 	UserName     string  `json:"user"`
@@ -52,24 +72,58 @@ type collectorEvent struct {
 
 // SessionPerfCollector 会话性能数据批量收集器
 type SessionPerfCollector struct {
-	redis       *redis.Redis
+	clickhouse  driver.Conn
+	chEnabled   bool
 	buffer      []SessionPerfRecord
 	bufferLock  sync.Mutex
-	metricsChan chan collectorEvent // 改为接收通用事件
+	metricsChan chan collectorEvent
 	ctx         context.Context
 	cancel      context.CancelFunc
 }
 
 // NewSessionPerfCollector 创建新的收集器
-func NewSessionPerfCollector(rdb *redis.Redis) *SessionPerfCollector {
+func NewSessionPerfCollector(chConfig config.ClickHouse) *SessionPerfCollector {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &SessionPerfCollector{
-		redis:       rdb,
+
+	c := &SessionPerfCollector{
+		chEnabled:   chConfig.Enable,
 		buffer:      make([]SessionPerfRecord, 0, maxBufferSize),
-		metricsChan: make(chan collectorEvent, 2000), // 增加缓冲区
+		metricsChan: make(chan collectorEvent, 2000),
 		ctx:         ctx,
 		cancel:      cancel,
 	}
+
+	// 初始化 ClickHouse 连接
+	if chConfig.Enable {
+		conn, err := clickhouse.Open(&clickhouse.Options{
+			Addr: []string{chConfig.Addr},
+			Auth: clickhouse.Auth{
+				Database: chConfig.Database,
+				Username: chConfig.Username,
+				Password: chConfig.Password,
+			},
+			Settings: clickhouse.Settings{
+				"max_execution_time": 60,
+			},
+			DialTimeout:     10 * time.Second,
+			MaxOpenConns:    5,
+			MaxIdleConns:    2,
+			ConnMaxLifetime: time.Hour,
+		})
+		if err != nil {
+			logx.Errorf("SessionPerfCollector: ClickHouse connect error: %v", err)
+		} else {
+			c.clickhouse = conn
+			// 自动建表
+			if err := conn.Exec(ctx, createTableSQL); err != nil {
+				logx.Errorf("SessionPerfCollector: Create table error: %v", err)
+			} else {
+				logx.Info("SessionPerfCollector: ClickHouse connected and table ready")
+			}
+		}
+	}
+
+	return c
 }
 
 // Start 启动后台刷新协程
@@ -91,6 +145,9 @@ func (c *SessionPerfCollector) Start() {
 			c.Flush()
 		case <-c.ctx.Done():
 			c.Flush() // 退出前最后刷新一次
+			if c.clickhouse != nil {
+				c.clickhouse.Close()
+			}
 			logx.Info("SessionPerfCollector stopped")
 			return
 		}
@@ -147,14 +204,18 @@ func (c *SessionPerfCollector) ReportSessionStart(userName string) {
 
 // Collect 添加数据到缓冲区
 func (c *SessionPerfCollector) Collect(record SessionPerfRecord) {
-	// 1. 异步发送到处理通道
+	// 1. 异步发送到处理通道（用于 Prometheus 指标）
 	select {
 	case c.metricsChan <- collectorEvent{isStart: false, record: record}:
 	default:
 		logx.WithContext(c.ctx).Error("SessionPerfCollector: metrics channel full, dropping end record")
 	}
 
-	// 2. 批量写入 Redis 逻辑
+	// 2. 批量写入 ClickHouse
+	if !c.chEnabled {
+		return
+	}
+
 	c.bufferLock.Lock()
 	c.buffer = append(c.buffer, record)
 	needFlush := len(c.buffer) >= maxBufferSize
@@ -165,8 +226,12 @@ func (c *SessionPerfCollector) Collect(record SessionPerfRecord) {
 	}
 }
 
-// Flush 批量写入 Redis
+// Flush 批量写入 ClickHouse
 func (c *SessionPerfCollector) Flush() {
+	if !c.chEnabled || c.clickhouse == nil {
+		return
+	}
+
 	c.bufferLock.Lock()
 	if len(c.buffer) == 0 {
 		c.bufferLock.Unlock()
@@ -177,49 +242,42 @@ func (c *SessionPerfCollector) Flush() {
 	c.buffer = make([]SessionPerfRecord, 0, maxBufferSize)
 	c.bufferLock.Unlock()
 
-	// 使用 Pipeline 批量写入
-	pipe, err := c.redis.TxPipeline()
+	// 批量 INSERT
+	ctx := context.Background()
+	batch, err := c.clickhouse.PrepareBatch(ctx, "INSERT INTO session_perf")
 	if err != nil {
-		logx.Errorf("SessionPerfCollector Flush: TxPipeline error: %v", err)
+		logx.Errorf("SessionPerfCollector Flush: PrepareBatch error: %v", err)
 		return
 	}
 
-	// 按天分区的 key
-	key := fmt.Sprintf(redisKeySessionPerf, time.Now().Format("20060102"))
-	ctx := context.Background()
-
 	for _, r := range toFlush {
-		jsonData, err := json.Marshal(r)
+		createdAt := time.Unix(r.Timestamp, 0)
+		err := batch.Append(
+			r.SessionID,
+			r.UserName,
+			r.TargetDomain,
+			r.DurationSec,
+			r.T1BytesMB,
+			r.T1SpeedMBps,
+			r.T1Count,
+			r.T2AvgUs,
+			r.T2TotalMs,
+			r.T2Count,
+			r.T3BytesMB,
+			r.T3SpeedMBps,
+			r.T3Count,
+			r.Bottleneck,
+			createdAt,
+		)
 		if err != nil {
-			logx.Errorf("SessionPerfCollector Flush: Marshal error: %v", err)
-			continue
+			logx.Errorf("SessionPerfCollector Flush: Append error: %v", err)
 		}
-
-		// 使用 session_id + timestamp 作为唯一标识，避免重复
-		member := fmt.Sprintf("%s:%d", r.SessionID, r.Timestamp)
-
-		pipe.ZAdd(ctx, key, goredis.Z{
-			Score:  float64(r.Timestamp),
-			Member: string(jsonData),
-		})
-
-		// 同时存储索引，方便按用户查询
-		userKey := fmt.Sprintf("session:perf:user:%s:%s", r.UserName, time.Now().Format("20060102"))
-		pipe.ZAdd(ctx, userKey, goredis.Z{
-			Score:  float64(r.Timestamp),
-			Member: member,
-		})
-		pipe.Expire(ctx, userKey, sessionPerfRetention)
 	}
 
-	// 设置主 key 过期时间
-	pipe.Expire(ctx, key, sessionPerfRetention)
-
-	_, err = pipe.Exec(ctx)
-	if err != nil {
-		logx.Errorf("SessionPerfCollector Flush: Exec error: %v", err)
+	if err := batch.Send(); err != nil {
+		logx.Errorf("SessionPerfCollector Flush: Send error: %v", err)
 	} else {
-		logx.Debugf("SessionPerfCollector Flush: wrote %d records", len(toFlush))
+		logx.Debugf("SessionPerfCollector Flush: wrote %d records to ClickHouse", len(toFlush))
 	}
 }
 
@@ -228,4 +286,44 @@ func (c *SessionPerfCollector) BufferSize() int {
 	c.bufferLock.Lock()
 	defer c.bufferLock.Unlock()
 	return len(c.buffer)
+}
+
+// Query 查询会话数据 (示例方法)
+func (c *SessionPerfCollector) QueryByUser(userName string, limit int) ([]SessionPerfRecord, error) {
+	if !c.chEnabled || c.clickhouse == nil {
+		return nil, fmt.Errorf("ClickHouse not enabled")
+	}
+
+	ctx := context.Background()
+	rows, err := c.clickhouse.Query(ctx, `
+		SELECT session_id, user_name, target_domain, duration_sec, 
+		       t1_bytes_mb, t1_speed_mbps, t1_count,
+		       t2_avg_us, t2_total_ms, t2_count,
+		       t3_bytes_mb, t3_speed_mbps, t3_count,
+		       bottleneck, toUnixTimestamp(created_at) as ts
+		FROM session_perf
+		WHERE user_name = ?
+		ORDER BY created_at DESC
+		LIMIT ?
+	`, userName, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []SessionPerfRecord
+	for rows.Next() {
+		var r SessionPerfRecord
+		if err := rows.Scan(
+			&r.SessionID, &r.UserName, &r.TargetDomain, &r.DurationSec,
+			&r.T1BytesMB, &r.T1SpeedMBps, &r.T1Count,
+			&r.T2AvgUs, &r.T2TotalMs, &r.T2Count,
+			&r.T3BytesMB, &r.T3SpeedMBps, &r.T3Count,
+			&r.Bottleneck, &r.Timestamp,
+		); err != nil {
+			return nil, err
+		}
+		results = append(results, r)
+	}
+	return results, nil
 }
