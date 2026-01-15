@@ -11,8 +11,17 @@ require (
 )
 
 require (
+	github.com/ClickHouse/ch-go v0.65.1 // indirect
+	github.com/ClickHouse/clickhouse-go/v2 v2.34.0 // indirect
+	github.com/andybalholm/brotli v1.1.1 // indirect
+	github.com/go-faster/city v1.0.1 // indirect
+	github.com/go-faster/errors v0.7.1 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/grafana/pyroscope-go/godeltaprof v0.1.8 // indirect
+	github.com/paulmach/orb v0.11.1 // indirect
+	github.com/pierrec/lz4/v4 v4.1.22 // indirect
+	github.com/segmentio/asm v1.2.0 // indirect
+	github.com/shopspring/decimal v1.4.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	golang.org/x/mod v0.27.0 // indirect
 	golang.org/x/tools v0.35.0 // indirect
@@ -66,21 +75,21 @@ require (
 	go.etcd.io/etcd/api/v3 v3.5.15 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.5.15 // indirect
 	go.etcd.io/etcd/client/v3 v3.5.15 // indirect
-	go.opentelemetry.io/otel v1.34.0 // indirect
+	go.opentelemetry.io/otel v1.35.0 // indirect
 	go.opentelemetry.io/otel/exporters/jaeger v1.17.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.24.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.24.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.24.0 // indirect
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.24.0 // indirect
 	go.opentelemetry.io/otel/exporters/zipkin v1.24.0 // indirect
-	go.opentelemetry.io/otel/metric v1.34.0 // indirect
+	go.opentelemetry.io/otel/metric v1.35.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.34.0 // indirect
-	go.opentelemetry.io/otel/trace v1.34.0 // indirect
+	go.opentelemetry.io/otel/trace v1.35.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.3.1 // indirect
-	go.uber.org/atomic v1.10.0 // indirect
+	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/automaxprocs v1.6.0 // indirect
-	go.uber.org/multierr v1.10.0 // indirect
-	go.uber.org/zap v1.24.0 // indirect
+	go.uber.org/multierr v1.11.0 // indirect
+	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/net v0.42.0 // indirect
 	golang.org/x/oauth2 v0.26.0 // indirect
 	golang.org/x/sys v0.34.0 // indirect

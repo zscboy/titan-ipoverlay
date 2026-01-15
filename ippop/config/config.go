@@ -85,6 +85,16 @@ type PerfMonitoring struct {
 	AbnormalDurationSeconds int64 `json:",default=60"` // 异常会话阈值（秒）
 }
 
+type ClickHouse struct {
+	Enable   bool
+	Addr     string // e.g., "127.0.0.1:9000"
+	Database string
+	//lint:ignore SA5008 go-zero allows "optional" in struct tags
+	Username string `json:",optional"`
+	//lint:ignore SA5008 go-zero allows "optional" in struct tags
+	Password string `json:",optional"`
+}
+
 type Config struct {
 	// APIServer api.APIServerConfig
 	WS        WS
@@ -100,6 +110,9 @@ type Config struct {
 
 	//lint:ignore SA5008 go-zero allows "optional" in struct tags
 	PerfMonitoring PerfMonitoring `json:",optional"`
+
+	//lint:ignore SA5008 go-zero allows "optional" in struct tags
+	ClickHouse ClickHouse `json:",optional"`
 
 	JwtAuth JwtAuth
 	Socks5  Socks5
