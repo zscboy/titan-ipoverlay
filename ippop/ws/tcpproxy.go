@@ -15,18 +15,20 @@ type TCPProxy struct {
 	conn            net.Conn
 	tunnel          *Tunnel
 	userName        string
+	targetDomain    string // 目标域名
 	isCloseByClient bool
 	perfStats       *SessionPerfStats // 性能统计
 	closeOnce       sync.Once         // 确保只关闭一次
 }
 
-func newTCPProxy(id string, conn net.Conn, t *Tunnel, userName string) *TCPProxy {
+func newTCPProxy(id string, conn net.Conn, t *Tunnel, userName, targetDomain string) *TCPProxy {
 	return &TCPProxy{
-		id:        id,
-		conn:      conn,
-		tunnel:    t,
-		userName:  userName,
-		perfStats: NewSessionPerfStats(id, userName, &t.tunMgr.config.PerfMonitoring, t.tunMgr.perfCollector),
+		id:           id,
+		conn:         conn,
+		tunnel:       t,
+		userName:     userName,
+		targetDomain: targetDomain,
+		perfStats:    NewSessionPerfStats(id, userName, targetDomain, &t.tunMgr.config.PerfMonitoring, t.tunMgr.perfCollector),
 	}
 }
 
