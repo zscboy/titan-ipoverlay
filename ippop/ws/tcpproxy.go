@@ -21,14 +21,14 @@ type TCPProxy struct {
 	closeOnce       sync.Once         // 确保只关闭一次
 }
 
-func newTCPProxy(id string, conn net.Conn, t *Tunnel, userName, targetDomain string) *TCPProxy {
+func newTCPProxy(id string, conn net.Conn, t *Tunnel, userName, targetDomain, countryCode string) *TCPProxy {
 	return &TCPProxy{
 		id:           id,
 		conn:         conn,
 		tunnel:       t,
 		userName:     userName,
 		targetDomain: targetDomain,
-		perfStats:    NewSessionPerfStats(id, userName, targetDomain, &t.tunMgr.config.PerfMonitoring, t.tunMgr.perfCollector),
+		perfStats:    NewSessionPerfStats(id, userName, targetDomain, countryCode, &t.tunMgr.config.PerfMonitoring, t.tunMgr.perfCollector),
 	}
 }
 
@@ -39,7 +39,7 @@ func (proxy *TCPProxy) close() {
 			return
 		}
 
-		// 触发统计汇总并上报 (写入 Redis 和 Prometheus)
+		// 触发统计汇总并上报 (写入 ClickHouse 和 Prometheus)
 		if proxy.perfStats != nil {
 			proxy.perfStats.Close()
 		}

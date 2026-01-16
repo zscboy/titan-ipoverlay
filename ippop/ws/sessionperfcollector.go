@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS session_perf (
     session_id    String,
     user_name     String,
     target_domain String,
+    country_code  String,
     duration_sec  Float64,
     t1_bytes_mb   Float64,
     t1_speed_mbps Float64,
@@ -49,6 +50,7 @@ type SessionPerfRecord struct {
 	SessionID    string  `json:"sid"`
 	UserName     string  `json:"user"`
 	TargetDomain string  `json:"domain"`
+	CountryCode  string  `json:"country"`
 	DurationSec  float64 `json:"dur"`
 	T1BytesMB    float64 `json:"t1_mb"`
 	T1SpeedMBps  float64 `json:"t1_spd"`
@@ -186,6 +188,15 @@ func (c *SessionPerfCollector) handleSessionEnd(r SessionPerfRecord) {
 
 	// 瓶颈检测
 	metrics.BottleneckDetection.WithLabelValues(r.Bottleneck, r.UserName).Inc()
+
+	// 多维度流量统计 (Task 4)
+	totalBytes := (r.T1BytesMB + r.T3BytesMB) * 1024 * 1024
+	if r.TargetDomain != "" {
+		metrics.DomainTraffic.WithLabelValues(r.UserName, r.TargetDomain).Add(totalBytes)
+	}
+	if r.CountryCode != "" {
+		metrics.CountryTraffic.WithLabelValues(r.UserName, r.CountryCode).Add(totalBytes)
+	}
 }
 
 // Stop 停止收集器
@@ -256,6 +267,7 @@ func (c *SessionPerfCollector) Flush() {
 			r.SessionID,
 			r.UserName,
 			r.TargetDomain,
+			r.CountryCode,
 			r.DurationSec,
 			r.T1BytesMB,
 			r.T1SpeedMBps,
