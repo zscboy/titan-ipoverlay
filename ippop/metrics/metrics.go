@@ -128,4 +128,15 @@ var (
 		Name: "ippop_bottleneck_detection_total",
 		Help: "瓶颈检测统计",
 	}, []string{"type", "user"}) // type: t1_slow/t2_slow/t3_slow/balanced
+
+	// 多维度流量统计 (Task 4)
+	DomainTraffic = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "ippop_traffic_by_domain_bytes_total",
+		Help: "按域名统计的流量总字节数",
+	}, []string{"user", "domain"})
+
+	CountryTraffic = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "ippop_traffic_by_country_bytes_total",
+		Help: "按国家/地区统计的流量总字节数",
+	}, []string{"user", "country"})
 )

@@ -23,16 +23,16 @@ type TCPProxy struct {
 	perfStats       *SessionPerfStats // 性能统计
 }
 
-func newTCPProxy(id string, conn net.Conn, t *Tunnel, userName, targetDomain string) *TCPProxy {
+func newTCPProxy(id string, conn net.Conn, t *Tunnel, userName, targetDomain, countryCode string) *TCPProxy {
 	return &TCPProxy{
 		id:           id,
 		conn:         conn,
 		tunnel:       t,
 		userName:     userName,
 		targetDomain: targetDomain,
-		perfStats:    NewSessionPerfStats(id, userName, targetDomain, &t.tunMgr.config.PerfMonitoring, t.tunMgr.perfCollector),
 		activeTime:   time.Now(),
 		done:         make(chan struct{}),
+		perfStats:    NewSessionPerfStats(id, userName, targetDomain, countryCode, &t.tunMgr.config.PerfMonitoring, t.tunMgr.perfCollector),
 	}
 }
 
