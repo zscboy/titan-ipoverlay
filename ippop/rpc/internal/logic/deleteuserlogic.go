@@ -40,12 +40,6 @@ func (l *DeleteUserLogic) DeleteUser(in *pb.DeleteUserReq) (*pb.UserOperationRes
 		return &pb.UserOperationResp{ErrMsg: err.Error()}, nil
 	}
 
-	if user.RouteMode == int(model.RouteModeTimed) {
-		if err := model.RemoveUserFromSchedulerList(l.svcCtx.Redis, in.UserName); err != nil {
-			return &pb.UserOperationResp{ErrMsg: err.Error()}, nil
-		}
-	}
-
 	if len(user.RouteNodeID) > 0 {
 		if err := model.UnbindNode(l.ctx, l.svcCtx.Redis, user.RouteNodeID); err != nil {
 			return &pb.UserOperationResp{ErrMsg: err.Error()}, nil
