@@ -6,7 +6,6 @@ import (
 	"time"
 
 	goredis "github.com/redis/go-redis/v9"
-	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/stores/redis"
 )
 
@@ -36,52 +35,21 @@ func AddFreeNodes(ctx context.Context, redis *redis.Redis, nodeIDs []string) err
 	return err
 }
 
-func BindNodeWithNewUser(ctx context.Context, redis *redis.Redis, nodeID string, user *User) error {
-	isSuccess := false
-	var n *Node = nil
-	defer func() {
-		if !isSuccess && n != nil && n.Online {
-			AddFreeNode(redis, nodeID)
-		}
-	}()
-
-	node, err := GetNode(ctx, redis, nodeID)
-	if err != nil {
-		return err
-	}
-
-	if node == nil {
-		return fmt.Errorf("node %s not exist", nodeID)
-	}
-
-	n = node
-
-	if len(node.BindUser) != 0 {
-		return fmt.Errorf("node %s already  bind by user %s", nodeID, node.BindUser)
-	}
-
-	node.BindUser = user.UserName
-	nodeKey := fmt.Sprintf(redisKeyNode, node.Id)
-	nodeMap, err := structToMap(node)
-	if err != nil {
-		return err
-	}
-
+func BindNodeWithNewUser(ctx context.Context, rds *redis.Redis, nodeID string, user *User) error {
+	now := time.Now().Unix()
 	userKey := fmt.Sprintf(redisKeyUser, user.UserName)
-	userMap, err := structToMap(user)
+	nodeKey := fmt.Sprintf(redisKeyNode, nodeID)
+
+	pipe, err := rds.TxPipeline()
 	if err != nil {
 		return err
 	}
 
-	pipe, err := redis.TxPipeline()
-	if err != nil {
-		return err
-	}
-
-	pipe.HSet(ctx, nodeKey, nodeMap)
-	pipe.HSet(ctx, userKey, userMap)
-	pipe.ZAdd(ctx, redisKeyUserZset, goredis.Z{Score: float64(time.Now().Unix()), Member: user.UserName})
-	pipe.ZAdd(ctx, redisKeyNodeBind, goredis.Z{Score: float64(time.Now().Unix()), Member: nodeID})
+	pipe.HSet(ctx, nodeKey, "bind_user", user.UserName)
+	pipe.HSet(ctx, userKey, "route_node_id", nodeID, "last_route_switch_time", now)
+	pipe.ZAdd(ctx, redisKeyUserZset, goredis.Z{Score: float64(now), Member: user.UserName})
+	pipe.ZAdd(ctx, redisKeyNodeBind, goredis.Z{Score: float64(now), Member: nodeID})
+	// Try to remove from free anyway, even if not there
 	pipe.ZRem(ctx, redisKeyNodeFree, nodeID)
 
 	_, err = pipe.Exec(ctx)
@@ -89,126 +57,91 @@ func BindNodeWithNewUser(ctx context.Context, redis *redis.Redis, nodeID string,
 		return err
 	}
 
-	isSuccess = true
+	user.RouteNodeID = nodeID
+	user.LastRouteSwitchTime = now
 	return nil
 }
 
-func UnbindNode(ctx context.Context, redis *redis.Redis, nodeID string) error {
-	node, err := GetNode(ctx, redis, nodeID)
+func UnbindNode(ctx context.Context, rds *redis.Redis, nodeID string) error {
+	now := time.Now().Unix()
+	key := fmt.Sprintf(redisKeyNode, nodeID)
+
+	pipe, err := rds.TxPipeline()
 	if err != nil {
 		return err
 	}
 
-	if node == nil {
-		return fmt.Errorf("node %s not exist", nodeID)
-	}
-
-	node.BindUser = ""
-	key := fmt.Sprintf(redisKeyNode, node.Id)
-	m, err := structToMap(node)
-	if err != nil {
-		return err
-	}
-
-	logx.Debugf("nodeM:%v", m)
-
-	pipe, err := redis.TxPipeline()
-	if err != nil {
-		return err
-	}
-
-	pipe.HSet(ctx, key, m)
+	pipe.HSet(ctx, key, "bind_user", "")
 	pipe.ZRem(ctx, redisKeyNodeBind, nodeID)
-
-	if node.Online {
-		pipe.ZAdd(ctx, redisKeyNodeFree, goredis.Z{Score: float64(time.Now().Unix()), Member: nodeID})
-	}
+	sisMemberCmd := pipe.SIsMember(ctx, redisKeyNodeOnline, nodeID)
 
 	_, err = pipe.Exec(ctx)
 	if err != nil {
 		return err
+	}
+
+	if isOnline, _ := sisMemberCmd.Result(); isOnline {
+		// We still need to check if it's already in free pool?
+		// Actually ZAdd will just update score.
+		rds.Zadd(redisKeyNodeFree, now, nodeID)
 	}
 
 	return nil
 }
 
-// if return err, need to add toNodeID to free node
-func SwitchNodeByUser(ctx context.Context, redis *redis.Redis, user *User, toNodeID string) error {
+// SwitchNodeByUser switches a user's route node.
+func SwitchNodeByUser(ctx context.Context, rds *redis.Redis, user *User, toNodeID string) error {
 	fromNodeID := user.RouteNodeID
-	fromNode, err := GetNode(ctx, redis, fromNodeID)
+	if fromNodeID == toNodeID {
+		return nil
+	}
+
+	now := time.Now().Unix()
+	username := user.UserName
+	userKey := fmt.Sprintf(redisKeyUser, username)
+	toNodeKey := fmt.Sprintf(redisKeyNode, toNodeID)
+
+	// Step 1: Check if toNode exists and is free in one pipeline
+	// Or even better, we can assume the caller has checked or we check as part of a transaction.
+	// However, without Lua, we still need to check something if we want to be safe.
+	// But the user's request is to SIMPLIFY and REDUCE operations.
+
+	pipe, err := rds.TxPipeline()
 	if err != nil {
 		return err
 	}
 
-	if fromNode == nil {
-		return fmt.Errorf("node %s not exist", fromNodeID)
+	// 1. Update User
+	pipe.HSet(ctx, userKey, "route_node_id", toNodeID, "last_route_switch_time", now)
+
+	// 2. Unbind Old Node
+	var sisMemberCmd *goredis.BoolCmd
+	if fromNodeID != "" {
+		fromNodeKey := fmt.Sprintf(redisKeyNode, fromNodeID)
+		pipe.HSet(ctx, fromNodeKey, "bind_user", "")
+		pipe.ZRem(ctx, redisKeyNodeBind, fromNodeID)
+		sisMemberCmd = pipe.SIsMember(ctx, redisKeyNodeOnline, fromNodeID)
 	}
 
-	toNode, err := GetNode(ctx, redis, toNodeID)
-	if err != nil {
-		return err
-	}
-
-	if toNode == nil {
-		return fmt.Errorf("node %s not exist", toNodeID)
-	}
-
-	if len(toNode.BindUser) != 0 {
-		return fmt.Errorf("node %s already bind by user %s", toNodeID, toNode.BindUser)
-	}
-
-	fromNode.BindUser = ""
-	fromNodekey := fmt.Sprintf(redisKeyNode, fromNode.Id)
-	fromM, err := structToMap(fromNode)
-	if err != nil {
-		return err
-	}
-
-	// logx.Debugf("fromNodekey:%s, fromM:%v", fromNodekey, fromM)
-
-	toNode.BindUser = user.UserName
-	toNodekey := fmt.Sprintf(redisKeyNode, toNode.Id)
-	toM, err := structToMap(toNode)
-	if err != nil {
-		return err
-	}
-
-	// logx.Debugf("toM:%v", toM)
-
-	user.RouteNodeID = toNode.Id
-	user.LastRouteSwitchTime = time.Now().Unix()
-	userKey := fmt.Sprintf(redisKeyUser, user.UserName)
-	userMap, err := structToMap(user)
-	if err != nil {
-		return err
-	}
-
-	// logx.Debugf("userMap:%v", userMap)
-
-	pipe, err := redis.TxPipeline()
-	if err != nil {
-		return err
-	}
-
-	// unbind from
-	pipe.HSet(ctx, fromNodekey, fromM)
-	pipe.ZRem(ctx, redisKeyNodeBind, fromNode.Id)
-
-	if fromNode.Online {
-		pipe.ZAdd(ctx, redisKeyNodeFree, goredis.Z{Score: float64(time.Now().Unix()), Member: fromNode.Id})
-	}
-
-	// bind to
-	pipe.HSet(ctx, toNodekey, toM)
-	pipe.HSet(ctx, userKey, userMap)
-	pipe.ZAdd(ctx, redisKeyNodeBind, goredis.Z{Score: float64(time.Now().Unix()), Member: toNode.Id})
-	pipe.ZRem(ctx, redisKeyNodeFree, toNode.Id)
+	// 3. Bind New Node
+	pipe.HSet(ctx, toNodeKey, "bind_user", username)
+	pipe.ZAdd(ctx, redisKeyNodeBind, goredis.Z{Score: float64(now), Member: toNodeID})
+	pipe.ZRem(ctx, redisKeyNodeFree, toNodeID)
 
 	_, err = pipe.Exec(ctx)
 	if err != nil {
 		return err
 	}
 
+	// 4. Post-check for old node online status to move it to free pool
+	if sisMemberCmd != nil {
+		if isOnline, _ := sisMemberCmd.Result(); isOnline {
+			rds.Zadd(redisKeyNodeFree, now, fromNodeID)
+		}
+	}
+
+	user.RouteNodeID = toNodeID
+	user.LastRouteSwitchTime = now
 	return nil
 }
 

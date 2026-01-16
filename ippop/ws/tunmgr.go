@@ -198,7 +198,7 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, n
 	tun.serve()
 }
 
-func (tm *TunnelManager) switchNodeForUser(user *model.User) error {
+func (tm *TunnelManager) SwitchNodeForUser(user *model.User) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -578,7 +578,7 @@ func (tm *TunnelManager) SwitchNode(userName string) error {
 		return fmt.Errorf("handleNodeOffline, user %s not exist", userName)
 	}
 
-	return tm.switchNodeForUser(user)
+	return tm.SwitchNodeForUser(user)
 }
 
 func (tm *TunnelManager) DeleteCache(userName string) error {

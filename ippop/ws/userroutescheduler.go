@@ -140,5 +140,5 @@ func (scheduler *UserRouteScheduler) isUserNeedToSwithRoute(user *model.User) bo
 }
 
 func (scheduler *UserRouteScheduler) switchUserRoute(user *model.User) error {
-	return scheduler.tm.switchNodeForUser(user)
+	return scheduler.tm.SwitchNodeForUser(user)
 }

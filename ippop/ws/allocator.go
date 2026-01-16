@@ -15,6 +15,7 @@ type NodeSource interface {
 	ReleaseExclusiveNodes(nodeIDs []string)
 	GetLocalTunnel(nodeID string) *Tunnel
 	PickActiveTunnel() (*Tunnel, error)
+	SwitchNodeForUser(user *model.User) error
 }
 
 // UserSession tracks the binding between a user session and a node.
@@ -65,8 +66,16 @@ func NewStaticAllocator(source NodeSource) *StaticAllocator {
 	return &StaticAllocator{source: source}
 }
 
-// TODO: if tunnel offline, need to allocate a new one
 func (a *StaticAllocator) Allocate(user *model.User, target *socks5.SocksTargetInfo) (*Tunnel, *UserSession, error) {
 	tun := a.source.GetLocalTunnel(user.RouteNodeID)
+	if tun != nil {
+		return tun, nil, nil
+	}
+
+	if err := a.source.SwitchNodeForUser(user); err != nil {
+		return nil, nil, err
+	}
+
+	tun = a.source.GetLocalTunnel(user.RouteNodeID)
 	return tun, nil, nil
 }
