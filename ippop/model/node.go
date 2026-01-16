@@ -60,6 +60,23 @@ func HandleNodeOnline(ctx context.Context, redis *redis.Redis, node *Node) error
 	return err
 }
 
+func HandleNodeOffline(ctx context.Context, redis *redis.Redis, node *Node) error {
+	pipe, err := redis.TxPipeline()
+	if err != nil {
+		return err
+	}
+
+	pipe.SRem(ctx, redisKeyNodeOnline, node.Id)
+	pipe.ZRem(ctx, redisKeyNodeFree, node.Id)
+
+	_, err = pipe.Exec(ctx)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
 func SetNodeNetDelay(redis *redis.Redis, nodeID string, delay uint64) error {
 	node, _ := GetNode(context.TODO(), redis, nodeID)
 	if node == nil {

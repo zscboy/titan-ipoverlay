@@ -16,7 +16,6 @@ import (
 	"titan-ipoverlay/ippop/socks5"
 
 	"github.com/bluele/gcache"
-	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/stores/redis"
@@ -35,28 +34,16 @@ const (
 	userSessionExpireDuration = 3 * time.Minute
 )
 
-type UserSession struct {
-	deviceID     string
-	sessTime     int64
-	assignedTime time.Time
-	// lastUsed       time.Time
-	connectCount   int32
-	disconnectTime time.Time
-}
-
-type ExpiredSession struct {
-	username      string
-	sessionID     string
-	deviceID      string
-	isLeaseDevice bool
-}
+// UserSession and ExpiredSession are now handled by the allocator module.
 
 type TunnelManager struct {
-	tunnels     sync.Map
-	redis       *redis.Redis
-	config      config.Config
-	userTraffic *userTraffic
-	userCache   gcache.Cache
+	tunnels           sync.Map
+	redis             *redis.Redis
+	config            config.Config
+	userTraffic       *userTraffic
+	userCache         gcache.Cache
+	allocatorRegistry *AllocatorRegistry
+	sessionManager    *SessionManager
 
 	filterRules     *Rules
 	userSessionMap  map[string]map[string]*UserSession
@@ -91,13 +78,19 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 		tunnelList: make([]*Tunnel, 0, 100000),
 	}
 
+	tm.sessionManager = NewSessionManager(tm, userSessionExpireDuration)
+	tm.allocatorRegistry = NewAllocatorRegistry()
+	tm.allocatorRegistry.Register(model.RouteModeAuto, NewStaticAllocator(tm))
+	tm.allocatorRegistry.Register(model.RouteModeManual, NewStaticAllocator(tm))
+	tm.allocatorRegistry.Register(model.RouteModeTimed, NewStaticAllocator(tm))
+	tm.allocatorRegistry.Register(model.RouteModeCustom, NewSessionAllocator(tm.sessionManager, tm))
+
 	routeScheduler := newUserRouteScheduler(tm)
 
 	go tm.keepalive()
 	go tm.setNodeOnlineDataExpire()
 	go tm.startUserTrafficTimer()
 	go tm.startTunnelTrafficTimer()
-	go tm.RecyclUserSession()
 	go routeScheduler.start()
 	return tm
 }
@@ -200,59 +193,9 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, n
 		return
 	}
 
-	defer tm.handleNodeOffline(node.Id)
+	defer model.HandleNodeOffline(context.Background(), tm.redis, node)
 
 	tun.serve()
-}
-
-func (tm *TunnelManager) handleNodeOffline(nodeID string) {
-	if err := model.SetNodeOffline(tm.redis, nodeID); err != nil {
-		logx.Errorf("handleNodeOffline SetNodeOffline %v", err)
-	}
-
-	node, err := model.GetNode(context.TODO(), tm.redis, nodeID)
-	if err != nil {
-		logx.Errorf("handleNodeOffline GetNode %v", err)
-		return
-	}
-
-	if node == nil {
-		logx.Errorf("handleNodeOffline node == nil, id:%s", nodeID)
-		return
-	}
-
-	if len(node.BindUser) > 0 {
-		user, err := model.GetUser(tm.redis, node.BindUser)
-		if err != nil {
-			logx.Errorf("handleNodeOffline, get user %s for node %s failed: %v", node.BindUser, node.Id, err)
-			return
-		}
-
-		if user == nil {
-			logx.Errorf("handleNodeOffline, get user %s for node %s, but user not exist", node.BindUser, node.Id)
-			return
-		}
-
-		if user.RouteMode != int(model.RouteModeAuto) {
-			logx.Alert(fmt.Sprintf("handleNodeOffline, node %s is offline, but bind by user %s with mode=%s", node.Id, user.UserName, model.RouteMode(user.RouteMode)))
-			return
-		}
-
-		if user.RouteNodeID != node.Id {
-			logx.Errorf("handleNodeOffline, get user %s for node %s, but user.RouteNodeID[%s] != node.id", node.BindUser, node.Id, user.RouteNodeID)
-			return
-		}
-
-		logx.Debugf("node %s offline, user %s trigger switch node", node.Id, node.BindUser)
-		if err := tm.switchNodeForUser(user); err != nil {
-			logx.Errorf("handleNodeOffline switchNodeForUser %s failed: %v", node.BindUser, err)
-		}
-	} else {
-		if err := model.RemoveFreeNode(tm.redis, nodeID); err != nil {
-			logx.Errorf("handleNodeOffline RemoveFreeNode %v", err)
-		}
-	}
-
 }
 
 func (tm *TunnelManager) switchNodeForUser(user *model.User) error {
@@ -315,69 +258,7 @@ func (tm *TunnelManager) KickNode(nodeID string) error {
 	return fmt.Errorf("node %s already offline", nodeID)
 }
 
-func (tm *TunnelManager) allocateTunnelByUserSession(user *model.User, sessionID string, sessTime int64) (*Tunnel, *UserSession, error) {
-	tm.userSessionLock.Lock()
-	defer tm.userSessionLock.Unlock()
-
-	// No sessionID provided → return a random tunnel
-	if sessionID == "" {
-		tun, err := tm.allocateTunnelWithoutSession()
-		if err != nil {
-			return nil, nil, err
-		}
-		return tun, nil, nil
-	}
-
-	// Load or create the session map for this user
-	sessions, ok := tm.userSessionMap[user.UserName]
-	if !ok {
-		sessions = make(map[string]*UserSession)
-		tm.userSessionMap[user.UserName] = sessions
-	}
-
-	// If the session already exists, try to reuse it
-	if session, exists := sessions[sessionID]; exists {
-		// Look up the tunnel by the deviceID bound to this session
-		if v, ok := tm.tunnels.Load(session.deviceID); ok {
-			session.connectCount++
-			return v.(*Tunnel), session, nil
-		}
-
-		// Session exists but its tunnel does not (unexpected state)
-		// → fall through to allocate a new session
-	}
-
-	// Allocate a new session by taking a free device node
-	nodeIDBytes, err := model.AllocateFreeNode(context.Background(), tm.redis)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Create the session object if it does not exist yet
-	session := sessions[sessionID]
-	if session == nil {
-		session = &UserSession{
-			sessTime: sessTime,
-		}
-		sessions[sessionID] = session
-	}
-
-	session.deviceID = string(nodeIDBytes)
-	session.assignedTime = time.Now()
-	session.connectCount++
-
-	// Load the corresponding tunnel instance
-	v, ok := tm.tunnels.Load(session.deviceID)
-	if !ok {
-		return nil, nil, fmt.Errorf("allocated deviceID=%s but tunnel not found", session.deviceID)
-	}
-
-	tunnel := v.(*Tunnel)
-	tunnel.userSessionID = sessionID
-	// tunnel.setRateLimit(user.DownloadRateLimit, user.UploadRateLimit)
-
-	return tunnel, session, nil
-}
+// allocateTunnelByUserSession, randomTunnel, nextTunnel are now handled by NodeSource implementation or Allocators.
 
 func (tm *TunnelManager) getTunnelByUser(user *model.User) (*Tunnel, error) {
 	v, ok := tm.tunnels.Load(user.RouteNodeID)
@@ -391,14 +272,58 @@ func (tm *TunnelManager) getTunnelByUser(user *model.User) (*Tunnel, error) {
 	return tun, nil
 }
 
-func (tm *TunnelManager) allocateTunnelWithoutSession() (*Tunnel, error) {
+// NodeSource Interface Implementation
+
+func (tm *TunnelManager) AcquireExclusiveNode(ctx context.Context) (*Tunnel, error) {
+	nodeIDBytes, err := model.AllocateFreeNode(ctx, tm.redis)
+	if err != nil {
+		return nil, err
+	}
+	nodeID := string(nodeIDBytes)
+	v, ok := tm.tunnels.Load(nodeID)
+	if !ok {
+		// If tunnel is not online locally, we don't put it back to free pool
+		// because the free pool should only contain online/available nodes.
+		return nil, fmt.Errorf("node %s allocated but not found in local tunnels", nodeID)
+	}
+	return v.(*Tunnel), nil
+}
+
+func (tm *TunnelManager) ReleaseExclusiveNodes(nodeIDs []string) {
+	// Only release nodes that are still online locally
+	onlineNodes := make([]string, 0, len(nodeIDs))
+	for _, id := range nodeIDs {
+		if _, ok := tm.tunnels.Load(id); ok {
+			onlineNodes = append(onlineNodes, id)
+		}
+	}
+
+	if len(onlineNodes) == 0 {
+		return
+	}
+
+	err := model.AddFreeNodes(context.Background(), tm.redis, onlineNodes)
+	if err != nil {
+		logx.Errorf("ReleaseExclusiveNodes failed: %v", err)
+	}
+}
+
+func (tm *TunnelManager) GetLocalTunnel(nodeID string) *Tunnel {
+	v, ok := tm.tunnels.Load(nodeID)
+	if !ok {
+		return nil
+	}
+	return v.(*Tunnel)
+}
+
+func (tm *TunnelManager) PickActiveTunnel() (*Tunnel, error) {
 	switch tm.config.WS.TunnelSelectPolicy {
 	case config.TunnelSelectRandom:
 		return tm.randomTunnel()
 	case config.TunnelSelectRound:
 		return tm.nextTunnel()
 	default:
-		return nil, fmt.Errorf("unknown tunnel select policy: %s", tm.config.WS.TunnelSelectPolicy)
+		return tm.randomTunnel()
 	}
 }
 
@@ -429,11 +354,7 @@ func (tm *TunnelManager) nextTunnel() (*Tunnel, error) {
 }
 
 func (tm *TunnelManager) handleUserSessionWhenSocks5TCPClose(session *UserSession) {
-	tm.userSessionLock.Lock()
-	defer tm.userSessionLock.Unlock()
-
-	session.connectCount--
-	session.disconnectTime = time.Now()
+	tm.sessionManager.Decrement(session)
 }
 
 func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks5.SocksTargetInfo) error {
@@ -452,14 +373,13 @@ func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks
 		return err
 	}
 
-	var tun *Tunnel
-	var userSession *UserSession
-	if user.RouteMode == int(model.RouteModeCustom) {
-		tun, userSession, err = tm.allocateTunnelByUserSession(user, targetInfo.Session, targetInfo.SessTime)
-	} else {
-		tun, err = tm.getTunnelByUser(user)
+	mode := model.RouteMode(user.RouteMode)
+	allocator := tm.allocatorRegistry.Get(mode)
+	if allocator == nil {
+		return fmt.Errorf("no allocator for mode %v", mode)
 	}
 
+	tun, userSession, err := allocator.Allocate(user, targetInfo)
 	if err != nil {
 		return err
 	}
@@ -470,11 +390,9 @@ func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks
 
 	logx.Debugf("allocate tun %s for user %s session %s", tun.opts.Id, targetInfo.Username, targetInfo.Session)
 
-	defer func() {
-		if userSession != nil {
-			tm.handleUserSessionWhenSocks5TCPClose(userSession)
-		}
-	}()
+	if userSession != nil {
+		defer tm.sessionManager.Decrement(userSession)
+	}
 
 	return tun.acceptSocks5TCPConn(tcpConn, targetInfo)
 }
@@ -629,70 +547,6 @@ func (tm *TunnelManager) startTunnelTrafficTimer() {
 
 func (tm *TunnelManager) traffic(userName string, traffic int64) {
 	tm.userTraffic.add(userName, traffic)
-}
-
-func (tm *TunnelManager) RecyclUserSession() {
-	ticker := time.NewTicker(userSessionExpireInterval * time.Second)
-	defer ticker.Stop()
-
-	for range ticker.C {
-		tm.userSessionLock.Lock()
-
-		removeSessions := tm.collectExpiredSessions()
-
-		tm.removeSessions(removeSessions)
-
-		tm.userSessionLock.Unlock()
-	}
-}
-
-func (tm *TunnelManager) collectExpiredSessions() map[string]*ExpiredSession {
-	expiredSessions := make(map[string]*ExpiredSession)
-
-	for username, userSessions := range tm.userSessionMap {
-		for sessionID, session := range userSessions {
-			if session.connectCount > 0 {
-				continue
-			}
-
-			if time.Since(session.disconnectTime) <= userSessionExpireDuration {
-				continue
-			}
-
-			expiredSession := &ExpiredSession{
-				sessionID: sessionID,
-				deviceID:  session.deviceID,
-				username:  username,
-			}
-
-			if v, ok := tm.tunnels.Load(session.deviceID); ok {
-				tunnel := v.(*Tunnel)
-				expiredSession.isLeaseDevice = tunnel.userSessionID == sessionID
-			}
-
-			expiredSessions[uuid.NewString()] = expiredSession
-		}
-	}
-
-	return expiredSessions
-}
-
-func (tm *TunnelManager) removeSessions(expiredSessions map[string]*ExpiredSession) {
-	if len(expiredSessions) > 0 {
-		logx.Debugf("remove expire session count %d", len(expiredSessions))
-	}
-	for _, sess := range expiredSessions {
-		sessions := tm.userSessionMap[sess.username]
-		delete(sessions, sess.sessionID)
-
-		if len(sessions) == 0 {
-			delete(tm.userSessionMap, sess.username)
-		}
-
-		if sess.isLeaseDevice {
-			model.AddFreeNode(tm.redis, sess.deviceID)
-		}
-	}
 }
 
 // implement interface for rpc server

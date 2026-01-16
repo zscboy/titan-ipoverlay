@@ -20,6 +20,22 @@ func AddFreeNode(redis *redis.Redis, nodeID string) error {
 	return err
 }
 
+func AddFreeNodes(ctx context.Context, redis *redis.Redis, nodeIDs []string) error {
+	if len(nodeIDs) == 0 {
+		return nil
+	}
+	pipe, err := redis.TxPipeline()
+	if err != nil {
+		return err
+	}
+	score := float64(time.Now().Unix())
+	for _, id := range nodeIDs {
+		pipe.ZAdd(ctx, redisKeyNodeFree, goredis.Z{Score: score, Member: id})
+	}
+	_, err = pipe.Exec(ctx)
+	return err
+}
+
 func BindNodeWithNewUser(ctx context.Context, redis *redis.Redis, nodeID string, user *User) error {
 	isSuccess := false
 	var n *Node = nil
