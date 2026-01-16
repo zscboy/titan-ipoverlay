@@ -18,6 +18,7 @@ type SessionPerfStats struct {
 	SessionID    string
 	UserName     string
 	TargetDomain string // 目标域名
+	CountryCode  string // 国家码 (新增)
 	StartTime    time.Time
 	EndTime      time.Time
 
@@ -43,11 +44,12 @@ type SessionPerfStats struct {
 }
 
 // NewSessionPerfStats 创建新的会话性能统计
-func NewSessionPerfStats(sessionID, userName, targetDomain string, perfConfig *config.PerfMonitoring, collector *SessionPerfCollector) *SessionPerfStats {
+func NewSessionPerfStats(sessionID, userName, targetDomain, countryCode string, perfConfig *config.PerfMonitoring, collector *SessionPerfCollector) *SessionPerfStats {
 	return &SessionPerfStats{
 		SessionID:    sessionID,
 		UserName:     userName,
 		TargetDomain: targetDomain,
+		CountryCode:  countryCode,
 		StartTime:    time.Now(),
 		perfConfig:   perfConfig,
 		collector:    collector,
@@ -152,6 +154,7 @@ func (s *SessionPerfStats) Close() {
 			SessionID:    s.SessionID,
 			UserName:     s.UserName,
 			TargetDomain: s.TargetDomain,
+			CountryCode:  s.CountryCode,
 			DurationSec:  totalDuration.Seconds(),
 			T1BytesMB:    float64(s.T1BytesReceived) / 1024 / 1024,
 			T1SpeedMBps:  t1Speed,

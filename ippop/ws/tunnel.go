@@ -30,12 +30,13 @@ const (
 )
 
 type TunOptions struct {
-	Id      string
-	OS      string
-	VMAPI   string
-	IP      string
-	LocalIP string // The server's local IP assigned to this connection
-	Version string
+	Id          string
+	OS          string
+	VMAPI       string
+	IP          string
+	LocalIP     string // The server's local IP assigned to this connection
+	Version     string
+	CountryCode string // 国家码，如 "US"
 	// seconds
 	UDPTimeout        int
 	TCPTimeout        int
@@ -447,8 +448,14 @@ func (t *Tunnel) acceptSocks5TCPConn(conn net.Conn, targetInfo *socks5.SocksTarg
 
 	now := time.Now()
 
+	// 确定统计维度使用的目标标识（SOCKS5 库中 DomainName 会包含域名或 IP 字符串）
+	targetIdentifier := targetInfo.DomainName
+	if targetIdentifier == "" {
+		targetIdentifier = "unknown"
+	}
+
 	sessionID := uuid.NewString()
-	proxyTCP := newTCPProxy(sessionID, conn, t, targetInfo.Username, targetInfo.DomainName)
+	proxyTCP := newTCPProxy(sessionID, conn, t, targetInfo.Username, targetIdentifier, t.opts.CountryCode)
 
 	t.proxys.Store(sessionID, proxyTCP)
 
