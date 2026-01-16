@@ -120,13 +120,6 @@ func (l *CreateUserLogic) CreateUser(in *pb.CreateUserReq) (*pb.CreateUserResp, 
 		return nil, err
 	}
 
-	// add user to scheduler list
-	if user.RouteMode == int(model.RouteModeTimed) {
-		if err = model.AddUserToSchedulerList(l.svcCtx.Redis, user.UserName); err != nil {
-			return nil, err
-		}
-	}
-
 	createUserResp := &pb.CreateUserResp{
 		UserName:     in.UserName,
 		TrafficLimit: trafficLimit,

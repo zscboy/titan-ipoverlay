@@ -85,13 +85,10 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 	tm.allocatorRegistry.Register(model.RouteModeTimed, NewStaticAllocator(tm))
 	tm.allocatorRegistry.Register(model.RouteModeCustom, NewSessionAllocator(tm.sessionManager, tm))
 
-	routeScheduler := newUserRouteScheduler(tm)
-
 	go tm.keepalive()
 	go tm.setNodeOnlineDataExpire()
 	go tm.startUserTrafficTimer()
 	go tm.startTunnelTrafficTimer()
-	go routeScheduler.start()
 	return tm
 }
 

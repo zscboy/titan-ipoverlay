@@ -67,11 +67,20 @@ func NewStaticAllocator(source NodeSource) *StaticAllocator {
 }
 
 func (a *StaticAllocator) Allocate(user *model.User, target *socks5.SocksTargetInfo) (*Tunnel, *UserSession, error) {
+	// Lazy switch for Timed mode
+	if model.RouteMode(user.RouteMode) == model.RouteModeTimed {
+		nextTime := user.CalculateNextRouteSwitchTime()
+		if time.Now().Unix() >= nextTime {
+			_ = a.source.SwitchNodeForUser(user)
+		}
+	}
+
 	tun := a.source.GetLocalTunnel(user.RouteNodeID)
 	if tun != nil {
 		return tun, nil, nil
 	}
 
+	// Fallback switch if the assigned node is not available locally
 	if err := a.source.SwitchNodeForUser(user); err != nil {
 		return nil, nil, err
 	}

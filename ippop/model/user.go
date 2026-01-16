@@ -65,6 +65,25 @@ type User struct {
 	DownloadRateLimit   int64 `redis:"download_rate_limit"`
 }
 
+func (u *User) CalculateNextRouteSwitchTime() int64 {
+	lastUpdate := time.Unix(u.LastRouteSwitchTime, 0)
+
+	if u.UpdateRouteIntervalMinutes > 0 {
+		return lastUpdate.Add(time.Duration(u.UpdateRouteIntervalMinutes) * time.Minute).Unix()
+	}
+
+	// Daily at specific minute
+	now := time.Now().UTC()
+	dayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	switchTime := dayStart.Add(time.Duration(u.UpdateRouteUtcMinuteOfDay) * time.Minute)
+
+	if !lastUpdate.Before(switchTime) {
+		// Already switched today, next is tomorrow
+		switchTime = switchTime.AddDate(0, 0, 1)
+	}
+	return switchTime.Unix()
+}
+
 func SaveUser(redis *redis.Redis, user *User) error {
 	m, err := structToMap(user)
 	if err != nil {

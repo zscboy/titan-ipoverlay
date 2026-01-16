@@ -1,9 +1,8 @@
 package model
 
 const (
-	redisKeyUser               = "titan:user:%s"
-	redisKeyUserZset           = "titan:user:zset"
-	redisKeyUserRouteScheduler = "titan:user:routescheduler"
+	redisKeyUser     = "titan:user:%s"
+	redisKeyUserZset = "titan:user:zset"
 	// redisKeyUserTrafficDay     = "titan:traffic:%s"
 	// redisKeyUserTrafficDayAll  = "titan:trafficall"
 

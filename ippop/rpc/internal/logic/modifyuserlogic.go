@@ -55,7 +55,6 @@ func (l *ModifyUserLogic) ModifyUser(in *pb.ModifyUserReq) (*pb.UserOperationRes
 		return &pb.UserOperationResp{ErrMsg: fmt.Sprintf("user %s already bind node %s", in.UserName, user.RouteNodeID)}, nil
 	}
 
-	oldRouteModel := user.RouteMode
 	user.RouteMode = int(in.Route.Mode)
 
 	if in.TrafficLimit != nil {
@@ -78,20 +77,6 @@ func (l *ModifyUserLogic) ModifyUser(in *pb.ModifyUserReq) (*pb.UserOperationRes
 			return &pb.UserOperationResp{ErrMsg: err.Error()}, nil
 		}
 	}
-	// add user to scheduler list
-	if oldRouteModel != int(model.RouteModeTimed) && user.RouteMode == int(model.RouteModeTimed) {
-		if err := model.AddUserToSchedulerList(l.svcCtx.Redis, user.UserName); err != nil {
-			return &pb.UserOperationResp{ErrMsg: err.Error()}, nil
-		}
-	}
-
-	// remove user from scheduler list
-	if oldRouteModel == int(model.RouteModeTimed) && user.RouteMode != int(model.RouteModeTimed) {
-		if err := model.RemoveUserFromSchedulerList(l.svcCtx.Redis, user.UserName); err != nil {
-			return &pb.UserOperationResp{ErrMsg: err.Error()}, nil
-		}
-	}
-
 	if err := l.svcCtx.DeleteCache(in.UserName); err != nil {
 		return &pb.UserOperationResp{ErrMsg: err.Error()}, nil
 	}
