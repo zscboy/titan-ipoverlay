@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS session_perf (
     bottleneck    String,
     created_at    DateTime DEFAULT now()
 ) ENGINE = MergeTree()
-PARTITION BY toYYYYMMDDhh(created_at)
+PARTITION BY toStartOfHour(created_at)
 ORDER BY (user_name, created_at)
 TTL created_at + INTERVAL 3 DAY
 `
