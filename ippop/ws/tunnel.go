@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -176,10 +177,8 @@ func (t *Tunnel) onPong(data []byte) {
 
 func (t *Tunnel) serve() {
 	for {
-		// T1 开始：WebSocket 读取开始
-		t1StartTime := time.Now()
-
-		_, message, err := t.readMessageWithLimitRate()
+		// T1 开始：由 readMessageWithLimitRate 内部精确捕获消息到达时间
+		_, message, t1StartTime, t1EndTime, err := t.readMessageWithLimitRate()
 		if err != nil {
 			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) {
 				logx.Infof("Tunnel %s %s closed: %v", t.opts.Id, t.opts.IP, err)
@@ -191,8 +190,6 @@ func (t *Tunnel) serve() {
 			break
 		}
 
-		// T1 结束：WebSocket 读取完成（包含原始消息大小）
-		t1EndTime := time.Now()
 		rawMessageSize := int64(len(message))
 
 		// T2 开始：protobuf 解码和消息处理
@@ -557,31 +554,42 @@ func (t *Tunnel) write(msg []byte) error {
 	return t.writeMessageWithLimitRate(websocket.BinaryMessage, msg)
 }
 
-func (t *Tunnel) readMessageWithLimitRate() (int, []byte, error) {
+func (t *Tunnel) readMessageWithLimitRate() (int, []byte, time.Time, time.Time, error) {
 	if t.closed.Load() {
-		return 0, nil, net.ErrClosed
+		return 0, nil, time.Time{}, time.Time{}, net.ErrClosed
 	}
 
-	// will reset when proxy is empty
-	t.trafficStats.ReadStartTime = time.Now()
-
-	messageType, data, err := t.conn.ReadMessage()
+	// 使用 NextReader 等待下一帧的到来，以此区分空闲等待时间与传输时间
+	messageType, r, err := t.conn.NextReader()
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, time.Time{}, time.Time{}, err
 	}
 
-	t.trafficStats.ReadDuration += time.Since(t.trafficStats.ReadStartTime)
+	// 此时 header 已收到，记录为 T1 (传输) 的开始时间
+	startTime := time.Now()
+	t.trafficStats.ReadStartTime = startTime
+
+	// 读取实际负载数据
+	data, err := io.ReadAll(r)
+	endTime := time.Now()
+	if err != nil {
+		return messageType, nil, startTime, endTime, err
+	}
+
+	t.trafficStats.ReadDuration += endTime.Sub(startTime)
 	t.trafficStats.ReadBytes += int64(len(data))
-	t.trafficStats.DataProcessStartTime = time.Now()
+	t.trafficStats.DataProcessStartTime = endTime
 
 	t.waitPong.Store(0)
 
 	readLimiter := t.readLimiter
 	if readLimiter != nil {
 		readLimiter.WaitN(context.TODO(), len(data))
+		// 将限速等待时间也计入 T1 总耗时（反映出真实的用户感知速度）
+		endTime = time.Now()
 	}
 
-	return messageType, data, nil
+	return messageType, data, startTime, endTime, nil
 }
 
 func (t *Tunnel) writeMessageWithLimitRate(messageType int, data []byte) error {
