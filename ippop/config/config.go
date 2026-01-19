@@ -118,5 +118,7 @@ type Config struct {
 	Socks5  Socks5
 	// Domain      string `json:",optional"`
 	FilterRules FilterRules
+	//lint:ignore SA5008 go-zero allows "optional" in struct tags
+	NodeID string `json:",optional"`
 	// TLSKeyPair TLSKeyPair
 }

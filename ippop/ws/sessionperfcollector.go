@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS session_perf (
     user_name     String,
     target_domain String,
     country_code  String,
+    node_id       String,
     duration_sec  Float64,
     t1_bytes_mb   Float64,
     t1_speed_mbps Float64,
@@ -75,6 +76,7 @@ type collectorEvent struct {
 type SessionPerfCollector struct {
 	clickhouse   driver.Conn
 	chEnabled    bool
+	nodeID       string
 	chBufferChan chan SessionPerfRecord // 无锁 channel buffer
 	metricsChan  chan collectorEvent
 	ctx          context.Context
@@ -82,11 +84,12 @@ type SessionPerfCollector struct {
 }
 
 // NewSessionPerfCollector 创建新的收集器
-func NewSessionPerfCollector(chConfig config.ClickHouse) *SessionPerfCollector {
+func NewSessionPerfCollector(chConfig config.ClickHouse, nodeID string) *SessionPerfCollector {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	c := &SessionPerfCollector{
 		chEnabled:    chConfig.Enable,
+		nodeID:       nodeID,
 		chBufferChan: make(chan SessionPerfRecord, maxBufferSize*2), // 无锁 buffer channel
 		metricsChan:  make(chan collectorEvent, 2000),
 		ctx:          ctx,
@@ -114,7 +117,7 @@ func NewSessionPerfCollector(chConfig config.ClickHouse) *SessionPerfCollector {
 			logx.Errorf("SessionPerfCollector: ClickHouse connect error: %v", err)
 		} else {
 			c.clickhouse = conn
-			// 自动建表
+			// 自动建表 (增加 node_id 字段的支持)
 			if err := conn.Exec(ctx, createTableSQL); err != nil {
 				logx.Errorf("SessionPerfCollector: Create table error: %v", err)
 			} else {
@@ -156,44 +159,44 @@ func (c *SessionPerfCollector) Start() {
 
 // handleSessionStart 处理会话开始指标
 func (c *SessionPerfCollector) handleSessionStart(userName string) {
-	metrics.SOCKS5Connections.Inc()
-	metrics.TotalSessions.Inc()
-	metrics.ActiveSessions.Inc()
+	metrics.SOCKS5Connections.WithLabelValues(c.nodeID).Inc()
+	metrics.TotalSessions.WithLabelValues(c.nodeID).Inc()
+	metrics.ActiveSessions.WithLabelValues(c.nodeID).Inc()
 }
 
 // handleSessionEnd 处理会话结束指标
 func (c *SessionPerfCollector) handleSessionEnd(r SessionPerfRecord) {
 	// 基础指标
-	metrics.ActiveSessions.Dec()
-	metrics.SessionDuration.Observe(r.DurationSec)
+	metrics.ActiveSessions.WithLabelValues(c.nodeID).Dec()
+	metrics.SessionDuration.WithLabelValues(c.nodeID).Observe(r.DurationSec)
 
 	// T1 指标
 	if r.T1Count > 0 {
-		metrics.T1Throughput.WithLabelValues(r.UserName).Observe(r.T1SpeedMBps)
-		metrics.T1Bytes.WithLabelValues(r.UserName).Add(r.T1BytesMB * 1024 * 1024)
+		metrics.T1Throughput.WithLabelValues(r.UserName, c.nodeID).Observe(r.T1SpeedMBps)
+		metrics.T1Bytes.WithLabelValues(r.UserName, c.nodeID).Add(r.T1BytesMB * 1024 * 1024)
 	}
 
 	// T2 指标
 	if r.T2Count > 0 {
-		metrics.T2ProcessingTime.WithLabelValues(r.UserName).Observe(float64(r.T2AvgUs))
+		metrics.T2ProcessingTime.WithLabelValues(r.UserName, c.nodeID).Observe(float64(r.T2AvgUs))
 	}
 
 	// T3 指标
 	if r.T3Count > 0 {
-		metrics.T3Throughput.WithLabelValues(r.UserName).Observe(r.T3SpeedMBps)
-		metrics.T3Bytes.WithLabelValues(r.UserName).Add(r.T3BytesMB * 1024 * 1024)
+		metrics.T3Throughput.WithLabelValues(r.UserName, c.nodeID).Observe(r.T3SpeedMBps)
+		metrics.T3Bytes.WithLabelValues(r.UserName, c.nodeID).Add(r.T3BytesMB * 1024 * 1024)
 	}
 
 	// 瓶颈检测
-	metrics.BottleneckDetection.WithLabelValues(r.Bottleneck, r.UserName).Inc()
+	metrics.BottleneckDetection.WithLabelValues(r.Bottleneck, r.UserName, c.nodeID).Inc()
 
 	// 多维度流量统计 (Task 4)
 	totalBytes := (r.T1BytesMB + r.T3BytesMB) * 1024 * 1024
 	if r.TargetDomain != "" {
-		metrics.DomainTraffic.WithLabelValues(r.UserName, r.TargetDomain).Add(totalBytes)
+		metrics.DomainTraffic.WithLabelValues(r.UserName, r.TargetDomain, c.nodeID).Add(totalBytes)
 	}
 	if r.CountryCode != "" {
-		metrics.CountryTraffic.WithLabelValues(r.UserName, r.CountryCode).Add(totalBytes)
+		metrics.CountryTraffic.WithLabelValues(r.UserName, r.CountryCode, c.nodeID).Add(totalBytes)
 	}
 }
 
@@ -275,6 +278,7 @@ flush:
 			r.UserName,
 			r.TargetDomain,
 			r.CountryCode,
+			c.nodeID, // 增加 node_id
 			r.DurationSec,
 			r.T1BytesMB,
 			r.T1SpeedMBps,

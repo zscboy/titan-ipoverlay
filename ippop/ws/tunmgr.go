@@ -82,7 +82,7 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 		tunnelList:    make([]*Tunnel, 0, 100000),
 		ipPool:        NewIPPool(),
 		acceptLocks:   make([]sync.Mutex, acceptLockShards),
-		perfCollector: NewSessionPerfCollector(config.ClickHouse),
+		perfCollector: NewSessionPerfCollector(config.ClickHouse, config.NodeID),
 	}
 
 	tm.sessionManager = NewSessionManager(tm, userSessionExpireDuration)
@@ -135,7 +135,7 @@ func (tm *TunnelManager) addTunnel(t *Tunnel) {
 	atomic.StoreUint64(&tm.rrIdx, rrIdx%uint64(len(tm.tunnelList)))
 
 	// Prometheus 指标：增加活跃隧道数
-	metrics.ActiveTunnels.Inc()
+	metrics.ActiveTunnels.WithLabelValues(tm.config.NodeID).Inc()
 }
 
 // 删除 tunnel
@@ -184,7 +184,7 @@ func (tm *TunnelManager) removeTunnel(tun *Tunnel) {
 	}
 
 	// Prometheus 指标：减少活跃隧道数
-	metrics.ActiveTunnels.Dec()
+	metrics.ActiveTunnels.WithLabelValues(tm.config.NodeID).Dec()
 }
 
 func (tm *TunnelManager) getShardIndex(nodeID string) uint32 {
