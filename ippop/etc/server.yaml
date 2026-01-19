@@ -2,8 +2,20 @@ WS:
   Name: titan-tunnel-server
   Host: 0.0.0.0
   Port: 41005
-  MaxConns: 20000
   Domain: 127.0.0.1
+
+  MaxConns: 0        # 不限并发
+  MaxBytes: 0        # 不限 body
+  Timeout: 0         # 不设超时
+  CpuThreshold: 0    # 关闭 CPU 熔断
+
+  Middlewares:
+    Trace: false
+    Log: false
+    Metrics: false
+    Prometheus: false
+    Breaker: false
+
 RPCServer:
   Name: server.rpc
   ListenOn: 127.0.0.1:8080
@@ -27,7 +39,7 @@ Socks5:
   EnableAuth: true
     ## 4 seconds
   ### example: dail dest timeout
-  TCPTimeout: 4
+  TCPTimeout: 15
   ### 120 seconds
   ### udp proxy timeout if no data transfer
   ### client udp proxy timeout is 60s
