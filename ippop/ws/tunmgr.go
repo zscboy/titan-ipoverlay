@@ -83,7 +83,7 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 
 		tunnelList:    make([]*Tunnel, 0, 100000),
 		ipPool:        NewIPPool(),
-		perfCollector: NewSessionPerfCollector(config.ClickHouse),
+		perfCollector: NewSessionPerfCollector(config.ClickHouse, config.NodeID),
 	}
 
 	tm.sessionManager = NewSessionManager(tm, userSessionExpireDuration)
@@ -137,7 +137,7 @@ func (tm *TunnelManager) addTunnel(t *Tunnel) {
 
 	tm.ipPool.AddTunnel(t)
 	// Prometheus 指标：增加活跃隧道数
-	metrics.ActiveTunnels.Inc()
+	metrics.ActiveTunnels.WithLabelValues(tm.config.NodeID).Inc()
 }
 
 // 删除 tunnel
@@ -182,7 +182,7 @@ func (tm *TunnelManager) removeTunnel(tun *Tunnel) {
 
 	tm.ipPool.RemoveTunnel(tun)
 	// Prometheus 指标：减少活跃隧道数
-	metrics.ActiveTunnels.Dec()
+	metrics.ActiveTunnels.WithLabelValues(tm.config.NodeID).Dec()
 }
 
 func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, nodeIP string) {
