@@ -61,6 +61,7 @@ type SessionPerfRecord struct {
 	T3BytesMB    float64 `json:"t3_mb"`
 	T3SpeedMBps  float64 `json:"t3_spd"`
 	T3Count      int64   `json:"t3_cnt"`
+	UploadBytes  int64   `json:"up_bytes"`
 	Bottleneck   string  `json:"btn"`
 	Timestamp    int64   `json:"ts"`
 }
@@ -185,6 +186,13 @@ func (c *SessionPerfCollector) handleSessionEnd(r SessionPerfRecord) {
 	if r.T3Count > 0 {
 		metrics.T3Throughput.WithLabelValues(r.UserName, c.nodeID).Observe(r.T3SpeedMBps)
 		metrics.T3Bytes.WithLabelValues(r.UserName, c.nodeID).Add(r.T3BytesMB * 1024 * 1024)
+		// 同时更新全局发送指标 (异步)
+		metrics.BytesSent.WithLabelValues(r.UserName, c.nodeID).Add(r.T3BytesMB * 1024 * 1024)
+	}
+
+	// 更新全局接收指标 (上传方向，异步)
+	if r.UploadBytes > 0 {
+		metrics.BytesReceived.WithLabelValues(r.UserName, c.nodeID).Add(float64(r.UploadBytes))
 	}
 
 	// 瓶颈检测
