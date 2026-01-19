@@ -122,3 +122,10 @@ type Config struct {
 	NodeID string `json:",optional"`
 	// TLSKeyPair TLSKeyPair
 }
+
+func (c Config) GetNodeID() string {
+	if c.NodeID != "" {
+		return c.NodeID
+	}
+	return "default-node"
+}
