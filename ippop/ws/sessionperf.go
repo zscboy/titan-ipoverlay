@@ -41,6 +41,9 @@ type SessionPerfStats struct {
 	T3BytesSent int64
 	T3Duration  time.Duration
 	T3Count     int64
+
+	// T4: 用户 → IPPop (SOCKS5 读取)
+	T4BytesReceived int64
 }
 
 // NewSessionPerfStats 创建新的会话性能统计
@@ -76,28 +79,45 @@ func (s *SessionPerfStats) AddT3Write(bytes int64, duration time.Duration) {
 	s.T3Count++
 }
 
+// AddT4Read 添加 T4 读取统计（User → POP，上传方向）
+func (s *SessionPerfStats) AddT4Read(bytes int64) {
+	s.T4BytesReceived += bytes
+}
+
 // Close 关闭会话统计并输出日志
 func (s *SessionPerfStats) Close() {
 	s.EndTime = time.Now()
 
 	totalDuration := s.EndTime.Sub(s.StartTime)
 
-	// 计算速率
+	// 计算速率 (确保 duration 至少为 1us，避免极短会话导致的除零或 0 速率)
 	t1Speed := float64(0)
 	t3Speed := float64(0)
 
-	if s.T1Duration.Seconds() > 0 {
-		t1Speed = float64(s.T1BytesReceived) / s.T1Duration.Seconds() / 1024 / 1024 // MB/s
+	t1DurSec := s.T1Duration.Seconds()
+	if t1DurSec <= 0 && s.T1BytesReceived > 0 {
+		t1DurSec = 0.000001 // 1us min
+	}
+	if t1DurSec > 0 {
+		t1Speed = float64(s.T1BytesReceived) / t1DurSec / 1024 / 1024 // MB/s
 	}
 
-	if s.T3Duration.Seconds() > 0 {
-		t3Speed = float64(s.T3BytesSent) / s.T3Duration.Seconds() / 1024 / 1024 // MB/s
+	t3DurSec := s.T3Duration.Seconds()
+	if t3DurSec <= 0 && s.T3BytesSent > 0 {
+		t3DurSec = 0.000001 // 1us min
+	}
+	if t3DurSec > 0 {
+		t3Speed = float64(s.T3BytesSent) / t3DurSec / 1024 / 1024 // MB/s
 	}
 
 	// 计算平均处理时间
 	t2AvgUs := int64(0)
 	if s.T2Count > 0 {
-		t2AvgUs = s.T2Duration.Microseconds() / s.T2Count
+		t2Dur := s.T2Duration
+		if t2Dur <= 0 {
+			t2Dur = time.Microsecond
+		}
+		t2AvgUs = t2Dur.Microseconds() / s.T2Count
 	}
 
 	// 检测瓶颈
@@ -165,6 +185,7 @@ func (s *SessionPerfStats) Close() {
 			T3BytesMB:    float64(s.T3BytesSent) / 1024 / 1024,
 			T3SpeedMBps:  t3Speed,
 			T3Count:      s.T3Count,
+			UploadBytes:  s.T4BytesReceived,
 			Bottleneck:   bottleneck,
 			Timestamp:    time.Now().Unix(),
 		})

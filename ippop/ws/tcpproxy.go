@@ -157,5 +157,6 @@ func (proxy *TCPProxy) proxyConn() error {
 
 		// 转发数据到 WebSocket（发送给 Client）
 		proxy.tunnel.onProxyDataFromProxy(proxy.id, buf[:n])
+		proxy.perfStats.AddT4Read(int64(n))
 	}
 }
