@@ -3,7 +3,6 @@ package ws
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"titan-ipoverlay/ippop/config"
@@ -74,13 +73,12 @@ type collectorEvent struct {
 
 // SessionPerfCollector 会话性能数据批量收集器
 type SessionPerfCollector struct {
-	clickhouse  driver.Conn
-	chEnabled   bool
-	buffer      []SessionPerfRecord
-	bufferLock  sync.Mutex
-	metricsChan chan collectorEvent
-	ctx         context.Context
-	cancel      context.CancelFunc
+	clickhouse   driver.Conn
+	chEnabled    bool
+	chBufferChan chan SessionPerfRecord // 无锁 channel buffer
+	metricsChan  chan collectorEvent
+	ctx          context.Context
+	cancel       context.CancelFunc
 }
 
 // NewSessionPerfCollector 创建新的收集器
@@ -88,11 +86,11 @@ func NewSessionPerfCollector(chConfig config.ClickHouse) *SessionPerfCollector {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	c := &SessionPerfCollector{
-		chEnabled:   chConfig.Enable,
-		buffer:      make([]SessionPerfRecord, 0, maxBufferSize),
-		metricsChan: make(chan collectorEvent, 2000),
-		ctx:         ctx,
-		cancel:      cancel,
+		chEnabled:    chConfig.Enable,
+		chBufferChan: make(chan SessionPerfRecord, maxBufferSize*2), // 无锁 buffer channel
+		metricsChan:  make(chan collectorEvent, 2000),
+		ctx:          ctx,
+		cancel:       cancel,
 	}
 
 	// 初始化 ClickHouse 连接
@@ -213,7 +211,7 @@ func (c *SessionPerfCollector) ReportSessionStart(userName string) {
 	}
 }
 
-// Collect 添加数据到缓冲区
+// Collect 添加数据到缓冲区（完全无锁）
 func (c *SessionPerfCollector) Collect(record SessionPerfRecord) {
 	// 1. 异步发送到处理通道（用于 Prometheus 指标）
 	select {
@@ -222,36 +220,45 @@ func (c *SessionPerfCollector) Collect(record SessionPerfRecord) {
 		logx.WithContext(c.ctx).Error("SessionPerfCollector: metrics channel full, dropping end record")
 	}
 
-	// 2. 批量写入 ClickHouse
+	// 2. 批量写入 ClickHouse（无锁发送到 channel）
 	if !c.chEnabled {
 		return
 	}
 
-	c.bufferLock.Lock()
-	c.buffer = append(c.buffer, record)
-	needFlush := len(c.buffer) >= maxBufferSize
-	c.bufferLock.Unlock()
-
-	if needFlush {
-		go c.Flush() // 异步刷新，避免阻塞调用者
+	select {
+	case c.chBufferChan <- record:
+		// 检查是否需要触发异步刷新
+		if len(c.chBufferChan) >= maxBufferSize {
+			go c.Flush()
+		}
+	default:
+		logx.WithContext(c.ctx).Error("SessionPerfCollector: ClickHouse buffer channel full, dropping record")
 	}
 }
 
-// Flush 批量写入 ClickHouse
+// Flush 批量写入 ClickHouse（从 channel 批量读取）
 func (c *SessionPerfCollector) Flush() {
 	if !c.chEnabled || c.clickhouse == nil {
 		return
 	}
 
-	c.bufferLock.Lock()
-	if len(c.buffer) == 0 {
-		c.bufferLock.Unlock()
+	// 从 channel 批量读取，无锁操作
+	toFlush := make([]SessionPerfRecord, 0, maxBufferSize)
+	for {
+		select {
+		case record := <-c.chBufferChan:
+			toFlush = append(toFlush, record)
+			if len(toFlush) >= maxBufferSize {
+				goto flush
+			}
+		default:
+			goto flush
+		}
+	}
+flush:
+	if len(toFlush) == 0 {
 		return
 	}
-	// 交换缓冲区
-	toFlush := c.buffer
-	c.buffer = make([]SessionPerfRecord, 0, maxBufferSize)
-	c.bufferLock.Unlock()
 
 	// 批量 INSERT
 	ctx := context.Background()
@@ -295,9 +302,7 @@ func (c *SessionPerfCollector) Flush() {
 
 // BufferSize 返回当前缓冲区大小（用于监控）
 func (c *SessionPerfCollector) BufferSize() int {
-	c.bufferLock.Lock()
-	defer c.bufferLock.Unlock()
-	return len(c.buffer)
+	return len(c.chBufferChan)
 }
 
 // Query 查询会话数据 (示例方法)
