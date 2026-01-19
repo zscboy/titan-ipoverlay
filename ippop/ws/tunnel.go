@@ -45,8 +45,11 @@ type TunOptions struct {
 
 type TrafficStats struct {
 	ReadStartTime time.Time
+	ReadEndTime   time.Time
 	ReadDuration  time.Duration
 	ReadBytes     int64
+
+	LastMessageSize int64
 
 	DataProcessStartTime time.Time
 	DataProcessDuration  time.Duration
@@ -175,8 +178,8 @@ func (t *Tunnel) onPong(data []byte) {
 
 func (t *Tunnel) serve() {
 	for {
-		// T1 开始：由 readMessageWithLimitRate 内部精确捕获消息到达时间
-		_, message, t1StartTime, t1EndTime, err := t.readMessageWithLimitRate()
+		// T1 开始：由 readMessageWithLimitRate 内部精确捕获消息到达时间，存储在 t.trafficStats 中
+		_, message, err := t.readMessageWithLimitRate()
 		if err != nil {
 			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) {
 				logx.Infof("Tunnel %s %s closed: %v", t.opts.Id, t.opts.IP, err)
@@ -188,10 +191,8 @@ func (t *Tunnel) serve() {
 			break
 		}
 
-		rawMessageSize := int64(len(message))
-
 		// T2 开始：protobuf 解码和消息处理
-		err = t.onMessage(message, t1StartTime, t1EndTime, rawMessageSize)
+		err = t.onMessage(message)
 		if err != nil {
 			logx.Errorf("Tunnel %s %s onMessage failed: %v", t.opts.Id, t.opts.IP, err)
 		}
@@ -201,7 +202,7 @@ func (t *Tunnel) serve() {
 	t.conn = nil
 }
 
-func (t *Tunnel) onMessage(data []byte, t1StartTime, t1EndTime time.Time, rawMessageSize int64) error {
+func (t *Tunnel) onMessage(data []byte) error {
 	msg := &pb.Message{}
 	err := proto.Unmarshal(data, msg)
 	if err != nil {
@@ -214,7 +215,7 @@ func (t *Tunnel) onMessage(data []byte, t1StartTime, t1EndTime time.Time, rawMes
 	case pb.MessageType_PROXY_SESSION_CREATE:
 		return t.onProxySessionCreateReply(msg.GetSessionId(), msg.Payload)
 	case pb.MessageType_PROXY_SESSION_DATA:
-		return t.onProxySessionDataFromTunnel(msg.GetSessionId(), msg.Payload, t1StartTime, t1EndTime, rawMessageSize)
+		return t.onProxySessionDataFromTunnel(msg.GetSessionId(), msg.Payload)
 	case pb.MessageType_PROXY_SESSION_CLOSE:
 		return t.onProxySessionClose(msg.GetSessionId())
 	case pb.MessageType_PROXY_SESSION_HALF_CLOSE:
@@ -291,7 +292,7 @@ func (t *Tunnel) onProxySessionHalfClose(sessionID string) error {
 	return proxy.closeWrite()
 }
 
-func (t *Tunnel) onProxySessionDataFromTunnel(sessionID string, data []byte, t1StartTime, t1EndTime time.Time, rawMessageSize int64) error {
+func (t *Tunnel) onProxySessionDataFromTunnel(sessionID string, data []byte) error {
 	v, ok := t.proxys.Load(sessionID)
 	if !ok {
 		logx.Debugf("Tunnel %s %s onProxySessionDataFromTunnel, can not found session %s", t.opts.Id, t.opts.IP, sessionID)
@@ -301,16 +302,18 @@ func (t *Tunnel) onProxySessionDataFromTunnel(sessionID string, data []byte, t1S
 	proxy := v.(*TCPProxy)
 
 	// 记录 T1 统计（Client → IPPop，WebSocket 读取）
-	// 使用原始 WebSocket 消息大小（包含 protobuf 编码）
+	// 使用由 t.readMessageWithLimitRate 捕获并存储在 trafficStats 中的时间戳
 	if proxy.perfStats != nil {
+		t1StartTime := t.trafficStats.ReadStartTime
+		t1EndTime := t.trafficStats.ReadEndTime
+		rawMessageSize := t.trafficStats.LastMessageSize
+
 		t1Duration := t1EndTime.Sub(t1StartTime)
 		proxy.perfStats.AddT1Read(rawMessageSize, t1Duration)
 	}
 
 	// T2 开始时间 = T1 结束时间（WebSocket 读取完成）
-	// T2 包括：protobuf 解码、消息路由、查找 session
-	// proxy.write() 会记录 T2 和 T3
-	return proxy.write(data, t1EndTime)
+	return proxy.write(data, t.trafficStats.ReadEndTime)
 }
 
 func (t *Tunnel) onProxyTCPConnClose(sessionID string) {
@@ -559,15 +562,15 @@ func (t *Tunnel) write(msg []byte) error {
 	return t.writeMessageWithLimitRate(websocket.BinaryMessage, msg)
 }
 
-func (t *Tunnel) readMessageWithLimitRate() (int, []byte, time.Time, time.Time, error) {
+func (t *Tunnel) readMessageWithLimitRate() (int, []byte, error) {
 	if t.conn == nil {
-		return 0, nil, time.Time{}, time.Time{}, fmt.Errorf("t.conn == nil")
+		return 0, nil, fmt.Errorf("t.conn == nil")
 	}
 
 	// 使用 NextReader 等待下一帧的到来，以此区分空闲等待时间与传输时间
 	messageType, r, err := t.conn.NextReader()
 	if err != nil {
-		return 0, nil, time.Time{}, time.Time{}, err
+		return 0, nil, err
 	}
 
 	// 此时 header 已收到，记录为 T1 (传输) 的开始时间
@@ -578,11 +581,13 @@ func (t *Tunnel) readMessageWithLimitRate() (int, []byte, time.Time, time.Time, 
 	data, err := io.ReadAll(r)
 	endTime := time.Now()
 	if err != nil {
-		return messageType, nil, startTime, endTime, err
+		return messageType, nil, err
 	}
 
+	t.trafficStats.ReadEndTime = endTime
 	t.trafficStats.ReadDuration += endTime.Sub(startTime)
 	t.trafficStats.ReadBytes += int64(len(data))
+	t.trafficStats.LastMessageSize = int64(len(data))
 	t.trafficStats.DataProcessStartTime = endTime
 
 	t.waitPong.Store(0)
@@ -591,10 +596,10 @@ func (t *Tunnel) readMessageWithLimitRate() (int, []byte, time.Time, time.Time, 
 	if readLimiter != nil {
 		readLimiter.WaitN(context.TODO(), len(data))
 		// 将限速等待时间也计入 T1 总耗时（反映出真实的用户感知速度）
-		endTime = time.Now()
+		t.trafficStats.ReadEndTime = time.Now()
 	}
 
-	return messageType, data, startTime, endTime, nil
+	return messageType, data, nil
 }
 
 func (t *Tunnel) writeMessageWithLimitRate(messageType int, data []byte) error {
