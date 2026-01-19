@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 	"titan-ipoverlay/ippop/socks5"
 	"titan-ipoverlay/ippop/ws/pb"
@@ -56,7 +57,7 @@ type TrafficStats struct {
 type Tunnel struct {
 	conn      *websocket.Conn
 	writeLock sync.Mutex
-	waitPong  int
+	waitPong  atomic.Int32
 
 	proxys ProxyMap
 
@@ -92,7 +93,7 @@ func newTunnel(conn *websocket.Conn, tunMgr *TunnelManager, opts *TunOptions) *T
 	t.setRateLimit(opts.DownloadRateLimti, opts.UploadRateLimit)
 
 	conn.SetPingHandler(func(data string) error {
-		t.waitPong = 0
+		t.waitPong.Store(0)
 
 		if err := t.writePong([]byte(data)); err != nil {
 			logx.Errorf("Tunnel %s %s writePong error:%s", t.opts.Id, t.opts.IP, err.Error())
@@ -166,7 +167,7 @@ func (t *Tunnel) onPong(data []byte) {
 	timestamp := int64(binary.LittleEndian.Uint64(data))
 	t.delay = time.Since(time.UnixMicro(timestamp)).Milliseconds()
 
-	t.waitPong = 0
+	t.waitPong.Store(0)
 }
 
 func (t *Tunnel) serve() {
@@ -406,7 +407,7 @@ func (t *Tunnel) createClientWithDestV2(dest *pb.DestAddr, sessionID string) err
 }
 
 func (t *Tunnel) createClientWithDestV1(dest *pb.DestAddr, sessionID string) error {
-	logx.Debugf("Tunnel.onClientCreateByDomain, dest %s", dest.Addr)
+	logx.Debugf("Tunnel.createClientWithDestV1, session %s dest %s", sessionID, dest.Addr)
 
 	buf, err := proto.Marshal(dest)
 	if err != nil {
@@ -493,7 +494,7 @@ func (t *Tunnel) acceptSocks5UDPData(conn socks5.UDPConn, udpInfo *socks5.Socks5
 }
 
 func (t *Tunnel) keepalive() {
-	if t.waitPong > waitPongTimeout {
+	if t.waitPong.Load() > waitPongTimeout {
 		if t.conn != nil {
 			t.conn.Close()
 			t.conn = nil
@@ -502,6 +503,13 @@ func (t *Tunnel) keepalive() {
 			logx.Errorf("keepalive timeout, tunnel %s already close", t.opts.Id)
 		}
 
+		return
+	}
+
+	// If waitPong is 0, it means a message was received recently (passive keepalive).
+	// We can skip sending an active Ping this time and increment waitPong.
+	if t.waitPong.Load() == 0 {
+		t.waitPong.Add(1)
 		return
 	}
 
@@ -517,7 +525,7 @@ func (t *Tunnel) keepalive() {
 	// 	logx.Debugf("tunnel %s keepalive send ping, waitPong:%d, delay:%d", t.opts.Id, t.waitPong, t.delay)
 	// }
 
-	t.waitPong++
+	t.waitPong.Add(1)
 }
 
 func (t *Tunnel) write(msg []byte) error {
@@ -544,7 +552,7 @@ func (t *Tunnel) readMessageWithLimitRate() (int, []byte, error) {
 	t.trafficStats.ReadBytes += int64(len(data))
 	t.trafficStats.DataProcessStartTime = time.Now()
 
-	t.waitPong = 0
+	t.waitPong.Store(0)
 
 	readLimiter := t.readLimiter
 	if readLimiter != nil {

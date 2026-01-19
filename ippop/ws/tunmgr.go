@@ -57,7 +57,7 @@ type TunnelManager struct {
 
 	rng *rand.Rand
 
-	HealthStatsMap sync.Map
+	// HealthStatsMap sync.Map
 }
 
 func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
@@ -176,7 +176,7 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, n
 
 	tun := newTunnel(conn, tm, opts)
 	tm.tunnels.Store(node.Id, tun)
-	tm.HealthStatsMap.LoadOrStore(node.Id, &HealthStats{})
+	// tm.HealthStatsMap.LoadOrStore(node.Id, &HealthStats{})
 
 	tm.addTunnel(tun)
 
@@ -456,43 +456,34 @@ func (tm *TunnelManager) HandleUserAuth(userName, password string) error {
 }
 
 func (tm *TunnelManager) keepalive() {
-	const logInterval = 60
-	logTick := 0
-
-	tick := 0
-	for {
-		time.Sleep(time.Second * 1)
-		tick++
-		logTick++
-
-		if tick == keepaliveInterval {
-			tick = 0
-			count := 0
-			halfFailureCount := 0
-			totalFailureCount := 0
-			now := time.Now()
-			tm.tunnels.Range(func(key, value any) bool {
-				t := value.(*Tunnel)
+	const workerCount = 16
+	taskCh := make(chan *Tunnel, workerCount*2)
+	for i := 0; i < workerCount; i++ {
+		go func() {
+			for t := range taskCh {
 				t.keepalive()
-
-				v, ok := tm.HealthStatsMap.Load(key.(string))
-				if ok {
-					healthStats := v.(*HealthStats)
-					if healthStats.isTotalFailed() {
-						totalFailureCount++
-					} else if healthStats.isHalfFailed() {
-						halfFailureCount++
-					}
-				}
-
-				count++
-				return true
-			})
-
-			if logTick%logInterval == 0 {
-				logTick = 0
-				logx.Infof("TunnelManager.keepalive tunnel count:%d, cost:%v, halfFailureCount:%d, totalFailureCount:%d", count, time.Since(now), halfFailureCount, totalFailureCount)
 			}
+		}()
+	}
+
+	ticker := time.NewTicker(time.Second * keepaliveInterval)
+	defer ticker.Stop()
+
+	tickCount := 0
+	for range ticker.C {
+		now := time.Now()
+		count := 0
+		tm.tunnels.Range(func(key, value any) bool {
+			t := value.(*Tunnel)
+			taskCh <- t
+			count++
+			return true
+		})
+
+		tickCount++
+		if tickCount > 2 {
+			logx.Infof("TunnelManager.keepalive tunnel count:%d, cost:%v", count, time.Since(now))
+			tickCount = 0
 		}
 	}
 }
@@ -542,9 +533,9 @@ func (tm *TunnelManager) startTunnelTrafficTimer() {
 	}
 }
 
-func (tm *TunnelManager) traffic(userName string, traffic int64) {
-	tm.userTraffic.add(userName, traffic)
-}
+// func (tm *TunnelManager) traffic(userName string, traffic int64) {
+// 	tm.userTraffic.add(userName, traffic)
+// }
 
 // implement interface for rpc server
 /*type NodeManager interface {

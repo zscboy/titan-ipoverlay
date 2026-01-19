@@ -28,13 +28,13 @@ type Location struct {
 	IP       string `json:"ip"`
 }
 
-type LocationData struct {
-	Location *Location `json:"location"`
-}
+//	type LocationData struct {
+//		Location *Location `json:"location"`
+//	}
 type LocationResp struct {
-	Code int           `json:"code"`
-	Data *LocationData `json:"data"`
-	Msg  string        `json:"msg"`
+	Code int       `json:"code"`
+	Data *Location `json:"data"`
+	Msg  string    `json:"msg"`
 }
 
 type GetNodePopLogic struct {
@@ -99,7 +99,7 @@ func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*config.Pop, er
 
 	location, err := l.getLocalInfo(ip)
 	if err != nil {
-		logx.Errorf("getLocalInfo %v", err)
+		logx.Errorf("getLocalInfo ip:%s, failed:%v", ip, err)
 		return nil, fmt.Errorf("getLocalInfo failed:%v", err)
 	}
 
@@ -188,7 +188,7 @@ func (l *GetNodePopLogic) getLocalInfo(ip string) (*Location, error) {
 func (l *GetNodePopLogic) httpGetLocationInfo(ip string) (*Location, error) {
 	logx.Infof("get %s local info from %s", ip, l.svcCtx.Config.Geo.API)
 
-	url := fmt.Sprintf("%s?key=%s&ip=%s&language=en", l.svcCtx.Config.Geo.API, l.svcCtx.Config.Geo.Key, ip)
+	url := fmt.Sprintf("%s?ip=%s", l.svcCtx.Config.Geo.API, ip)
 
 	client := &http.Client{
 		Timeout: 3 * time.Second,
@@ -220,7 +220,11 @@ func (l *GetNodePopLogic) httpGetLocationInfo(ip string) (*Location, error) {
 		return nil, fmt.Errorf("code:%d, msg:%s", locationResp.Code, locationResp.Msg)
 	}
 
-	location := locationResp.Data.Location
+	if locationResp.Data == nil || len(locationResp.Data.Country) == 0 {
+		return nil, fmt.Errorf("resp:%s", string(body))
+	}
+
+	location := locationResp.Data
 
 	return location, nil
 }

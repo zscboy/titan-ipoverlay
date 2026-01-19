@@ -27,7 +27,7 @@ func newProxyUDP(id string, conn socks5.UDPConn, udpInfo *socks5.Socks5UDPInfo, 
 
 func (proxy *UDPProxy) writeToSrc(data []byte) error {
 	proxy.activeTime = time.Now()
-	proxy.tunnel.tunMgr.traffic(proxy.udpInfo.UserName, int64(len(data)))
+	// proxy.tunnel.tunMgr.traffic(proxy.udpInfo.UserName, int64(len(data)))
 
 	srcAddr, err := net.ResolveUDPAddr("udp", proxy.udpInfo.Src)
 	if err != nil {
@@ -47,7 +47,7 @@ func (proxy *UDPProxy) writeToSrc(data []byte) error {
 
 func (proxy *UDPProxy) writeToDest(data []byte) error {
 	proxy.activeTime = time.Now()
-	proxy.tunnel.tunMgr.traffic(proxy.udpInfo.UserName, int64(len(data)))
+	// proxy.tunnel.tunMgr.traffic(proxy.udpInfo.UserName, int64(len(data)))
 
 	udpData := pb.UDPData{Addr: proxy.udpInfo.Dest, Data: data}
 	payload, err := proto.Marshal(&udpData)
