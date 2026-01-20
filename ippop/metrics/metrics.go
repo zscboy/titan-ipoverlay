@@ -6,15 +6,15 @@ import (
 )
 
 var (
-	// 隧道指标
+	// 节点指标
 	ActiveTunnels = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "ippop_active_tunnels",
-		Help: "当前活跃的 WebSocket 隧道数量",
+		Help: "当前活跃的节点数量",
 	}, []string{"node"})
 
 	TunnelDelay = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "ippop_tunnel_delay_ms",
-		Help: "隧道延迟（毫秒）",
+		Help: "节点延迟（毫秒）",
 	}, []string{"tunnel_id", "node"})
 
 	// 会话指标
@@ -25,7 +25,7 @@ var (
 
 	TotalSessions = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "ippop_total_sessions",
-		Help: "总会话数（累计）",
+		Help: "业务转发总次数",
 	}, []string{"node"})
 
 	SessionDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
@@ -37,7 +37,7 @@ var (
 	// 连接指标
 	SOCKS5Connections = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "ippop_socks5_connections_total",
-		Help: "SOCKS5 连接总数",
+		Help: "用户接入连接总数",
 	}, []string{"node"})
 
 	SOCKS5Errors = promauto.NewCounterVec(prometheus.CounterOpts{
