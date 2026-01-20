@@ -384,7 +384,7 @@ func toAddress(a byte, addr []byte, port []byte) string {
 	return net.JoinHostPort(h, p)
 }
 
-var sessionRegex = regexp.MustCompile(`^[0-9A-Za-z]{1,9}$`)
+var sessionRegex = regexp.MustCompile(`^[0-9A-Za-z]{16}$`)
 
 func validateSession(session string) error {
 	if !sessionRegex.MatchString(session) {

@@ -369,7 +369,7 @@ func (t *Tunnel) acceptSocks5TCPConn(conn net.Conn, targetInfo *socks5.SocksTarg
 	err := t.createClientWithDest(&pb.DestAddr{Addr: addr}, sessionID)
 	if err != nil {
 		t.proxys.Delete(sessionID)
-		return fmt.Errorf("Tunnel.acceptSocks5TCPConn client create by Domain failed, cost:%dms, addr:%s, err:%v, tun ip:%s", time.Since(now).Milliseconds(), addr, err, t.opts.IP)
+		return fmt.Errorf("Tunnel.acceptSocks5TCPConn client create by Domain failed, cost:%dms, addr:%s, err:%v, tun:%s ip:%s", time.Since(now).Milliseconds(), addr, err, t.opts.Id, t.opts.IP)
 	}
 
 	if len(targetInfo.ExtraBytes) > 0 {
@@ -513,9 +513,9 @@ func (t *Tunnel) keepalive() {
 		logx.Errorf("Tunnel %s %s keepalive writePing failed:%v", t.opts.Id, t.opts.IP, err.Error())
 	}
 
-	if t.waitPong > 3 {
-		logx.Debugf("tunnel %s keepalive send ping, waitPong:%d, delay:%d", t.opts.Id, t.waitPong, t.delay)
-	}
+	// if t.waitPong > 3 {
+	// 	logx.Debugf("tunnel %s keepalive send ping, waitPong:%d, delay:%d", t.opts.Id, t.waitPong, t.delay)
+	// }
 
 	t.waitPong++
 }
