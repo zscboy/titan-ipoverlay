@@ -80,6 +80,7 @@ type SessionPerfCollector struct {
 	nodeID       string
 	chBufferChan chan SessionPerfRecord // 无锁 channel buffer
 	metricsChan  chan collectorEvent
+	userSessions map[string]int // 维护用户 -> 会话数，仅在 Start 协程内访问
 	ctx          context.Context
 	cancel       context.CancelFunc
 }
@@ -93,6 +94,7 @@ func NewSessionPerfCollector(chConfig config.ClickHouse, nodeID string) *Session
 		nodeID:       nodeID,
 		chBufferChan: make(chan SessionPerfRecord, maxBufferSize*2), // 无锁 buffer channel
 		metricsChan:  make(chan collectorEvent, 2000),
+		userSessions: make(map[string]int),
 		ctx:          ctx,
 		cancel:       cancel,
 	}
@@ -135,6 +137,10 @@ func (c *SessionPerfCollector) Start() {
 	ticker := time.NewTicker(flushInterval)
 	defer ticker.Stop()
 
+	// 初始值设为 0，确保指标被 Prometheus 发现
+	metrics.ActiveUsers.WithLabelValues(c.nodeID).Set(0)
+	metrics.ActiveSessions.WithLabelValues(c.nodeID).Set(0)
+
 	logx.Info("SessionPerfCollector started")
 
 	for {
@@ -163,6 +169,12 @@ func (c *SessionPerfCollector) handleSessionStart(userName string) {
 	metrics.SOCKS5Connections.WithLabelValues(c.nodeID).Inc()
 	metrics.TotalSessions.WithLabelValues(c.nodeID).Inc()
 	metrics.ActiveSessions.WithLabelValues(c.nodeID).Inc()
+
+	// 更新活跃用户数
+	if count := c.userSessions[userName]; count == 0 {
+		metrics.ActiveUsers.WithLabelValues(c.nodeID).Inc()
+	}
+	c.userSessions[userName]++
 }
 
 // handleSessionEnd 处理会话结束指标
@@ -170,6 +182,15 @@ func (c *SessionPerfCollector) handleSessionEnd(r SessionPerfRecord) {
 	// 基础指标
 	metrics.ActiveSessions.WithLabelValues(c.nodeID).Dec()
 	metrics.SessionDuration.WithLabelValues(c.nodeID).Observe(r.DurationSec)
+
+	// 更新活跃用户数
+	if count := c.userSessions[r.UserName]; count > 0 {
+		c.userSessions[r.UserName]--
+		if c.userSessions[r.UserName] == 0 {
+			metrics.ActiveUsers.WithLabelValues(c.nodeID).Dec()
+			delete(c.userSessions, r.UserName)
+		}
+	}
 
 	// T1 指标
 	if r.T1Count > 0 {

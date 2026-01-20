@@ -357,7 +357,7 @@ func (tm *TunnelManager) getTunnelByUser(user *model.User) (*Tunnel, error) {
 // NodeSource interface implementation, helper methods, and RPC interface implementations
 // have been moved to tunmgr_alloc.go and tunmgr_rpc.go respectively.
 
-func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks5.SocksTargetInfo) error {
+func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks5.SocksTargetInfo) (err error) {
 	logx.Debugf("HandleSocks5TCP, user %s, DomainName %s, port %d, remote:%s, connCount:%d, connTime:%d",
 		targetInfo.Username, targetInfo.DomainName, targetInfo.Port, tcpConn.RemoteAddr().String(), tm.socks5ConnCount.Load(), time.Since(targetInfo.ConnCreateTime).Milliseconds())
 
@@ -367,6 +367,15 @@ func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks
 	// 异步上报会话开始
 	if tm.perfCollector != nil {
 		tm.perfCollector.ReportSessionStart(targetInfo.Username)
+		// 如果之后发生错误，需确保上报结束以平衡 ActiveSessions/ActiveUsers 指标
+		defer func() {
+			if err != nil {
+				tm.perfCollector.Collect(SessionPerfRecord{
+					UserName:  targetInfo.Username,
+					Timestamp: time.Now().Unix(),
+				})
+			}
+		}()
 	}
 
 	if tm.filterRules.isDeny(targetInfo.DomainName, fmt.Sprintf("%d", targetInfo.Port)) {

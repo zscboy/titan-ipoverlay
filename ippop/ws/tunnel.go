@@ -171,6 +171,7 @@ func (t *Tunnel) onPong(data []byte) {
 
 	timestamp := int64(binary.LittleEndian.Uint64(data))
 	t.delay = time.Since(time.UnixMicro(timestamp)).Milliseconds()
+	// metrics.TunnelDelay.WithLabelValues(t.opts.Id, t.tunMgr.config.GetNodeID()).Set(float64(t.delay))
 
 	t.waitPong.Store(0)
 }
