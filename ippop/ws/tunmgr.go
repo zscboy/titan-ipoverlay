@@ -481,7 +481,7 @@ func (tm *TunnelManager) keepalive() {
 		})
 
 		tickCount++
-		if tickCount > 2 {
+		if tickCount > 10 {
 			logx.Infof("TunnelManager.keepalive tunnel count:%d, cost:%v", count, time.Since(now))
 			tickCount = 0
 		}
