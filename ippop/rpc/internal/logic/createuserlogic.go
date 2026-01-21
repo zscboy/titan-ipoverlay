@@ -115,6 +115,10 @@ func (l *CreateUserLogic) CreateUser(in *pb.CreateUserReq) (*pb.CreateUserResp, 
 		DownloadRateLimit:          in.DownloadRateLimit,
 	}
 
+	if err := model.SaveUser(l.svcCtx.Redis, user); err != nil {
+		return nil, err
+	}
+
 	err = model.BindNodeWithNewUser(l.ctx, l.svcCtx.Redis, route.NodeId, user)
 	if err != nil {
 		return nil, err

@@ -37,7 +37,7 @@ func AddFreeNodes(ctx context.Context, redis *redis.Redis, nodeIDs []string) err
 
 func BindNodeWithNewUser(ctx context.Context, rds *redis.Redis, nodeID string, user *User) error {
 	now := time.Now().Unix()
-	userKey := fmt.Sprintf(redisKeyUser, user.UserName)
+	// userKey := fmt.Sprintf(redisKeyUser, user.UserName)
 	nodeKey := fmt.Sprintf(redisKeyNode, nodeID)
 
 	pipe, err := rds.TxPipeline()
@@ -46,7 +46,7 @@ func BindNodeWithNewUser(ctx context.Context, rds *redis.Redis, nodeID string, u
 	}
 
 	pipe.HSet(ctx, nodeKey, "bind_user", user.UserName)
-	pipe.HSet(ctx, userKey, "route_node_id", nodeID, "last_route_switch_time", now)
+	// pipe.HSet(ctx, userKey, "route_node_id", nodeID, "last_route_switch_time", now)
 	pipe.ZAdd(ctx, redisKeyUserZset, goredis.Z{Score: float64(now), Member: user.UserName})
 	pipe.ZAdd(ctx, redisKeyNodeBind, goredis.Z{Score: float64(now), Member: nodeID})
 	// Try to remove from free anyway, even if not there
