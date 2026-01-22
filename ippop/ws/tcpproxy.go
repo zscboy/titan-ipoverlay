@@ -135,7 +135,7 @@ func (proxy *TCPProxy) proxyConn() error {
 
 	buf := make([]byte, 32*1024)
 	for {
-		// 从 SOCKS5 用户读取数据（这是反向流量，不是 T1）
+		// 从 SOCKS5 用户读取数据
 		n, err := conn.Read(buf)
 
 		if err != nil {

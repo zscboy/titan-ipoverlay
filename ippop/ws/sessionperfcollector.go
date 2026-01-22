@@ -66,11 +66,19 @@ type SessionPerfRecord struct {
 	Timestamp    int64   `json:"ts"`
 }
 
+const (
+	evtStart = iota
+	evtEnd
+	evtSocksError
+	evtAuthFailure
+)
+
 // collectorEvent 内部事件
 type collectorEvent struct {
-	isStart  bool
+	typ      int // 事件类型
 	userName string
 	record   SessionPerfRecord
+	tag      string // 用于存放 error_type 等标签
 }
 
 // SessionPerfCollector 会话性能数据批量收集器
@@ -146,10 +154,15 @@ func (c *SessionPerfCollector) Start() {
 	for {
 		select {
 		case event := <-c.metricsChan:
-			if event.isStart {
+			switch event.typ {
+			case evtStart:
 				c.handleSessionStart(event.userName)
-			} else {
+			case evtEnd:
 				c.handleSessionEnd(event.record)
+			case evtSocksError:
+				metrics.SOCKS5Errors.WithLabelValues(event.tag, c.nodeID).Inc()
+			case evtAuthFailure:
+				metrics.UserAuthFailures.WithLabelValues(event.userName, c.nodeID).Inc()
 			}
 		case <-ticker.C:
 			c.Flush()
@@ -237,9 +250,25 @@ func (c *SessionPerfCollector) Stop() {
 // ReportSessionStart 异步上报会话开始
 func (c *SessionPerfCollector) ReportSessionStart(userName string) {
 	select {
-	case c.metricsChan <- collectorEvent{isStart: true, userName: userName}:
+	case c.metricsChan <- collectorEvent{typ: evtStart, userName: userName}:
 	default:
 		logx.WithContext(c.ctx).Error("SessionPerfCollector: metrics channel full, dropping start event")
+	}
+}
+
+// ReportSOCKS5Error 异步上报 SOCKS5 错误
+func (c *SessionPerfCollector) ReportSOCKS5Error(errType string) {
+	select {
+	case c.metricsChan <- collectorEvent{typ: evtSocksError, tag: errType}:
+	default:
+	}
+}
+
+// ReportAuthFailure 异步上报认证失败
+func (c *SessionPerfCollector) ReportAuthFailure(userName string) {
+	select {
+	case c.metricsChan <- collectorEvent{typ: evtAuthFailure, userName: userName}:
+	default:
 	}
 }
 
@@ -247,7 +276,7 @@ func (c *SessionPerfCollector) ReportSessionStart(userName string) {
 func (c *SessionPerfCollector) Collect(record SessionPerfRecord) {
 	// 1. 异步发送到处理通道（用于 Prometheus 指标）
 	select {
-	case c.metricsChan <- collectorEvent{isStart: false, record: record}:
+	case c.metricsChan <- collectorEvent{typ: evtEnd, record: record}:
 	default:
 		logx.WithContext(c.ctx).Error("SessionPerfCollector: metrics channel full, dropping end record")
 	}

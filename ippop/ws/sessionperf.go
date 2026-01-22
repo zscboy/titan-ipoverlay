@@ -2,12 +2,9 @@ package ws
 
 import (
 	"fmt"
-	"math/rand"
 	"time"
 
 	"titan-ipoverlay/ippop/config"
-
-	"github.com/zeromicro/go-zero/core/logx"
 )
 
 // SessionPerfStats 会话性能统计
@@ -123,53 +120,13 @@ func (s *SessionPerfStats) Close() {
 	// 检测瓶颈
 	bottleneck := s.DetectBottleneck(t1Speed, t3Speed, t2AvgUs)
 
-	// 日志输出策略（优化性能）
-	shouldLog := false
-
-	// 使用配置值，如果配置为 nil 则使用默认值
-	logSampleRate := 0.01
-	enableVerboseLog := false
-	abnormalDurationThreshold := 60 * time.Second
-
-	if s.perfConfig != nil {
-		logSampleRate = s.perfConfig.LogSampleRate
-		enableVerboseLog = s.perfConfig.EnableVerboseLog
-		abnormalDurationThreshold = time.Duration(s.perfConfig.AbnormalDurationSeconds) * time.Second
-	}
-
-	if enableVerboseLog {
-		// 详细模式：采样记录
-		shouldLog = rand.Float64() < logSampleRate
-	} else {
-		// 生产模式：只记录异常会话
-		shouldLog = (bottleneck != "balanced" && bottleneck != "too_small_to_detect") ||
-			totalDuration > abnormalDurationThreshold
-	}
-
-	if shouldLog {
-		logx.Infof("TCPProxy close: Session[%s] User[%s] Duration:%.1fs | "+
-			"T1: %.2fMB @ %.2fMB/s (reads:%d) | "+
-			"T2: avg=%dμs total=%dms (ops:%d) | "+
-			"T3: %.2fMB @ %.2fMB/s (writes:%d) | "+
-			"Bottleneck: %s",
-			s.SessionID,
-			s.UserName,
-			totalDuration.Seconds(),
-			float64(s.T1BytesReceived)/1024/1024,
-			t1Speed,
-			s.T1Count,
-			t2AvgUs,
-			s.T2Duration.Milliseconds(),
-			s.T2Count,
-			float64(s.T3BytesSent)/1024/1024,
-			t3Speed,
-			s.T3Count,
-			bottleneck,
-		)
-	}
-
-	// 提交到收集器异步处理（必做：用于平衡活跃会话数等指标）
+	// 提交到收集器异步处理
 	if s.collector != nil {
+		// 【过滤保护】：只对真正有数据的会话进行 ClickHouse 写入和详细统计收集
+		if (s.T1Count == 0 && s.T4BytesReceived == 0) || s.TargetDomain == "" {
+			return
+		}
+
 		s.collector.Collect(SessionPerfRecord{
 			SessionID:    s.SessionID,
 			UserName:     s.UserName,

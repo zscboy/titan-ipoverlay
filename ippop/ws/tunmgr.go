@@ -379,26 +379,41 @@ func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks
 	}
 
 	if tm.filterRules.isDeny(targetInfo.DomainName, fmt.Sprintf("%d", targetInfo.Port)) {
+		if tm.perfCollector != nil {
+			tm.perfCollector.ReportSOCKS5Error("policy_deny")
+		}
 		return fmt.Errorf("tcp: target %s:%d have been deny", targetInfo.DomainName, targetInfo.Port)
 	}
 
 	user, err := tm.getUserFromCache(targetInfo.Username)
 	if err != nil {
+		if tm.perfCollector != nil {
+			tm.perfCollector.ReportSOCKS5Error("internal_error")
+		}
 		return err
 	}
 
 	mode := model.RouteMode(user.RouteMode)
 	allocator := tm.allocatorRegistry.Get(mode)
 	if allocator == nil {
+		if tm.perfCollector != nil {
+			tm.perfCollector.ReportSOCKS5Error("invalid_mode")
+		}
 		return fmt.Errorf("no allocator for mode %v", mode)
 	}
 
 	tun, userSession, err := allocator.Allocate(user, targetInfo)
 	if err != nil {
+		if tm.perfCollector != nil {
+			tm.perfCollector.ReportSOCKS5Error("allocate_fail")
+		}
 		return err
 	}
 
 	if tun == nil {
+		if tm.perfCollector != nil {
+			tm.perfCollector.ReportSOCKS5Error("no_node_available")
+		}
 		return fmt.Errorf("can not allocate tunnel, user %s", targetInfo.Username)
 	}
 
@@ -449,21 +464,33 @@ func (tm *TunnelManager) HandleUserAuth(userName, password string) error {
 	}
 
 	if user == nil {
+		if tm.perfCollector != nil {
+			tm.perfCollector.ReportAuthFailure(userName)
+		}
 		return fmt.Errorf("user %s not exist", userName)
 	}
 
 	if user.Off {
+		if tm.perfCollector != nil {
+			tm.perfCollector.ReportAuthFailure(userName)
+		}
 		return fmt.Errorf("user %s off", userName)
 	}
 
 	hash := md5.Sum([]byte(password))
 	passwordMD5 := hex.EncodeToString(hash[:])
 	if user.PasswordMD5 != passwordMD5 {
+		if tm.perfCollector != nil {
+			tm.perfCollector.ReportAuthFailure(userName)
+		}
 		return fmt.Errorf("password not match")
 	}
 
 	now := time.Now().Unix()
 	if now < user.StartTime || now > user.EndTime {
+		if tm.perfCollector != nil {
+			tm.perfCollector.ReportAuthFailure(userName)
+		}
 		startTime := time.Unix(user.StartTime, 0)
 		endTime := time.Unix(user.EndTime, 0)
 		return fmt.Errorf("user %s is out of date[%s~%s]", userName, startTime.Format(time.RFC3339), endTime.Format(time.RFC3339))
