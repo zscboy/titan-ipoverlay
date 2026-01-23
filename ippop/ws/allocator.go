@@ -5,6 +5,7 @@ import (
 	"context"
 	"sync"
 	"time"
+	"titan-ipoverlay/ippop/config"
 	"titan-ipoverlay/ippop/model"
 	"titan-ipoverlay/ippop/socks5"
 )
@@ -12,10 +13,13 @@ import (
 // NodeSource defines the capabilities required from the tunnel provider.
 type NodeSource interface {
 	AcquireExclusiveNode(ctx context.Context) (*Tunnel, error)
+	AcquireExclusiveNodeByIP(ctx context.Context) (string, *Tunnel, error)
 	ReleaseExclusiveNodes(nodeIDs []string)
+	ReleaseExclusiveNodeByIP(ip string)
 	GetLocalTunnel(nodeID string) *Tunnel
 	PickActiveTunnel() (*Tunnel, error)
 	SwitchNodeForUser(user *model.User) error
+	GetNodeAllocateStrategy() config.NodeAllocateStrategy
 }
 
 // UserSession tracks the binding between a user session and a node.
@@ -23,6 +27,7 @@ type UserSession struct {
 	username     string
 	sessionID    string
 	deviceID     string
+	exitIP       string
 	connectCount int32         // Reference count of active connections
 	disconnectAt time.Time     // Time when connectCount became zero
 	idleElement  *list.Element // Pointer to the element in SessionManager's idleList

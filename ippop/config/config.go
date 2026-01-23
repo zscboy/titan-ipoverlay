@@ -15,6 +15,13 @@ const (
 	TunnelSelectRound  TunnelSelectPolicy = "round"
 )
 
+type NodeAllocateStrategy string
+
+const (
+	NodeAllocateRedis  NodeAllocateStrategy = "redis"
+	NodeAllocateIPPool NodeAllocateStrategy = "ippool"
+)
+
 type JwtAuth struct {
 	AccessSecret string
 	AccessExpire int64
@@ -40,6 +47,8 @@ type WS struct {
 	UploadRateLimit int64 `json:",default=655360"`
 	//lint:ignore SA5008 go-zero allows "default" in struct tags
 	TunnelSelectPolicy TunnelSelectPolicy `json:",default=random"`
+	//lint:ignore SA5008 go-zero allows "default" in struct tags
+	NodeAllocateStrategy NodeAllocateStrategy `json:",default=redis"`
 }
 
 type FilterRule struct {

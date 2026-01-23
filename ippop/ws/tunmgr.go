@@ -60,6 +60,7 @@ type TunnelManager struct {
 	ipBlacklist sync.Map
 
 	// HealthStatsMap sync.Map
+	ipPool *IPPool
 }
 
 func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
@@ -78,6 +79,7 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 		rng:             rand.New(rand.NewSource(time.Now().UnixNano())),
 
 		tunnelList: make([]*Tunnel, 0, 100000),
+		ipPool:     NewIPPool(),
 	}
 
 	tm.sessionManager = NewSessionManager(tm, userSessionExpireDuration)
@@ -124,6 +126,9 @@ func (tm *TunnelManager) addTunnel(t *Tunnel) {
 
 	rrIdx := atomic.LoadUint64(&tm.rrIdx)
 	atomic.StoreUint64(&tm.rrIdx, rrIdx%uint64(len(tm.tunnelList)))
+
+	tm.tunnels.Store(t.opts.Id, t)
+	tm.ipPool.AddTunnel(t)
 }
 
 // 删除 tunnel
@@ -161,6 +166,9 @@ func (tm *TunnelManager) removeTunnel(tun *Tunnel) {
 	} else {
 		atomic.StoreUint64(&tm.rrIdx, 0)
 	}
+
+	tm.tunnels.Delete(tun.opts.Id)
+	tm.ipPool.RemoveTunnel(tun)
 }
 
 func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, nodeIP string) {
@@ -207,14 +215,14 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, n
 	}
 
 	tun := newTunnel(conn, tm, opts)
-	tm.tunnels.Store(node.Id, tun)
+
 	// tm.HealthStatsMap.LoadOrStore(node.Id, &HealthStats{})
 
 	tm.addTunnel(tun)
 
 	defer tun.leaseComplete()
 
-	defer tm.tunnels.Delete(node.Id)
+	// defer tm.tunnels.Delete(node.Id)
 	defer tm.removeTunnel(tun)
 
 	if err := model.HandleNodeOnline(context.Background(), tm.redis, node); err != nil {
@@ -335,6 +343,22 @@ func (tm *TunnelManager) ReleaseExclusiveNodes(nodeIDs []string) {
 	if err != nil {
 		logx.Errorf("ReleaseExclusiveNodes failed: %v", err)
 	}
+}
+
+func (tm *TunnelManager) GetNodeAllocateStrategy() config.NodeAllocateStrategy {
+	return tm.config.WS.NodeAllocateStrategy
+}
+
+func (tm *TunnelManager) AcquireExclusiveNodeByIP(ctx context.Context) (string, *Tunnel, error) {
+	ip, tun := tm.ipPool.AcquireIP()
+	if tun == nil {
+		return "", nil, fmt.Errorf("no free ip found in pool")
+	}
+	return ip, tun, nil
+}
+
+func (tm *TunnelManager) ReleaseExclusiveNodeByIP(ip string) {
+	tm.ipPool.ReleaseIP(ip)
 }
 
 func (tm *TunnelManager) GetLocalTunnel(nodeID string) *Tunnel {

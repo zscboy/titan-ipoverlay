@@ -6,6 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	config "titan-ipoverlay/ippop/config"
 	"titan-ipoverlay/ippop/model"
 	"titan-ipoverlay/ippop/socks5"
 
@@ -68,19 +69,21 @@ func (sm *SessionManager) GetAndActivate(username, sessionID string) (*UserSessi
 	return sess, tun
 }
 
-// UpdateDeviceID safely updates the deviceID of a session
-func (sm *SessionManager) UpdateDeviceID(sess *UserSession, deviceID string) {
+// UpdateAllocation safely updates the deviceID and exitIP of a session
+func (sm *SessionManager) UpdateAllocation(sess *UserSession, deviceID, exitIP string) {
 	sm.lock.Lock()
 	defer sm.lock.Unlock()
 	sess.deviceID = deviceID
+	sess.exitIP = exitIP
 }
 
-func (sm *SessionManager) Create(username, sessionID, deviceID string) *UserSession {
+func (sm *SessionManager) Create(username, sessionID, deviceID, exitIP string) *UserSession {
 	key := sessionKey{username, sessionID}
 	sess := &UserSession{
 		username:  username,
 		sessionID: sessionID,
 		deviceID:  deviceID,
+		exitIP:    exitIP,
 	}
 	sm.lock.Lock()
 	sm.sessions[key] = sess
@@ -141,6 +144,7 @@ func (sm *SessionManager) checkAndClean() {
 
 	now := time.Now()
 	var nodesToRelease []string
+	var ipsToRelease []string
 	for {
 		element := sm.idleList.Front()
 		if element == nil {
@@ -162,8 +166,12 @@ func (sm *SessionManager) checkAndClean() {
 			sm.idleList.Remove(element)
 			sess.idleElement = nil
 
-			// Collect node IDs for batch release
-			nodesToRelease = append(nodesToRelease, sess.deviceID)
+			// Collect node IDs or IPs for batch release
+			if sess.exitIP != "" {
+				ipsToRelease = append(ipsToRelease, sess.exitIP)
+			} else {
+				nodesToRelease = append(nodesToRelease, sess.deviceID)
+			}
 		} else {
 			// Should have been removed by OnSessionActive, but for safety:
 			sm.idleList.Remove(element)
@@ -173,6 +181,10 @@ func (sm *SessionManager) checkAndClean() {
 
 	if len(nodesToRelease) > 0 {
 		sm.source.ReleaseExclusiveNodes(nodesToRelease)
+	}
+
+	for _, ip := range ipsToRelease {
+		sm.source.ReleaseExclusiveNodeByIP(ip)
 	}
 }
 
@@ -198,17 +210,34 @@ func (a *SessionAllocator) Allocate(user *model.User, target *socks5.SocksTarget
 	}
 
 	// If we reach here, either sess is nil OR tun is dead.
-	// Allocate new exclusive node
-	tun, err := a.source.AcquireExclusiveNode(context.Background())
-	if err != nil {
-		return nil, nil, err
+	// Choose allocation strategy based on config
+	strategy := a.source.GetNodeAllocateStrategy()
+	var exitIP string
+	var err error
+
+	if strategy == config.NodeAllocateIPPool {
+		exitIP, tun, err = a.source.AcquireExclusiveNodeByIP(context.Background())
+		if err != nil {
+			logx.Errorf("SessionAllocator: AcquireExclusiveNodeByIP failed: %v, falling back to AcquireExclusiveNode", err)
+			tun, err = a.source.AcquireExclusiveNode(context.Background())
+			if err != nil {
+				return nil, nil, err
+			}
+			exitIP = ""
+		}
+	} else {
+		tun, err = a.source.AcquireExclusiveNode(context.Background())
+		if err != nil {
+			return nil, nil, err
+		}
+		exitIP = ""
 	}
 
 	if sess == nil {
-		sess = a.sm.Create(user.UserName, target.Session, tun.opts.Id)
+		sess = a.sm.Create(user.UserName, target.Session, tun.opts.Id, exitIP)
 	} else {
-		// Update existing session with new device node
-		a.sm.UpdateDeviceID(sess, tun.opts.Id)
+		// Update existing session with new device node and IP
+		a.sm.UpdateAllocation(sess, tun.opts.Id, exitIP)
 	}
 
 	a.sm.Activate(sess)

@@ -590,11 +590,25 @@ func (t *Tunnel) onClose() {
 }
 
 func (t *Tunnel) clearProxys() {
+	count := t.proxys.Count()
+	if count > 0 {
+		logx.Infof("Tunnel %s %s disconnected, cleaning up %d proxies", t.opts.Id, t.opts.IP, count)
+	}
+
 	t.proxys.Range(func(key, value any) bool {
-		session, ok := value.(*TCPProxy)
-		if ok {
+		// Try TCPProxy
+		if session, ok := value.(*TCPProxy); ok {
+			logx.Errorf("Tunnel %s %s disconnected, closing TCPProxy session %s for user %s", t.opts.Id, t.opts.IP, session.id, session.userName)
 			session.close()
+			return true
 		}
+
+		// Try UDPProxy
+		if session, ok := value.(*UDPProxy); ok {
+			logx.Errorf("Tunnel %s %s disconnected, closing UDPProxy session %s for user %s", t.opts.Id, t.opts.IP, session.id, session.udpInfo.UserName)
+			return true
+		}
+
 		return true
 	})
 	t.proxys.Clear()
