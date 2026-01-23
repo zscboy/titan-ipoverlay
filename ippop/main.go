@@ -35,6 +35,7 @@ func newWS(config config.Config, tunMgr *ws.TunnelManager) *rest.Server {
 
 	nodews := ws.NewNodeWS(tunMgr)
 	nodePop := ws.NewNodePop(&config)
+	sessionQuery := ws.NewSessionQuery(tunMgr)
 
 	// httpproxy := pophttp.NewHttProxy(tunMgr)
 
@@ -47,6 +48,11 @@ func newWS(config config.Config, tunMgr *ws.TunnelManager) *rest.Server {
 		Method:  "GET",
 		Path:    "/node/pop",
 		Handler: nodePop.ServeNodePop,
+	})
+	server.AddRoute(rest.Route{
+		Method:  "GET",
+		Path:    "/session/query",
+		Handler: sessionQuery.ServeSessionQuery,
 	})
 	return server
 

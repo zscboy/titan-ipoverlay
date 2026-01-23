@@ -36,6 +36,12 @@ func NewSessionManager(source NodeSource, expire time.Duration) *SessionManager 
 	return sm
 }
 
+func (sm *SessionManager) GetSession(username, sessionID string) *UserSession {
+	sm.lock.RLock()
+	defer sm.lock.RUnlock()
+	return sm.sessions[sessionKey{username, sessionID}]
+}
+
 func (sm *SessionManager) GetAndActivate(username, sessionID string) (*UserSession, *Tunnel) {
 	key := sessionKey{username, sessionID}
 	sm.lock.Lock()
