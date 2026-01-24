@@ -113,6 +113,9 @@ func (tm *TunnelManager) loadBlacklist() {
 
 // 添加 tunnel
 func (tm *TunnelManager) addTunnel(t *Tunnel) {
+	// tunnels contain blacklisted node
+	tm.tunnels.Store(t.opts.Id, t)
+
 	if t.opts.IsBlacklisted {
 		logx.Infof("addTunnel error: %s %s is in blacklist", t.opts.Id, t.opts.IP)
 		return
@@ -127,12 +130,14 @@ func (tm *TunnelManager) addTunnel(t *Tunnel) {
 	rrIdx := atomic.LoadUint64(&tm.rrIdx)
 	atomic.StoreUint64(&tm.rrIdx, rrIdx%uint64(len(tm.tunnelList)))
 
-	tm.tunnels.Store(t.opts.Id, t)
 	tm.ipPool.AddTunnel(t)
 }
 
 // 删除 tunnel
 func (tm *TunnelManager) removeTunnel(tun *Tunnel) {
+	// tunnels contain blacklisted node
+	tm.tunnels.Delete(tun.opts.Id)
+
 	if tun.opts.IsBlacklisted {
 		logx.Infof("removeTunnel error: %s %s is in blacklist", tun.opts.Id, tun.opts.IP)
 		return
@@ -167,7 +172,6 @@ func (tm *TunnelManager) removeTunnel(tun *Tunnel) {
 		atomic.StoreUint64(&tm.rrIdx, 0)
 	}
 
-	tm.tunnels.Delete(tun.opts.Id)
 	tm.ipPool.RemoveTunnel(tun)
 }
 
@@ -215,14 +219,10 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, n
 	}
 
 	tun := newTunnel(conn, tm, opts)
-
+	tm.addTunnel(tun)
 	// tm.HealthStatsMap.LoadOrStore(node.Id, &HealthStats{})
 
-	tm.addTunnel(tun)
-
 	defer tun.leaseComplete()
-
-	// defer tm.tunnels.Delete(node.Id)
 	defer tm.removeTunnel(tun)
 
 	if err := model.HandleNodeOnline(context.Background(), tm.redis, node); err != nil {
@@ -335,6 +335,7 @@ func (tm *TunnelManager) AcquireExclusiveNode(ctx context.Context) (string, *Tun
 }
 
 func (tm *TunnelManager) ReleaseExclusiveNodes(nodeIDs []string, ips []string) {
+	now := time.Now()
 	// Only release nodes that are still online locally
 	if len(nodeIDs) > 0 {
 		onlineNodes := make([]string, 0, len(nodeIDs))
@@ -355,6 +356,8 @@ func (tm *TunnelManager) ReleaseExclusiveNodes(nodeIDs []string, ips []string) {
 	for _, ip := range ips {
 		tm.ipPool.ReleaseIP(ip)
 	}
+
+	logx.Infof("TunnelManager.ReleaseExclusiveNodes cose %v", time.Since(now))
 }
 
 func (tm *TunnelManager) GetLocalTunnel(nodeID string) *Tunnel {
