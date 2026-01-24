@@ -6,7 +6,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-	config "titan-ipoverlay/ippop/config"
 	"titan-ipoverlay/ippop/model"
 	"titan-ipoverlay/ippop/socks5"
 
@@ -179,12 +178,8 @@ func (sm *SessionManager) checkAndClean() {
 		}
 	}
 
-	if len(nodesToRelease) > 0 {
-		sm.source.ReleaseExclusiveNodes(nodesToRelease)
-	}
-
-	for _, ip := range ipsToRelease {
-		sm.source.ReleaseExclusiveNodeByIP(ip)
+	if len(nodesToRelease) > 0 || len(ipsToRelease) > 0 {
+		sm.source.ReleaseExclusiveNodes(nodesToRelease, ipsToRelease)
 	}
 }
 
@@ -210,27 +205,10 @@ func (a *SessionAllocator) Allocate(user *model.User, target *socks5.SocksTarget
 	}
 
 	// If we reach here, either sess is nil OR tun is dead.
-	// Choose allocation strategy based on config
-	strategy := a.source.GetNodeAllocateStrategy()
-	var exitIP string
-	var err error
-
-	if strategy == config.NodeAllocateIPPool {
-		exitIP, tun, err = a.source.AcquireExclusiveNodeByIP(context.Background())
-		if err != nil {
-			logx.Errorf("SessionAllocator: AcquireExclusiveNodeByIP failed: %v, falling back to AcquireExclusiveNode", err)
-			tun, err = a.source.AcquireExclusiveNode(context.Background())
-			if err != nil {
-				return nil, nil, err
-			}
-			exitIP = ""
-		}
-	} else {
-		tun, err = a.source.AcquireExclusiveNode(context.Background())
-		if err != nil {
-			return nil, nil, err
-		}
-		exitIP = ""
+	// Allocate new exclusive node
+	exitIP, tun, err := a.source.AcquireExclusiveNode(context.Background())
+	if err != nil {
+		return nil, nil, err
 	}
 
 	if sess == nil {

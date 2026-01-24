@@ -311,54 +311,50 @@ func (tm *TunnelManager) getTunnelByUser(user *model.User) (*Tunnel, error) {
 
 // NodeSource Interface Implementation
 
-func (tm *TunnelManager) AcquireExclusiveNode(ctx context.Context) (*Tunnel, error) {
+func (tm *TunnelManager) AcquireExclusiveNode(ctx context.Context) (string, *Tunnel, error) {
+	if tm.config.WS.NodeAllocateStrategy == config.NodeAllocateIPPool {
+		ip, tun := tm.ipPool.AcquireIP()
+		if tun == nil {
+			return "", nil, fmt.Errorf("no free ip found in pool")
+		}
+		return ip, tun, nil
+	}
+
 	nodeIDBytes, err := model.AllocateFreeNode(ctx, tm.redis)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 	nodeID := string(nodeIDBytes)
 	v, ok := tm.tunnels.Load(nodeID)
 	if !ok {
 		// If tunnel is not online locally, we don't put it back to free pool
 		// because the free pool should only contain online/available nodes.
-		return nil, fmt.Errorf("node %s allocated but not found in local tunnels", nodeID)
+		return "", nil, fmt.Errorf("node %s allocated but not found in local tunnels", nodeID)
 	}
-	return v.(*Tunnel), nil
+	return "", v.(*Tunnel), nil
 }
 
-func (tm *TunnelManager) ReleaseExclusiveNodes(nodeIDs []string) {
+func (tm *TunnelManager) ReleaseExclusiveNodes(nodeIDs []string, ips []string) {
 	// Only release nodes that are still online locally
-	onlineNodes := make([]string, 0, len(nodeIDs))
-	for _, id := range nodeIDs {
-		if _, ok := tm.tunnels.Load(id); ok {
-			onlineNodes = append(onlineNodes, id)
+	if len(nodeIDs) > 0 {
+		onlineNodes := make([]string, 0, len(nodeIDs))
+		for _, id := range nodeIDs {
+			if _, ok := tm.tunnels.Load(id); ok {
+				onlineNodes = append(onlineNodes, id)
+			}
+		}
+
+		if len(onlineNodes) > 0 {
+			err := model.AddFreeNodes(context.Background(), tm.redis, onlineNodes)
+			if err != nil {
+				logx.Errorf("ReleaseExclusiveNodes failed: %v", err)
+			}
 		}
 	}
 
-	if len(onlineNodes) == 0 {
-		return
+	for _, ip := range ips {
+		tm.ipPool.ReleaseIP(ip)
 	}
-
-	err := model.AddFreeNodes(context.Background(), tm.redis, onlineNodes)
-	if err != nil {
-		logx.Errorf("ReleaseExclusiveNodes failed: %v", err)
-	}
-}
-
-func (tm *TunnelManager) GetNodeAllocateStrategy() config.NodeAllocateStrategy {
-	return tm.config.WS.NodeAllocateStrategy
-}
-
-func (tm *TunnelManager) AcquireExclusiveNodeByIP(ctx context.Context) (string, *Tunnel, error) {
-	ip, tun := tm.ipPool.AcquireIP()
-	if tun == nil {
-		return "", nil, fmt.Errorf("no free ip found in pool")
-	}
-	return ip, tun, nil
-}
-
-func (tm *TunnelManager) ReleaseExclusiveNodeByIP(ip string) {
-	tm.ipPool.ReleaseIP(ip)
 }
 
 func (tm *TunnelManager) GetLocalTunnel(nodeID string) *Tunnel {

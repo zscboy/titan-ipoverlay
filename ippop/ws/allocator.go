@@ -5,21 +5,17 @@ import (
 	"context"
 	"sync"
 	"time"
-	"titan-ipoverlay/ippop/config"
 	"titan-ipoverlay/ippop/model"
 	"titan-ipoverlay/ippop/socks5"
 )
 
 // NodeSource defines the capabilities required from the tunnel provider.
 type NodeSource interface {
-	AcquireExclusiveNode(ctx context.Context) (*Tunnel, error)
-	AcquireExclusiveNodeByIP(ctx context.Context) (string, *Tunnel, error)
-	ReleaseExclusiveNodes(nodeIDs []string)
-	ReleaseExclusiveNodeByIP(ip string)
+	AcquireExclusiveNode(ctx context.Context) (string, *Tunnel, error)
+	ReleaseExclusiveNodes(nodeIDs []string, ips []string)
 	GetLocalTunnel(nodeID string) *Tunnel
 	PickActiveTunnel() (*Tunnel, error)
 	SwitchNodeForUser(user *model.User) error
-	GetNodeAllocateStrategy() config.NodeAllocateStrategy
 }
 
 // UserSession tracks the binding between a user session and a node.
