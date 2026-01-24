@@ -110,3 +110,11 @@ func (p *IPPool) ReleaseIP(ip string) {
 		entry.element = p.freeList.PushBack(entry)
 	}
 }
+
+func (p *IPPool) GetIPCount() (ipCount int, freeCount int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	ipCount = len(p.allIPs)
+	freeCount = p.freeList.Len()
+	return
+}

@@ -538,7 +538,8 @@ func (tm *TunnelManager) keepalive() {
 
 		tickCount++
 		if tickCount > 10 {
-			logx.Infof("TunnelManager.keepalive tunnel count:%d, cost:%v", count, time.Since(now))
+			ipCount, freeCount := tm.ipPool.GetIPCount()
+			logx.Infof("TunnelManager.keepalive tunnel count:%d, cost:%v, ipCount:%d, freeCount:%d", count, time.Since(now), ipCount, freeCount)
 			tickCount = 0
 		}
 	}
