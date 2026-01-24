@@ -57,6 +57,8 @@ type TunnelManager struct {
 
 	rng *rand.Rand
 
+	ipBlacklist sync.Map
+
 	// HealthStatsMap sync.Map
 }
 
@@ -85,6 +87,8 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 	tm.allocatorRegistry.Register(model.RouteModeTimed, NewStaticAllocator(tm))
 	tm.allocatorRegistry.Register(model.RouteModeCustom, NewSessionAllocator(tm.sessionManager, tm))
 
+	tm.loadBlacklist()
+
 	go tm.keepalive()
 	go tm.setNodeOnlineDataExpire()
 	go tm.startUserTrafficTimer()
@@ -92,8 +96,26 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 	return tm
 }
 
+func (tm *TunnelManager) loadBlacklist() {
+	ips, err := model.GetBlacklist(tm.redis)
+	if err != nil {
+		logx.Errorf("loadBlacklist error: %v", err)
+		return
+	}
+
+	for _, ip := range ips {
+		tm.ipBlacklist.Store(ip, struct{}{})
+	}
+	logx.Infof("loadBlacklist success, count: %d", len(ips))
+}
+
 // 添加 tunnel
 func (tm *TunnelManager) addTunnel(t *Tunnel) {
+	if t.opts.IsBlacklisted {
+		logx.Infof("addTunnel error: %s %s is in blacklist", t.opts.Id, t.opts.IP)
+		return
+	}
+
 	tm.tunnelListLock.Lock()
 	defer tm.tunnelListLock.Unlock()
 
@@ -106,6 +128,11 @@ func (tm *TunnelManager) addTunnel(t *Tunnel) {
 
 // 删除 tunnel
 func (tm *TunnelManager) removeTunnel(tun *Tunnel) {
+	if tun.opts.IsBlacklisted {
+		logx.Infof("removeTunnel error: %s %s is in blacklist", tun.opts.Id, tun.opts.IP)
+		return
+	}
+
 	tm.tunnelListLock.Lock()
 	defer tm.tunnelListLock.Unlock()
 
@@ -156,6 +183,10 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, n
 		node = &model.Node{Id: req.NodeId, RegisterAt: time.Now().Format(model.TimeLayout)}
 	}
 
+	if _, ok := tm.ipBlacklist.Load(nodeIP); ok {
+		node.IsBlacklisted = true
+	}
+
 	node.OS = req.OS
 	node.Version = req.Version
 	node.IP = nodeIP
@@ -172,6 +203,7 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, n
 		TCPTimeout:        int(config.Socks5.TCPTimeout),
 		DownloadRateLimti: config.WS.DownloadRateLimit,
 		UploadRateLimit:   config.WS.UploadRateLimit,
+		IsBlacklisted:     node.IsBlacklisted,
 	}
 
 	tun := newTunnel(conn, tm, opts)

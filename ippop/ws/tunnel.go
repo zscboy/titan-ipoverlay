@@ -38,6 +38,7 @@ type TunOptions struct {
 	TCPTimeout        int
 	DownloadRateLimti int64
 	UploadRateLimit   int64
+	IsBlacklisted     bool
 }
 
 type TrafficStats struct {

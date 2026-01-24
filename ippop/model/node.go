@@ -99,7 +99,7 @@ func GetNode(ctx context.Context, redis *redis.Redis, id string) (*Node, error) 
 
 	hgetallCmd := pipe.HGetAll(ctx, key)
 	onlineCmd := pipe.SIsMember(ctx, redisKeyNodeOnline, id)
-	blacklistCmd := pipe.SIsMember(ctx, redisKeyNodeBlacklist, id)
+	// blacklistCmd := pipe.SIsMember(ctx, redisKeyNodeBlacklist, id)
 
 	_, err = pipe.Exec(ctx)
 	if err != nil {
@@ -121,7 +121,7 @@ func GetNode(ctx context.Context, redis *redis.Redis, id string) (*Node, error) 
 
 	node.Id = id
 	node.Online, _ = onlineCmd.Result()
-	node.IsBlacklisted, _ = blacklistCmd.Result()
+	// node.IsBlacklisted, _ = blacklistCmd.Result()
 
 	return node, nil
 }
