@@ -357,7 +357,7 @@ func (tm *TunnelManager) ReleaseExclusiveNodes(nodeIDs []string, ips []string) {
 		tm.ipPool.ReleaseIP(ip)
 	}
 
-	logx.Infof("TunnelManager.ReleaseExclusiveNodes cose %v", time.Since(now))
+	logx.Infof("TunnelManager.ReleaseExclusiveNodes nodeIDs len:%d, ips len:%d cost %v", len(nodeIDs), len(ips), time.Since(now))
 }
 
 func (tm *TunnelManager) GetLocalTunnel(nodeID string) *Tunnel {

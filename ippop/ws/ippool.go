@@ -7,10 +7,10 @@ import (
 
 // ipEntry tracks an IP and its associated tunnels
 type ipEntry struct {
-	ip      string
-	tunnels map[string]*Tunnel // nodeID -> Tunnel
-	element *list.Element      // Pointer to position in freeList
-	// busy    bool               // Whether this IP is currently assigned to a session
+	ip             string
+	tunnels        map[string]*Tunnel // nodeID -> Tunnel
+	element        *list.Element      // Pointer to position in freeList
+	assignedNodeID string             // The nodeID currently given out by AcquireIP
 }
 
 // IPPool manages a pool of unique exit IPs from connected nodes
@@ -62,6 +62,16 @@ func (p *IPPool) RemoveTunnel(t *Tunnel) {
 
 	delete(entry.tunnels, t.opts.Id)
 
+	// If the tunnel being removed was the one assigned to a session
+	if entry.assignedNodeID == t.opts.Id {
+		entry.assignedNodeID = ""
+		// If the IP was Busy (element == nil) but still has other tunnels,
+		// return it to freeList so it can be re-acquired (avoid leak)
+		if entry.element == nil && len(entry.tunnels) > 0 {
+			entry.element = p.freeList.PushBack(entry)
+		}
+	}
+
 	// If no more tunnels for this IP, remove the IP from the pool
 	if len(entry.tunnels) == 0 {
 		if entry.element != nil {
@@ -85,10 +95,10 @@ func (p *IPPool) AcquireIP() (string, *Tunnel) {
 	entry := element.Value.(*ipEntry)
 	p.freeList.Remove(element)
 	entry.element = nil
-	// entry.busy = true
 
-	// Pick a tunnel (pick the first available one)
-	for _, t := range entry.tunnels {
+	// Pick a tunnel and record its ID
+	for id, t := range entry.tunnels {
+		entry.assignedNodeID = id
 		return entry.ip, t
 	}
 
@@ -105,8 +115,9 @@ func (p *IPPool) ReleaseIP(ip string) {
 		return
 	}
 
-	// entry.busy = false
+	// return to free list
 	if entry.element == nil && len(entry.tunnels) > 0 {
+		entry.assignedNodeID = ""
 		entry.element = p.freeList.PushBack(entry)
 	}
 }
