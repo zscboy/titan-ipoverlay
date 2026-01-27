@@ -149,6 +149,7 @@ func (tm *TunnelManager) removeTunnel(tun *Tunnel) {
 	idx := tun.index
 	last := len(tm.tunnelList) - 1
 	if idx < 0 || idx > last {
+		logx.Errorf("removeTunnel error: invalid index %d for tunnel %s, current list size %d", idx, tun.opts.Id, len(tm.tunnelList))
 		return
 	}
 
@@ -329,6 +330,7 @@ func (tm *TunnelManager) AcquireExclusiveNode(ctx context.Context) (string, *Tun
 	if !ok {
 		// If tunnel is not online locally, we don't put it back to free pool
 		// because the free pool should only contain online/available nodes.
+		logx.Errorf("AcquireExclusiveNode error: node %s allocated but not found in local tunnels", nodeID)
 		return "", nil, fmt.Errorf("node %s allocated but not found in local tunnels", nodeID)
 	}
 	return "", v.(*Tunnel), nil
@@ -440,7 +442,11 @@ func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks
 		return fmt.Errorf("can not allocate tunnel, user %s", targetInfo.Username)
 	}
 
-	logx.Debugf("allocate tun %s for user %s session %s", tun.opts.Id, targetInfo.Username, targetInfo.Session)
+	if targetInfo.Session != "" {
+		logx.Infof("HandleSocks5TCP: user %s session %s allocated on node %s", targetInfo.Username, targetInfo.Session, tun.opts.Id)
+	} else {
+		logx.Debugf("HandleSocks5TCP: user %s allocated on node %s", targetInfo.Username, tun.opts.Id)
+	}
 
 	if userSession != nil {
 		defer tm.sessionManager.Decrement(userSession)

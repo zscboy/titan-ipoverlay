@@ -114,7 +114,7 @@ func (proxy *TCPProxy) proxyConn() error {
 				return nil
 			}
 
-			logx.Infof("proxy.proxyConn error: %v", err)
+			logx.Infof("Tunnel %s proxy.proxyConn error user %s session %s: %v", proxy.tunnel.opts.Id, proxy.userName, proxy.id, err)
 			if !proxy.isCloseByClient {
 				proxy.tunnel.onProxyTCPConnClose(proxy.id)
 			}
