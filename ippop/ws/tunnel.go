@@ -177,17 +177,6 @@ func (t *Tunnel) onPong(data []byte) {
 }
 
 func (t *Tunnel) serve() {
-	defer func() {
-		// Tunnel 挂了时，强制结算所有还没结束的会话，确保 T1/T2/T3 统计不丢失
-		t.proxys.Range(func(key, value any) bool {
-			if proxy, ok := value.(*TCPProxy); ok {
-				proxy.close()
-			}
-			return true
-		})
-		t.proxys.Clear()
-	}()
-
 	for {
 		// T1 开始：由 readMessageWithLimitRate 内部精确捕获消息到达时间
 		_, message, t1StartTime, t1EndTime, err := t.readMessageWithLimitRate()

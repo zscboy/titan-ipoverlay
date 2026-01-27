@@ -379,41 +379,31 @@ func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks
 	}
 
 	if tm.filterRules.isDeny(targetInfo.DomainName, fmt.Sprintf("%d", targetInfo.Port)) {
-		if tm.perfCollector != nil {
-			tm.perfCollector.ReportSOCKS5Error("policy_deny")
-		}
+		tm.reportSOCKS5Error("policy_deny")
 		return fmt.Errorf("tcp: target %s:%d have been deny", targetInfo.DomainName, targetInfo.Port)
 	}
 
 	user, err := tm.getUserFromCache(targetInfo.Username)
 	if err != nil {
-		if tm.perfCollector != nil {
-			tm.perfCollector.ReportSOCKS5Error("internal_error")
-		}
+		tm.reportSOCKS5Error("internal_error")
 		return err
 	}
 
 	mode := model.RouteMode(user.RouteMode)
 	allocator := tm.allocatorRegistry.Get(mode)
 	if allocator == nil {
-		if tm.perfCollector != nil {
-			tm.perfCollector.ReportSOCKS5Error("invalid_mode")
-		}
+		tm.reportSOCKS5Error("invalid_mode")
 		return fmt.Errorf("no allocator for mode %v", mode)
 	}
 
 	tun, userSession, err := allocator.Allocate(user, targetInfo)
 	if err != nil {
-		if tm.perfCollector != nil {
-			tm.perfCollector.ReportSOCKS5Error("allocate_fail")
-		}
+		tm.reportSOCKS5Error("allocate_fail")
 		return err
 	}
 
 	if tun == nil {
-		if tm.perfCollector != nil {
-			tm.perfCollector.ReportSOCKS5Error("no_node_available")
-		}
+		tm.reportSOCKS5Error("no_node_available")
 		return fmt.Errorf("can not allocate tunnel, user %s", targetInfo.Username)
 	}
 
