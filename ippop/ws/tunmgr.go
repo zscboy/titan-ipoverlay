@@ -45,9 +45,7 @@ type TunnelManager struct {
 	allocatorRegistry *AllocatorRegistry
 	sessionManager    *SessionManager
 
-	filterRules     *Rules
-	userSessionMap  map[string]map[string]*UserSession
-	userSessionLock sync.Mutex
+	filterRules *Rules
 
 	socks5ConnCount atomic.Int64
 
@@ -69,14 +67,12 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 	}
 
 	tm := &TunnelManager{
-		config:          config,
-		redis:           redis,
-		userTraffic:     newUserTraffic(),
-		userCache:       gcache.New(userCacheSize).LRU().Build(),
-		filterRules:     &Rules{rules: RulesToMap(config.FilterRules.Rules), defaultAction: config.FilterRules.DefaultAction},
-		userSessionMap:  make(map[string]map[string]*UserSession),
-		userSessionLock: sync.Mutex{},
-		rng:             rand.New(rand.NewSource(time.Now().UnixNano())),
+		config:      config,
+		redis:       redis,
+		userTraffic: newUserTraffic(),
+		userCache:   gcache.New(userCacheSize).LRU().Build(),
+		filterRules: &Rules{rules: RulesToMap(config.FilterRules.Rules), defaultAction: config.FilterRules.DefaultAction},
+		rng:         rand.New(rand.NewSource(time.Now().UnixNano())),
 
 		tunnelList: make([]*Tunnel, 0, 100000),
 		ipPool:     NewIPPool(),
@@ -450,7 +446,7 @@ func (tm *TunnelManager) keepalive() {
 		tickCount++
 		if tickCount > 10 {
 			ipCount, freeCount := tm.ipPool.GetIPCount()
-			logx.Infof("TunnelManager.keepalive tunnel count:%d, cost:%v, ipCount:%d, freeCount:%d", count, time.Since(now), ipCount, freeCount)
+			logx.Infof("TunnelManager.keepalive tunnel count:%d, cost:%v, ipCount:%d, freeCount:%d, session len:%d", count, time.Since(now), ipCount, freeCount, tm.sessionManager.SessionLen())
 			tickCount = 0
 		}
 	}

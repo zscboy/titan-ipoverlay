@@ -42,6 +42,12 @@ func (sm *SessionManager) GetSession(username, sessionID string) *UserSession {
 	return sm.sessions[sessionKey{username, sessionID}]
 }
 
+func (sm *SessionManager) SessionLen() int {
+	sm.lock.RLock()
+	defer sm.lock.RUnlock()
+	return len(sm.sessions)
+}
+
 func (sm *SessionManager) GetAndActivate(username, sessionID string) (*UserSession, *Tunnel) {
 	key := sessionKey{username, sessionID}
 	sm.lock.Lock()
