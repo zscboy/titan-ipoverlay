@@ -3,15 +3,16 @@ package handler
 import (
 	"net/http"
 
-	"github.com/zeromicro/go-zero/rest/httpx"
 	"titan-ipoverlay/manager/internal/logic"
 	"titan-ipoverlay/manager/internal/svc"
 	"titan-ipoverlay/manager/internal/types"
+
+	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
-func removeBlackListHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+func removeBlacklistHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var req types.RemoveBlackListReq
+		var req types.RemoveBlacklistReq
 		if err := httpx.Parse(r, &req); err != nil {
 			httpx.ErrorCtx(r.Context(), w, err)
 			return

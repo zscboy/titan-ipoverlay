@@ -3,8 +3,9 @@
 
 package types
 
-type AddBlackListReq struct {
-	NodeID string `json:"node_id"`
+type AddBlacklistReq struct {
+	PopID  string   `json:"pop_id"`
+	IPList []string `json:"ip_list"` // max length 100
 }
 
 type AllStatsPer5MinReq struct {
@@ -48,12 +49,12 @@ type GetAuthTokenResp struct {
 	Token string `json:"token"`
 }
 
-type GetBlackListReq struct {
-	PodID string `form:"popid"`
+type GetBlacklistReq struct {
+	PopID string `form:"popid"`
 }
 
-type GetBlackListResp struct {
-	Nodes []string `json:"nodes"`
+type GetBlacklistResp struct {
+	IPList []string `json:"ip_list"`
 }
 
 type GetNodePopReq struct {
@@ -134,8 +135,9 @@ type Pop struct {
 	CountryCode     string `json:"country_code"`
 }
 
-type RemoveBlackListReq struct {
-	NodeID string `json:"node_id"`
+type RemoveBlacklistReq struct {
+	PopID  string   `json:"pop_id"`
+	IPList []string `json:"ip_list"` // max length 100
 }
 
 type Route struct {

@@ -134,15 +134,15 @@ message GetNodeAccessTokenResp {
 }
 
 message AddBlacklistReq {
-  string node_id = 1;
+  repeated string ip_list = 1; // max length 100
 }
 
 message RemoveBlacklistReq {
-  string node_id = 1;
+  repeated string ip_list = 1; // max length 100
 }
 
 message GetBlacklistResp {
-  repeated string nodes = 1;
+  repeated string ip_list = 1;
 }
 
 message KickNodeReq {

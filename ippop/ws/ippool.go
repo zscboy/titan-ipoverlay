@@ -81,6 +81,22 @@ func (p *IPPool) RemoveTunnel(t *Tunnel) {
 	}
 }
 
+// RemoveIP removes the entire IP entry from the pool, regardless of tunnels.
+func (p *IPPool) RemoveIP(ip string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	entry, ok := p.allIPs[ip]
+	if !ok {
+		return
+	}
+
+	if entry.element != nil {
+		p.freeList.Remove(entry.element)
+	}
+	delete(p.allIPs, ip)
+}
+
 // AcquireIP picks a free IP and one of its nodes.
 // It marks the IP as busy so no other session can take it.
 func (p *IPPool) AcquireIP() (string, *Tunnel) {

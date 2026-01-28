@@ -25,16 +25,16 @@ func NewGetBlackListLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetB
 	}
 }
 
-func (l *GetBlackListLogic) GetBlackList(req *types.GetBlackListReq) (resp *types.GetBlackListResp, err error) {
-	server := l.svcCtx.Pops[string(req.PodID)]
+func (l *GetBlackListLogic) GetBlackList(req *types.GetBlacklistReq) (resp *types.GetBlacklistResp, err error) {
+	server := l.svcCtx.Pops[req.PopID]
 	if server == nil {
 		return nil, fmt.Errorf("")
 	}
 
-	getBlackListResp, err := server.API.GetBlacklist(l.ctx, &serverapi.Empty{})
+	getBlacklistResp, err := server.API.GetBlacklist(l.ctx, &serverapi.Empty{})
 	if err != nil {
 		return nil, err
 	}
 
-	return &types.GetBlackListResp{Nodes: getBlackListResp.Nodes}, nil
+	return &types.GetBlacklistResp{IPList: getBlacklistResp.IpList}, nil
 }

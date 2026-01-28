@@ -7,7 +7,6 @@ import (
 	"titan-ipoverlay/ippop/rpc/serverapi"
 	"titan-ipoverlay/manager/internal/svc"
 	"titan-ipoverlay/manager/internal/types"
-	"titan-ipoverlay/manager/model"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -26,22 +25,17 @@ func NewRemoveBlackListLogic(ctx context.Context, svcCtx *svc.ServiceContext) *R
 	}
 }
 
-func (l *RemoveBlackListLogic) RemoveBlackList(req *types.RemoveBlackListReq) (resp *types.UserOperationResp, err error) {
-	popID, _, err := model.GetNodePopIP(l.svcCtx.Redis, req.NodeID)
-	if err != nil {
-		return &types.UserOperationResp{ErrMsg: err.Error()}, nil
+func (l *RemoveBlackListLogic) RemoveBlackList(req *types.RemoveBlacklistReq) (resp *types.UserOperationResp, err error) {
+	if len(req.IPList) > maxIPListLen {
+		return &types.UserOperationResp{ErrMsg: fmt.Sprintf("too many ips, max is %d", maxIPListLen)}, nil
 	}
 
-	if len(popID) == 0 {
-		return &types.UserOperationResp{ErrMsg: fmt.Sprintf("node %s not exist", req.NodeID)}, nil
-	}
-
-	server := l.svcCtx.Pops[string(popID)]
+	server := l.svcCtx.Pops[string(req.PopID)]
 	if server == nil {
-		return &types.UserOperationResp{ErrMsg: fmt.Sprintf("pop %s not found", popID)}, nil
+		return &types.UserOperationResp{ErrMsg: fmt.Sprintf("pop %s not found", req.PopID)}, nil
 	}
 
-	removeBlacklistResp, err := server.API.RemoveBlacklist(l.ctx, &serverapi.RemoveBlacklistReq{NodeId: req.NodeID})
+	removeBlacklistResp, err := server.API.RemoveBlacklist(l.ctx, &serverapi.RemoveBlacklistReq{IpList: req.IPList})
 	if err != nil {
 		return &types.UserOperationResp{ErrMsg: err.Error()}, nil
 	}

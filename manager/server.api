@@ -142,17 +142,19 @@ type (
 		Users []*User `json:"users"`
 		Total int     `json:"total"`
 	}
-	AddBlackListReq {
-		NodeID string `json:"node_id"`
+	AddBlacklistReq {
+		PopID  string   `json:"pop_id"`
+		IPList []string `json:"ip_list"` // max length 100
 	}
-	RemoveBlackListReq {
-		NodeID string `json:"node_id"`
+	RemoveBlacklistReq {
+		PopID  string   `json:"pop_id"`
+		IPList []string `json:"ip_list"` // max length 100
 	}
-	GetBlackListReq {
-		PodID string `form:"popid"`
+	GetBlacklistReq {
+		PopID string `form:"popid"`
 	}
-	GetBlackListResp {
-		Nodes []string `json:"nodes"`
+	GetBlacklistResp {
+		IPList []string `json:"ip_list"`
 	}
 	KickNodeReq {
 		NodeID string `form:"nodeid"`
@@ -259,14 +261,14 @@ service server-api {
 	@handler GetUserBaseStats
 	get /user/stats/base (UserBaseStatsReq) returns (UserBaseStatsResp)
 
-	@handler addBlackList
-	post /node/blacklist/add (AddBlackListReq) returns (UserOperationResp)
+	@handler addBlacklist
+	post /node/blacklist/add (AddBlacklistReq) returns (UserOperationResp)
 
-	@handler removeBlackList
-	post /node/blacklist/remove (RemoveBlackListReq) returns (UserOperationResp)
+	@handler removeBlacklist
+	post /node/blacklist/remove (RemoveBlacklistReq) returns (UserOperationResp)
 
-	@handler getBlackList
-	get /node/blacklist/get (GetBlackListReq) returns (GetBlackListResp)
+	@handler getBlacklist
+	get /node/blacklist/get (GetBlacklistReq) returns (GetBlacklistResp)
 
 	@handler KickNode
 	post /node/kick (KickNodeReq) returns (UserOperationResp)

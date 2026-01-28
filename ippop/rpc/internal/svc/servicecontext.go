@@ -21,12 +21,22 @@ type EndpointProvider interface {
 	GetSocks5Addr() (string, error)
 }
 
-type ServiceContext struct {
-	Config config.Config
-	Redis  *redis.Redis
+type BlacklistManager interface {
+	AddBlacklist(ips []string) error
+	RemoveBlacklist(ips []string) error
+}
+
+type TunnelManager interface {
 	NodeManager
 	UserManager
 	EndpointProvider
+	BlacklistManager
+}
+
+type ServiceContext struct {
+	Config config.Config
+	Redis  *redis.Redis
+	TunnelManager
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {

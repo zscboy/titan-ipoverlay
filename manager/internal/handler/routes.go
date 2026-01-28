@@ -32,17 +32,17 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 			{
 				Method:  http.MethodPost,
 				Path:    "/node/blacklist/add",
-				Handler: addBlackListHandler(serverCtx),
+				Handler: addBlacklistHandler(serverCtx),
 			},
 			{
 				Method:  http.MethodGet,
 				Path:    "/node/blacklist/get",
-				Handler: getBlackListHandler(serverCtx),
+				Handler: getBlacklistHandler(serverCtx),
 			},
 			{
 				Method:  http.MethodPost,
 				Path:    "/node/blacklist/remove",
-				Handler: removeBlackListHandler(serverCtx),
+				Handler: removeBlacklistHandler(serverCtx),
 			},
 			{
 				Method:  http.MethodPost,

@@ -25,10 +25,10 @@ func NewGetBlacklistLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetB
 }
 
 func (l *GetBlacklistLogic) GetBlacklist(in *pb.Empty) (*pb.GetBlacklistResp, error) {
-	nodes, err := model.GetBlacklist(l.svcCtx.Redis)
+	ips, err := model.GetBlacklist(l.svcCtx.Redis)
 	if err != nil {
 		return nil, err
 	}
 
-	return &pb.GetBlacklistResp{Nodes: nodes}, nil
+	return &pb.GetBlacklistResp{IpList: ips}, nil
 }

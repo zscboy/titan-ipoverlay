@@ -2,9 +2,7 @@ package logic
 
 import (
 	"context"
-	"fmt"
 
-	"titan-ipoverlay/ippop/model"
 	"titan-ipoverlay/ippop/rpc/internal/svc"
 	"titan-ipoverlay/ippop/rpc/pb"
 
@@ -25,29 +23,14 @@ func NewAddBlacklistLogic(ctx context.Context, svcCtx *svc.ServiceContext) *AddB
 	}
 }
 
+const maxIPListLen = 100
+
 func (l *AddBlacklistLogic) AddBlacklist(req *pb.AddBlacklistReq) (*pb.UserOperationResp, error) {
-	node, err := model.GetNode(l.ctx, l.svcCtx.Redis, req.NodeId)
-	if err != nil {
+	if len(req.IpList) > maxIPListLen {
+		return &pb.UserOperationResp{ErrMsg: "too many ips"}, nil
+	}
+	if err := l.svcCtx.AddBlacklist(req.IpList); err != nil {
 		return &pb.UserOperationResp{ErrMsg: err.Error()}, nil
-	}
-
-	if node == nil {
-		return &pb.UserOperationResp{ErrMsg: fmt.Sprintf("node %s not exist", req.NodeId)}, nil
-	}
-
-	if len(node.BindUser) != 0 {
-		if err := l.svcCtx.SwitchNode(node.BindUser); err != nil {
-			return &pb.UserOperationResp{ErrMsg: fmt.Sprintf("node %s already bind by user %s, switch new node for user failed:%v", req.NodeId, node.BindUser, err)}, nil
-		}
-	}
-
-	if err := model.AddBlacklist(l.svcCtx.Redis, req.NodeId); err != nil {
-		return &pb.UserOperationResp{ErrMsg: err.Error()}, nil
-	}
-
-	err = l.svcCtx.Kick(req.NodeId)
-	if err != nil {
-		logx.Infof("AddBlackListLogic.AddBlackList: %s", err.Error())
 	}
 
 	return &pb.UserOperationResp{Success: true}, nil

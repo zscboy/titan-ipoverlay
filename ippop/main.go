@@ -98,7 +98,7 @@ func main() {
 	group.Add(ws)
 	group.Add(socks5)
 
-	rpcServer := rpc.NewRPCServer(c.RPCServer, tunMgr, tunMgr, tunMgr)
+	rpcServer := rpc.NewRPCServer(c.RPCServer, tunMgr)
 	group.Add(rpcServer)
 
 	if len(c.HTTPProxy) > 0 {

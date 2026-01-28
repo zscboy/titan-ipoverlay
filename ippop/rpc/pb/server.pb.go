@@ -1246,7 +1246,7 @@ func (x *GetNodeAccessTokenResp) GetToken() string {
 
 type AddBlacklistReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	NodeId        string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	IpList        []string               `protobuf:"bytes,1,rep,name=ip_list,json=ipList,proto3" json:"ip_list,omitempty"` // max length 100
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1281,16 +1281,16 @@ func (*AddBlacklistReq) Descriptor() ([]byte, []int) {
 	return file_server_proto_rawDescGZIP(), []int{20}
 }
 
-func (x *AddBlacklistReq) GetNodeId() string {
+func (x *AddBlacklistReq) GetIpList() []string {
 	if x != nil {
-		return x.NodeId
+		return x.IpList
 	}
-	return ""
+	return nil
 }
 
 type RemoveBlacklistReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	NodeId        string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	IpList        []string               `protobuf:"bytes,1,rep,name=ip_list,json=ipList,proto3" json:"ip_list,omitempty"` // max length 100
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1325,16 +1325,16 @@ func (*RemoveBlacklistReq) Descriptor() ([]byte, []int) {
 	return file_server_proto_rawDescGZIP(), []int{21}
 }
 
-func (x *RemoveBlacklistReq) GetNodeId() string {
+func (x *RemoveBlacklistReq) GetIpList() []string {
 	if x != nil {
-		return x.NodeId
+		return x.IpList
 	}
-	return ""
+	return nil
 }
 
 type GetBlacklistResp struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Nodes         []string               `protobuf:"bytes,1,rep,name=nodes,proto3" json:"nodes,omitempty"`
+	IpList        []string               `protobuf:"bytes,1,rep,name=ip_list,json=ipList,proto3" json:"ip_list,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1369,9 +1369,9 @@ func (*GetBlacklistResp) Descriptor() ([]byte, []int) {
 	return file_server_proto_rawDescGZIP(), []int{22}
 }
 
-func (x *GetBlacklistResp) GetNodes() []string {
+func (x *GetBlacklistResp) GetIpList() []string {
 	if x != nil {
-		return x.Nodes
+		return x.IpList
 	}
 	return nil
 }
@@ -2166,11 +2166,11 @@ const file_server_proto_rawDesc = "" +
 	"\x16GetNodeAccessTokenResp\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\"*\n" +
 	"\x0fAddBlacklistReq\x12\x17\n" +
-	"\anode_id\x18\x01 \x01(\tR\x06nodeId\"-\n" +
+	"\aip_list\x18\x01 \x03(\tR\x06ipList\"-\n" +
 	"\x12RemoveBlacklistReq\x12\x17\n" +
-	"\anode_id\x18\x01 \x01(\tR\x06nodeId\"(\n" +
-	"\x10GetBlacklistResp\x12\x14\n" +
-	"\x05nodes\x18\x01 \x03(\tR\x05nodes\"&\n" +
+	"\aip_list\x18\x01 \x03(\tR\x06ipList\"+\n" +
+	"\x10GetBlacklistResp\x12\x17\n" +
+	"\aip_list\x18\x01 \x03(\tR\x06ipList\"&\n" +
 	"\vKickNodeReq\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\"a\n" +
 	"\tStatPoint\x12\x1c\n" +
