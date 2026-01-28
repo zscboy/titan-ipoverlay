@@ -446,6 +446,12 @@ func (tm *TunnelManager) HandleSocks5UDP(udpConn socks5.UDPConn, udpInfo *socks5
 	return tun.acceptSocks5UDPData(udpConn, udpInfo, data)
 }
 
+func (tm *TunnelManager) reportAuthFailure(userName string) {
+	if tm.perfCollector != nil {
+		tm.perfCollector.ReportAuthFailure(userName)
+	}
+}
+
 func (tm *TunnelManager) HandleUserAuth(userName, password string) error {
 	logx.Debugf("HandleUserAuth username %s", userName)
 	user, err := tm.getUserFromCache(userName)
@@ -454,33 +460,25 @@ func (tm *TunnelManager) HandleUserAuth(userName, password string) error {
 	}
 
 	if user == nil {
-		if tm.perfCollector != nil {
-			tm.perfCollector.ReportAuthFailure(userName)
-		}
+		tm.reportAuthFailure(userName)
 		return fmt.Errorf("user %s not exist", userName)
 	}
 
 	if user.Off {
-		if tm.perfCollector != nil {
-			tm.perfCollector.ReportAuthFailure(userName)
-		}
+		tm.reportAuthFailure(userName)
 		return fmt.Errorf("user %s off", userName)
 	}
 
 	hash := md5.Sum([]byte(password))
 	passwordMD5 := hex.EncodeToString(hash[:])
 	if user.PasswordMD5 != passwordMD5 {
-		if tm.perfCollector != nil {
-			tm.perfCollector.ReportAuthFailure(userName)
-		}
+		tm.reportAuthFailure(userName)
 		return fmt.Errorf("password not match")
 	}
 
 	now := time.Now().Unix()
 	if now < user.StartTime || now > user.EndTime {
-		if tm.perfCollector != nil {
-			tm.perfCollector.ReportAuthFailure(userName)
-		}
+		tm.reportAuthFailure(userName)
 		startTime := time.Unix(user.StartTime, 0)
 		endTime := time.Unix(user.EndTime, 0)
 		return fmt.Errorf("user %s is out of date[%s~%s]", userName, startTime.Format(time.RFC3339), endTime.Format(time.RFC3339))
