@@ -90,7 +90,6 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 	go tm.keepalive()
 	go tm.setNodeOnlineDataExpire()
 	go tm.startUserTrafficTimer()
-	go tm.startTunnelTrafficTimer()
 	return tm
 }
 
@@ -444,8 +443,8 @@ func (tm *TunnelManager) keepalive() {
 
 		tickCount++
 		if tickCount > 10 {
-			ipCount, freeCount, blackCount := tm.ipPool.GetIPCount()
-			logx.Infof("TunnelManager.keepalive tunnel count:%d, cost:%v, ipCount:%d, freeCount:%d, blackCount:%d, session len:%d", count, time.Since(now), ipCount, freeCount, blackCount, tm.sessionManager.SessionLen())
+			ipCount, freeCount, blackCount, assignedCount := tm.ipPool.GetIPCount()
+			logx.Infof("TunnelManager.keepalive tunnel count:%d, cost:%v, ipCount:%d, freeCount:%d, blackCount:%d, assignedCount:%d, session len:%d", count, time.Since(now), ipCount, freeCount, blackCount, assignedCount, tm.sessionManager.SessionLen())
 			tickCount = 0
 		}
 	}
@@ -486,16 +485,3 @@ func (tm *TunnelManager) startUserTrafficTimer() {
 
 	}
 }
-
-func (tm *TunnelManager) startTunnelTrafficTimer() {
-	ticker := time.NewTicker(tunnelTrafficSaveInterval * time.Second)
-	defer ticker.Stop()
-
-	for {
-		<-ticker.C
-	}
-}
-
-// func (tm *TunnelManager) traffic(userName string, traffic int64) {
-// 	tm.userTraffic.add(userName, traffic)
-// }

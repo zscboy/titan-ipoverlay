@@ -65,7 +65,8 @@ type Tunnel struct {
 	opts        *TunOptions
 	waitList    sync.Map
 	tunMgr      *TunnelManager
-	waitLeaseCh chan bool
+	waitLeaseCh chan struct{}
+	leaseOnce   sync.Once
 	// netDelays   []uint64
 	//  bytes/sec
 	readLimiter *rate.Limiter
@@ -90,6 +91,7 @@ func newTunnel(conn *websocket.Conn, tunMgr *TunnelManager, opts *TunOptions) *T
 		tunMgr:          tunMgr,
 		rateLimiterLock: sync.Mutex{},
 		trafficStats:    &TrafficStats{},
+		waitLeaseCh:     make(chan struct{}),
 	}
 	t.setRateLimit(opts.DownloadRateLimti, opts.UploadRateLimit)
 
@@ -578,7 +580,6 @@ func (t *Tunnel) writeMessageWithLimitRate(messageType int, data []byte) error {
 
 func (t *Tunnel) waitClose() {
 	if t.conn != nil {
-		t.waitLeaseCh = make(chan bool)
 		t.conn.Close()
 		<-t.waitLeaseCh
 		logx.Debugf("tunnel %s wait close", t.opts.Id)
@@ -606,6 +607,7 @@ func (t *Tunnel) clearProxys() {
 		// Try UDPProxy
 		if session, ok := value.(*UDPProxy); ok {
 			logx.Errorf("Tunnel %s %s disconnected, closing UDPProxy session %s for user %s", t.opts.Id, t.opts.IP, session.id, session.udpInfo.UserName)
+			session.stop()
 			return true
 		}
 
@@ -615,9 +617,9 @@ func (t *Tunnel) clearProxys() {
 }
 
 func (t *Tunnel) leaseComplete() {
-	if t.waitLeaseCh != nil {
-		t.waitLeaseCh <- true
-	}
+	t.leaseOnce.Do(func() {
+		close(t.waitLeaseCh)
+	})
 }
 
 func (t *Tunnel) getTrafficStats() *TrafficStats {

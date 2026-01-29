@@ -76,7 +76,7 @@ func paserUsername(username string) (*User, error) {
 	return user, nil
 }
 
-var sessionRegex = regexp.MustCompile(`^[0-9A-Za-z]{1,9}$`)
+var sessionRegex = regexp.MustCompile(`^[0-9A-Za-z]{1,16}$`)
 
 func validateSession(session string) error {
 	if !sessionRegex.MatchString(session) {

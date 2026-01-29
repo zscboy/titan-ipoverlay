@@ -62,13 +62,13 @@ func (proxy *TCPProxy) write(data []byte) error {
 	}
 
 	startTime := time.Now()
+	proxy.activeTime = startTime
 
 	_, err := proxy.conn.Write(data)
 	if err != nil {
 		return err
 	}
 
-	proxy.activeTime = time.Now()
 	proxy.tunnel.addTrafficStats(len(data), time.Now().Sub(startTime))
 
 	return nil

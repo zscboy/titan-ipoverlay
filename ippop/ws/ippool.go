@@ -21,6 +21,7 @@ type IPPool struct {
 	allIPs         map[string]*ipEntry // ip -> entry
 	freeList       *list.List          // List of *ipEntry (available IPs)
 	blacklistCount int                 // New: count of IPs currently blacklisted in the pool
+	assignedCount  int                 // New: count of IPs currently assigned
 }
 
 func NewIPPool() *IPPool {
@@ -91,6 +92,7 @@ func (p *IPPool) RemoveTunnel(t *Tunnel) {
 	// If the tunnel being removed was the one assigned to a session
 	if entry.assignedNodeID == t.opts.Id {
 		entry.assignedNodeID = ""
+		p.assignedCount--
 		// If the IP was Busy (element == nil) but still has other tunnels,
 		// return it to freeList so it can be re-acquired (avoid leak)
 		if entry.element == nil && len(entry.tunnels) > 0 {
@@ -125,6 +127,9 @@ func (p *IPPool) RemoveIP(ip string) {
 	}
 	if entry.isBlacklisted {
 		p.blacklistCount--
+	}
+	if entry.assignedNodeID != "" {
+		p.assignedCount--
 	}
 	delete(p.allIPs, ip)
 }
@@ -187,6 +192,7 @@ func (p *IPPool) AcquireIP() (string, *Tunnel) {
 	// Pick a tunnel and record its ID
 	for id, t := range entry.tunnels {
 		entry.assignedNodeID = id
+		p.assignedCount++
 		return entry.ip, t
 	}
 
@@ -204,7 +210,10 @@ func (p *IPPool) ReleaseIP(ip string) {
 	}
 
 	// Always clear assignment
-	entry.assignedNodeID = ""
+	if entry.assignedNodeID != "" {
+		entry.assignedNodeID = ""
+		p.assignedCount--
+	}
 
 	// return to free list only if not blacklisted and has active tunnels
 	if entry.element == nil && len(entry.tunnels) > 0 && !entry.isBlacklisted {
@@ -212,11 +221,12 @@ func (p *IPPool) ReleaseIP(ip string) {
 	}
 }
 
-func (p *IPPool) GetIPCount() (ipCount int, freeCount int, blackCount int) {
+func (p *IPPool) GetIPCount() (ipCount int, freeCount int, blackCount int, assignedCount int) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	ipCount = len(p.allIPs)
 	freeCount = p.freeList.Len()
 	blackCount = p.blacklistCount
+	assignedCount = p.assignedCount
 	return
 }

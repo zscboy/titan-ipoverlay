@@ -6,6 +6,8 @@ import (
 	"titan-ipoverlay/ippop/socks5"
 	"titan-ipoverlay/ippop/ws/pb"
 
+	"sync"
+
 	"github.com/zeromicro/go-zero/core/logx"
 	"google.golang.org/protobuf/proto"
 )
@@ -19,10 +21,12 @@ type UDPProxy struct {
 	timeout int
 
 	tunnel *Tunnel
+	done   chan struct{}
+	once   sync.Once
 }
 
 func newProxyUDP(id string, conn socks5.UDPConn, udpInfo *socks5.Socks5UDPInfo, t *Tunnel, timeout int) *UDPProxy {
-	return &UDPProxy{id: id, conn: conn, udpInfo: udpInfo, tunnel: t, activeTime: time.Now(), timeout: timeout}
+	return &UDPProxy{id: id, conn: conn, udpInfo: udpInfo, tunnel: t, activeTime: time.Now(), timeout: timeout, done: make(chan struct{})}
 }
 
 func (proxy *UDPProxy) writeToSrc(data []byte) error {
@@ -69,15 +73,24 @@ func (proxy *UDPProxy) writeToDest(data []byte) error {
 	return proxy.tunnel.write(buf)
 }
 
+func (proxy *UDPProxy) stop() {
+	proxy.once.Do(func() {
+		close(proxy.done)
+	})
+}
+
 func (proxy *UDPProxy) waitTimeout() {
 	defer proxy.tunnel.proxys.Delete(proxy.id)
 	for {
-		time.Sleep(10 * time.Second)
-
-		timeout := time.Since(proxy.activeTime)
-		if timeout.Seconds() > float64(proxy.timeout) {
-			logx.Debugf("UDPProxy %s timeout %f, will delete it", proxy.id, timeout.Seconds())
-			break
+		select {
+		case <-proxy.done:
+			return
+		case <-time.After(10 * time.Second):
+			timeout := time.Since(proxy.activeTime)
+			if timeout.Seconds() > float64(proxy.timeout) {
+				logx.Debugf("UDPProxy %s timeout %f, will delete it", proxy.id, timeout.Seconds())
+				return
+			}
 		}
 	}
 }
