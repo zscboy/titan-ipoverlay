@@ -111,6 +111,7 @@ func (tm *TunnelManager) loadBlacklist() {
 func (tm *TunnelManager) addTunnel(t *Tunnel) {
 	// tunnels contain blacklisted node
 	tm.tunnels.Store(t.opts.Id, t)
+	tm.ipPool.AddTunnel(t, t.opts.IsBlacklisted)
 
 	if t.opts.IsBlacklisted {
 		logx.Infof("addTunnel error: %s %s is in blacklist", t.opts.Id, t.opts.IP)
@@ -125,8 +126,6 @@ func (tm *TunnelManager) addTunnel(t *Tunnel) {
 
 	rrIdx := atomic.LoadUint64(&tm.rrIdx)
 	atomic.StoreUint64(&tm.rrIdx, rrIdx%uint64(len(tm.tunnelList)))
-
-	tm.ipPool.AddTunnel(t)
 }
 
 // 删除 tunnel
@@ -445,8 +444,8 @@ func (tm *TunnelManager) keepalive() {
 
 		tickCount++
 		if tickCount > 10 {
-			ipCount, freeCount := tm.ipPool.GetIPCount()
-			logx.Infof("TunnelManager.keepalive tunnel count:%d, cost:%v, ipCount:%d, freeCount:%d, session len:%d", count, time.Since(now), ipCount, freeCount, tm.sessionManager.SessionLen())
+			ipCount, freeCount, blackCount := tm.ipPool.GetIPCount()
+			logx.Infof("TunnelManager.keepalive tunnel count:%d, cost:%v, ipCount:%d, freeCount:%d, blackCount:%d, session len:%d", count, time.Since(now), ipCount, freeCount, blackCount, tm.sessionManager.SessionLen())
 			tickCount = 0
 		}
 	}

@@ -62,7 +62,7 @@ func (tm *TunnelManager) AddBlacklist(ips []string) error {
 	}
 	for _, ip := range ips {
 		tm.ipBlacklist.Store(ip, struct{}{})
-		tm.ipPool.RemoveIP(ip)
+		tm.ipPool.DeactivateIP(ip)
 	}
 	return nil
 }
@@ -74,6 +74,7 @@ func (tm *TunnelManager) RemoveBlacklist(ips []string) error {
 	}
 	for _, ip := range ips {
 		tm.ipBlacklist.Delete(ip)
+		tm.ipPool.ActivateIP(ip)
 	}
 	return nil
 }

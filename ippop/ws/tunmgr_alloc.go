@@ -14,20 +14,11 @@ import (
 // AcquireExclusiveNode implements NodeSource interface
 func (tm *TunnelManager) AcquireExclusiveNode(ctx context.Context) (string, *Tunnel, error) {
 	if tm.config.WS.NodeAllocateStrategy == config.NodeAllocateIPPool {
-		for {
-			ip, tun := tm.ipPool.AcquireIP()
-			if tun == nil {
-				return "", nil, fmt.Errorf("no free ip found in pool")
-			}
-
-			if _, ok := tm.ipBlacklist.Load(ip); ok {
-				logx.Infof("AcquireExclusiveNode: ip %s is in blacklist, removing from pool and retrying", ip)
-				tm.ipPool.RemoveIP(ip)
-				continue
-			}
-
-			return ip, tun, nil
+		ip, tun := tm.ipPool.AcquireIP()
+		if tun == nil {
+			return "", nil, fmt.Errorf("no free ip found in pool")
 		}
+		return ip, tun, nil
 	}
 
 	nodeIDBytes, err := model.AllocateFreeNode(ctx, tm.redis)
