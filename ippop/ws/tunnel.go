@@ -59,14 +59,14 @@ type Tunnel struct {
 	conn      *websocket.Conn
 	writeLock sync.Mutex
 	waitPong  atomic.Int32
+	closed    atomic.Bool
 
 	proxys ProxyMap
 
-	opts        *TunOptions
-	waitList    sync.Map
-	tunMgr      *TunnelManager
-	waitLeaseCh chan struct{}
-	leaseOnce   sync.Once
+	opts     *TunOptions
+	waitList sync.Map
+	tunMgr   *TunnelManager
+	ctx      context.Context
 	// netDelays   []uint64
 	//  bytes/sec
 	readLimiter *rate.Limiter
@@ -84,14 +84,14 @@ type Tunnel struct {
 	IdleStartTime *time.Time
 }
 
-func newTunnel(conn *websocket.Conn, tunMgr *TunnelManager, opts *TunOptions) *Tunnel {
+func newTunnel(conn *websocket.Conn, tunMgr *TunnelManager, opts *TunOptions, ctx context.Context) *Tunnel {
 	t := &Tunnel{
 		conn:            conn,
 		opts:            opts,
 		tunMgr:          tunMgr,
 		rateLimiterLock: sync.Mutex{},
 		trafficStats:    &TrafficStats{},
-		waitLeaseCh:     make(chan struct{}),
+		ctx:             ctx,
 	}
 	t.setRateLimit(opts.DownloadRateLimti, opts.UploadRateLimit)
 
@@ -193,8 +193,7 @@ func (t *Tunnel) serve() {
 		}
 	}
 
-	t.onClose()
-	t.conn = nil
+	t.close()
 }
 
 func (t *Tunnel) onMessage(data []byte) error {
@@ -498,14 +497,8 @@ func (t *Tunnel) acceptSocks5UDPData(conn socks5.UDPConn, udpInfo *socks5.Socks5
 
 func (t *Tunnel) keepalive() {
 	if t.waitPong.Load() > waitPongTimeout {
-		if t.conn != nil {
-			t.conn.Close()
-			t.conn = nil
-			logx.Errorf("keepalive timeout, close tunnel %s connection", t.opts.Id)
-		} else {
-			logx.Errorf("keepalive timeout, tunnel %s already close", t.opts.Id)
-		}
-
+		logx.Errorf("keepalive timeout, close tunnel %s connection", t.opts.Id)
+		t.close()
 		return
 	}
 
@@ -539,8 +532,8 @@ func (t *Tunnel) write(msg []byte) error {
 }
 
 func (t *Tunnel) readMessageWithLimitRate() (int, []byte, error) {
-	if t.conn == nil {
-		return 0, nil, fmt.Errorf("t.conn == nil")
+	if t.closed.Load() {
+		return 0, nil, net.ErrClosed
 	}
 
 	// will reset when proxy is empty
@@ -566,8 +559,8 @@ func (t *Tunnel) readMessageWithLimitRate() (int, []byte, error) {
 }
 
 func (t *Tunnel) writeMessageWithLimitRate(messageType int, data []byte) error {
-	if t.conn == nil {
-		return fmt.Errorf("tunnel.write t.conn == nil  id: %s", t.opts.Id)
+	if t.closed.Load() {
+		return net.ErrClosed
 	}
 
 	writeLimiter := t.writeLimiter
@@ -579,14 +572,16 @@ func (t *Tunnel) writeMessageWithLimitRate(messageType int, data []byte) error {
 }
 
 func (t *Tunnel) waitClose() {
-	if t.conn != nil {
-		t.conn.Close()
-		<-t.waitLeaseCh
-		logx.Debugf("tunnel %s wait close", t.opts.Id)
-	}
+	t.close()
+	<-t.ctx.Done()
+	logx.Debugf("tunnel %s wait close", t.opts.Id)
 }
 
-func (t *Tunnel) onClose() {
+func (t *Tunnel) close() {
+	if t.closed.Swap(true) {
+		return
+	}
+	t.conn.Close()
 	t.clearProxys()
 }
 
@@ -614,12 +609,6 @@ func (t *Tunnel) clearProxys() {
 		return true
 	})
 	t.proxys.Clear()
-}
-
-func (t *Tunnel) leaseComplete() {
-	t.leaseOnce.Do(func() {
-		close(t.waitLeaseCh)
-	})
 }
 
 func (t *Tunnel) getTrafficStats() *TrafficStats {

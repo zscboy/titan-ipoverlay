@@ -171,6 +171,9 @@ func (tm *TunnelManager) removeTunnel(tun *Tunnel) {
 }
 
 func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, nodeIP string) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	v, ok := tm.tunnels.Load(req.NodeId)
 	if ok {
 		oldTun := v.(*Tunnel)
@@ -213,11 +216,10 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, n
 		IsBlacklisted:     node.IsBlacklisted,
 	}
 
-	tun := newTunnel(conn, tm, opts)
+	tun := newTunnel(conn, tm, opts, ctx)
 	tm.addTunnel(tun)
 	// tm.HealthStatsMap.LoadOrStore(node.Id, &HealthStats{})
 
-	defer tun.leaseComplete()
 	defer tm.removeTunnel(tun)
 
 	if err := model.HandleNodeOnline(context.Background(), tm.redis, node); err != nil {
