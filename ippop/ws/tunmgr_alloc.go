@@ -85,8 +85,8 @@ func (tm *TunnelManager) PickActiveTunnel() (*Tunnel, error) {
 }
 
 func (tm *TunnelManager) randomTunnel() (*Tunnel, error) {
-	tm.tunnelListLock.Lock()
-	defer tm.tunnelListLock.Unlock()
+	tm.tunnelListLock.RLock()
+	defer tm.tunnelListLock.RUnlock()
 
 	n := len(tm.tunnelList)
 	if n == 0 {
@@ -98,8 +98,8 @@ func (tm *TunnelManager) randomTunnel() (*Tunnel, error) {
 }
 
 func (tm *TunnelManager) nextTunnel() (*Tunnel, error) {
-	tm.tunnelListLock.Lock()
-	defer tm.tunnelListLock.Unlock()
+	tm.tunnelListLock.RLock()
+	defer tm.tunnelListLock.RUnlock()
 
 	n := len(tm.tunnelList)
 	if n == 0 {

@@ -52,8 +52,7 @@ type TunnelManager struct {
 	tunnelListLock sync.RWMutex
 	tunnelList     []*Tunnel
 	rrIdx          uint64
-
-	rng *rand.Rand
+	rng            *rand.Rand
 
 	ipBlacklist sync.Map
 
@@ -72,7 +71,7 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 		userTraffic: newUserTraffic(),
 		userCache:   gcache.New(userCacheSize).LRU().Build(),
 		filterRules: &Rules{rules: RulesToMap(config.FilterRules.Rules), defaultAction: config.FilterRules.DefaultAction},
-		rng:         rand.New(rand.NewSource(time.Now().UnixNano())),
+		rng:         rand.New(&lockedSource{s: rand.NewSource(time.Now().UnixNano())}),
 
 		tunnelList: make([]*Tunnel, 0, 100000),
 		ipPool:     NewIPPool(),
