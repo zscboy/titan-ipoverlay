@@ -55,7 +55,7 @@ type ServerAPIClient interface {
 	GetNodeAccessToken(ctx context.Context, in *GetNodeAccessTokenReq, opts ...grpc.CallOption) (*GetNodeAccessTokenResp, error)
 	AddBlacklist(ctx context.Context, in *AddBlacklistReq, opts ...grpc.CallOption) (*UserOperationResp, error)
 	RemoveBlacklist(ctx context.Context, in *RemoveBlacklistReq, opts ...grpc.CallOption) (*UserOperationResp, error)
-	GetBlacklist(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetBlacklistResp, error)
+	GetBlacklist(ctx context.Context, in *GetBlacklistReq, opts ...grpc.CallOption) (*GetBlacklistResp, error)
 	KickNode(ctx context.Context, in *KickNodeReq, opts ...grpc.CallOption) (*UserOperationResp, error)
 	GetUserBaseStats(ctx context.Context, in *UserBaseStatsReq, opts ...grpc.CallOption) (*UserBaseStatsResp, error)
 	GetUserStatChart(ctx context.Context, in *UserStatChartReq, opts ...grpc.CallOption) (*UserStatChartResp, error)
@@ -199,7 +199,7 @@ func (c *serverAPIClient) RemoveBlacklist(ctx context.Context, in *RemoveBlackli
 	return out, nil
 }
 
-func (c *serverAPIClient) GetBlacklist(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetBlacklistResp, error) {
+func (c *serverAPIClient) GetBlacklist(ctx context.Context, in *GetBlacklistReq, opts ...grpc.CallOption) (*GetBlacklistResp, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetBlacklistResp)
 	err := c.cc.Invoke(ctx, ServerAPI_GetBlacklist_FullMethodName, in, out, cOpts...)
@@ -256,7 +256,7 @@ type ServerAPIServer interface {
 	GetNodeAccessToken(context.Context, *GetNodeAccessTokenReq) (*GetNodeAccessTokenResp, error)
 	AddBlacklist(context.Context, *AddBlacklistReq) (*UserOperationResp, error)
 	RemoveBlacklist(context.Context, *RemoveBlacklistReq) (*UserOperationResp, error)
-	GetBlacklist(context.Context, *Empty) (*GetBlacklistResp, error)
+	GetBlacklist(context.Context, *GetBlacklistReq) (*GetBlacklistResp, error)
 	KickNode(context.Context, *KickNodeReq) (*UserOperationResp, error)
 	GetUserBaseStats(context.Context, *UserBaseStatsReq) (*UserBaseStatsResp, error)
 	GetUserStatChart(context.Context, *UserStatChartReq) (*UserStatChartResp, error)
@@ -309,7 +309,7 @@ func (UnimplementedServerAPIServer) AddBlacklist(context.Context, *AddBlacklistR
 func (UnimplementedServerAPIServer) RemoveBlacklist(context.Context, *RemoveBlacklistReq) (*UserOperationResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RemoveBlacklist not implemented")
 }
-func (UnimplementedServerAPIServer) GetBlacklist(context.Context, *Empty) (*GetBlacklistResp, error) {
+func (UnimplementedServerAPIServer) GetBlacklist(context.Context, *GetBlacklistReq) (*GetBlacklistResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetBlacklist not implemented")
 }
 func (UnimplementedServerAPIServer) KickNode(context.Context, *KickNodeReq) (*UserOperationResp, error) {
@@ -577,7 +577,7 @@ func _ServerAPI_RemoveBlacklist_Handler(srv interface{}, ctx context.Context, de
 }
 
 func _ServerAPI_GetBlacklist_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Empty)
+	in := new(GetBlacklistReq)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -589,7 +589,7 @@ func _ServerAPI_GetBlacklist_Handler(srv interface{}, ctx context.Context, dec f
 		FullMethod: ServerAPI_GetBlacklist_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerAPIServer).GetBlacklist(ctx, req.(*Empty))
+		return srv.(ServerAPIServer).GetBlacklist(ctx, req.(*GetBlacklistReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }

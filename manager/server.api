@@ -151,10 +151,13 @@ type (
 		IPList []string `json:"ip_list"` // max length 100
 	}
 	GetBlacklistReq {
-		PopID string `form:"popid"`
+		PopID  string `form:"popid"`
+		Cursor uint64 `form:"cursor,optional"`
+		Count  int    `form:"count,optional"`
 	}
 	GetBlacklistResp {
-		IPList []string `json:"ip_list"`
+		IPList     []string `json:"ip_list"`
+		NextCursor uint64   `json:"next_cursor"`
 	}
 	KickNodeReq {
 		NodeID string `form:"nodeid"`

@@ -50,11 +50,14 @@ type GetAuthTokenResp struct {
 }
 
 type GetBlacklistReq struct {
-	PopID string `form:"popid"`
+	PopID  string `form:"popid"`
+	Cursor uint64 `form:"cursor,optional"`
+	Count  int    `form:"count,optional"`
 }
 
 type GetBlacklistResp struct {
-	IPList []string `json:"ip_list"`
+	IPList     []string `json:"ip_list"`
+	NextCursor uint64   `json:"next_cursor"`
 }
 
 type GetNodePopReq struct {

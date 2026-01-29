@@ -88,7 +88,7 @@ func (s *ServerAPIServer) RemoveBlacklist(ctx context.Context, in *pb.RemoveBlac
 	return l.RemoveBlacklist(in)
 }
 
-func (s *ServerAPIServer) GetBlacklist(ctx context.Context, in *pb.Empty) (*pb.GetBlacklistResp, error) {
+func (s *ServerAPIServer) GetBlacklist(ctx context.Context, in *pb.GetBlacklistReq) (*pb.GetBlacklistResp, error) {
 	l := logic.NewGetBlacklistLogic(ctx, s.svcCtx)
 	return l.GetBlacklist(in)
 }

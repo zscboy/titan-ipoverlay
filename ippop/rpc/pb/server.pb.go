@@ -1332,16 +1332,69 @@ func (x *RemoveBlacklistReq) GetIpList() []string {
 	return nil
 }
 
+type GetBlacklistReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Cursor        uint64                 `protobuf:"varint,1,opt,name=cursor,proto3" json:"cursor,omitempty"`
+	Count         uint32                 `protobuf:"varint,2,opt,name=count,proto3" json:"count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetBlacklistReq) Reset() {
+	*x = GetBlacklistReq{}
+	mi := &file_server_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetBlacklistReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetBlacklistReq) ProtoMessage() {}
+
+func (x *GetBlacklistReq) ProtoReflect() protoreflect.Message {
+	mi := &file_server_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetBlacklistReq.ProtoReflect.Descriptor instead.
+func (*GetBlacklistReq) Descriptor() ([]byte, []int) {
+	return file_server_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *GetBlacklistReq) GetCursor() uint64 {
+	if x != nil {
+		return x.Cursor
+	}
+	return 0
+}
+
+func (x *GetBlacklistReq) GetCount() uint32 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
 type GetBlacklistResp struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	IpList        []string               `protobuf:"bytes,1,rep,name=ip_list,json=ipList,proto3" json:"ip_list,omitempty"`
+	NextCursor    uint64                 `protobuf:"varint,2,opt,name=next_cursor,json=nextCursor,proto3" json:"next_cursor,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetBlacklistResp) Reset() {
 	*x = GetBlacklistResp{}
-	mi := &file_server_proto_msgTypes[22]
+	mi := &file_server_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1353,7 +1406,7 @@ func (x *GetBlacklistResp) String() string {
 func (*GetBlacklistResp) ProtoMessage() {}
 
 func (x *GetBlacklistResp) ProtoReflect() protoreflect.Message {
-	mi := &file_server_proto_msgTypes[22]
+	mi := &file_server_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1366,7 +1419,7 @@ func (x *GetBlacklistResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetBlacklistResp.ProtoReflect.Descriptor instead.
 func (*GetBlacklistResp) Descriptor() ([]byte, []int) {
-	return file_server_proto_rawDescGZIP(), []int{22}
+	return file_server_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *GetBlacklistResp) GetIpList() []string {
@@ -1374,6 +1427,13 @@ func (x *GetBlacklistResp) GetIpList() []string {
 		return x.IpList
 	}
 	return nil
+}
+
+func (x *GetBlacklistResp) GetNextCursor() uint64 {
+	if x != nil {
+		return x.NextCursor
+	}
+	return 0
 }
 
 type KickNodeReq struct {
@@ -1385,7 +1445,7 @@ type KickNodeReq struct {
 
 func (x *KickNodeReq) Reset() {
 	*x = KickNodeReq{}
-	mi := &file_server_proto_msgTypes[23]
+	mi := &file_server_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1397,7 +1457,7 @@ func (x *KickNodeReq) String() string {
 func (*KickNodeReq) ProtoMessage() {}
 
 func (x *KickNodeReq) ProtoReflect() protoreflect.Message {
-	mi := &file_server_proto_msgTypes[23]
+	mi := &file_server_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1410,7 +1470,7 @@ func (x *KickNodeReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KickNodeReq.ProtoReflect.Descriptor instead.
 func (*KickNodeReq) Descriptor() ([]byte, []int) {
-	return file_server_proto_rawDescGZIP(), []int{23}
+	return file_server_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *KickNodeReq) GetNodeId() string {
@@ -1431,7 +1491,7 @@ type StatPoint struct {
 
 func (x *StatPoint) Reset() {
 	*x = StatPoint{}
-	mi := &file_server_proto_msgTypes[24]
+	mi := &file_server_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1443,7 +1503,7 @@ func (x *StatPoint) String() string {
 func (*StatPoint) ProtoMessage() {}
 
 func (x *StatPoint) ProtoReflect() protoreflect.Message {
-	mi := &file_server_proto_msgTypes[24]
+	mi := &file_server_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1456,7 +1516,7 @@ func (x *StatPoint) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StatPoint.ProtoReflect.Descriptor instead.
 func (*StatPoint) Descriptor() ([]byte, []int) {
-	return file_server_proto_rawDescGZIP(), []int{24}
+	return file_server_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *StatPoint) GetTimestamp() int64 {
@@ -1489,7 +1549,7 @@ type AllStatsMinuteReq struct {
 
 func (x *AllStatsMinuteReq) Reset() {
 	*x = AllStatsMinuteReq{}
-	mi := &file_server_proto_msgTypes[25]
+	mi := &file_server_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1501,7 +1561,7 @@ func (x *AllStatsMinuteReq) String() string {
 func (*AllStatsMinuteReq) ProtoMessage() {}
 
 func (x *AllStatsMinuteReq) ProtoReflect() protoreflect.Message {
-	mi := &file_server_proto_msgTypes[25]
+	mi := &file_server_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1514,7 +1574,7 @@ func (x *AllStatsMinuteReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AllStatsMinuteReq.ProtoReflect.Descriptor instead.
 func (*AllStatsMinuteReq) Descriptor() ([]byte, []int) {
-	return file_server_proto_rawDescGZIP(), []int{25}
+	return file_server_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *AllStatsMinuteReq) GetMinutes() int32 {
@@ -1533,7 +1593,7 @@ type AllStatsHourReq struct {
 
 func (x *AllStatsHourReq) Reset() {
 	*x = AllStatsHourReq{}
-	mi := &file_server_proto_msgTypes[26]
+	mi := &file_server_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1545,7 +1605,7 @@ func (x *AllStatsHourReq) String() string {
 func (*AllStatsHourReq) ProtoMessage() {}
 
 func (x *AllStatsHourReq) ProtoReflect() protoreflect.Message {
-	mi := &file_server_proto_msgTypes[26]
+	mi := &file_server_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1558,7 +1618,7 @@ func (x *AllStatsHourReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AllStatsHourReq.ProtoReflect.Descriptor instead.
 func (*AllStatsHourReq) Descriptor() ([]byte, []int) {
-	return file_server_proto_rawDescGZIP(), []int{26}
+	return file_server_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *AllStatsHourReq) GetHours() int32 {
@@ -1577,7 +1637,7 @@ type AllStatsDayReq struct {
 
 func (x *AllStatsDayReq) Reset() {
 	*x = AllStatsDayReq{}
-	mi := &file_server_proto_msgTypes[27]
+	mi := &file_server_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1589,7 +1649,7 @@ func (x *AllStatsDayReq) String() string {
 func (*AllStatsDayReq) ProtoMessage() {}
 
 func (x *AllStatsDayReq) ProtoReflect() protoreflect.Message {
-	mi := &file_server_proto_msgTypes[27]
+	mi := &file_server_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1602,7 +1662,7 @@ func (x *AllStatsDayReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AllStatsDayReq.ProtoReflect.Descriptor instead.
 func (*AllStatsDayReq) Descriptor() ([]byte, []int) {
-	return file_server_proto_rawDescGZIP(), []int{27}
+	return file_server_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *AllStatsDayReq) GetDays() int32 {
@@ -1621,7 +1681,7 @@ type StatsResp struct {
 
 func (x *StatsResp) Reset() {
 	*x = StatsResp{}
-	mi := &file_server_proto_msgTypes[28]
+	mi := &file_server_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1633,7 +1693,7 @@ func (x *StatsResp) String() string {
 func (*StatsResp) ProtoMessage() {}
 
 func (x *StatsResp) ProtoReflect() protoreflect.Message {
-	mi := &file_server_proto_msgTypes[28]
+	mi := &file_server_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1646,7 +1706,7 @@ func (x *StatsResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StatsResp.ProtoReflect.Descriptor instead.
 func (*StatsResp) Descriptor() ([]byte, []int) {
-	return file_server_proto_rawDescGZIP(), []int{28}
+	return file_server_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *StatsResp) GetStats() []*StatPoint {
@@ -1666,7 +1726,7 @@ type UserStatsMinuteReq struct {
 
 func (x *UserStatsMinuteReq) Reset() {
 	*x = UserStatsMinuteReq{}
-	mi := &file_server_proto_msgTypes[29]
+	mi := &file_server_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1678,7 +1738,7 @@ func (x *UserStatsMinuteReq) String() string {
 func (*UserStatsMinuteReq) ProtoMessage() {}
 
 func (x *UserStatsMinuteReq) ProtoReflect() protoreflect.Message {
-	mi := &file_server_proto_msgTypes[29]
+	mi := &file_server_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1691,7 +1751,7 @@ func (x *UserStatsMinuteReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserStatsMinuteReq.ProtoReflect.Descriptor instead.
 func (*UserStatsMinuteReq) Descriptor() ([]byte, []int) {
-	return file_server_proto_rawDescGZIP(), []int{29}
+	return file_server_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *UserStatsMinuteReq) GetUsername() string {
@@ -1718,7 +1778,7 @@ type UserStatsHourReq struct {
 
 func (x *UserStatsHourReq) Reset() {
 	*x = UserStatsHourReq{}
-	mi := &file_server_proto_msgTypes[30]
+	mi := &file_server_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1730,7 +1790,7 @@ func (x *UserStatsHourReq) String() string {
 func (*UserStatsHourReq) ProtoMessage() {}
 
 func (x *UserStatsHourReq) ProtoReflect() protoreflect.Message {
-	mi := &file_server_proto_msgTypes[30]
+	mi := &file_server_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1743,7 +1803,7 @@ func (x *UserStatsHourReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserStatsHourReq.ProtoReflect.Descriptor instead.
 func (*UserStatsHourReq) Descriptor() ([]byte, []int) {
-	return file_server_proto_rawDescGZIP(), []int{30}
+	return file_server_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *UserStatsHourReq) GetUsername() string {
@@ -1770,7 +1830,7 @@ type UserStatsDayReq struct {
 
 func (x *UserStatsDayReq) Reset() {
 	*x = UserStatsDayReq{}
-	mi := &file_server_proto_msgTypes[31]
+	mi := &file_server_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1782,7 +1842,7 @@ func (x *UserStatsDayReq) String() string {
 func (*UserStatsDayReq) ProtoMessage() {}
 
 func (x *UserStatsDayReq) ProtoReflect() protoreflect.Message {
-	mi := &file_server_proto_msgTypes[31]
+	mi := &file_server_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1795,7 +1855,7 @@ func (x *UserStatsDayReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserStatsDayReq.ProtoReflect.Descriptor instead.
 func (*UserStatsDayReq) Descriptor() ([]byte, []int) {
-	return file_server_proto_rawDescGZIP(), []int{31}
+	return file_server_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *UserStatsDayReq) GetUsername() string {
@@ -1822,7 +1882,7 @@ type UserBaseStatsReq struct {
 
 func (x *UserBaseStatsReq) Reset() {
 	*x = UserBaseStatsReq{}
-	mi := &file_server_proto_msgTypes[32]
+	mi := &file_server_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1834,7 +1894,7 @@ func (x *UserBaseStatsReq) String() string {
 func (*UserBaseStatsReq) ProtoMessage() {}
 
 func (x *UserBaseStatsReq) ProtoReflect() protoreflect.Message {
-	mi := &file_server_proto_msgTypes[32]
+	mi := &file_server_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1847,7 +1907,7 @@ func (x *UserBaseStatsReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserBaseStatsReq.ProtoReflect.Descriptor instead.
 func (*UserBaseStatsReq) Descriptor() ([]byte, []int) {
-	return file_server_proto_rawDescGZIP(), []int{32}
+	return file_server_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *UserBaseStatsReq) GetUsername() string {
@@ -1869,7 +1929,7 @@ type UserBaseStatsResp struct {
 
 func (x *UserBaseStatsResp) Reset() {
 	*x = UserBaseStatsResp{}
-	mi := &file_server_proto_msgTypes[33]
+	mi := &file_server_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1881,7 +1941,7 @@ func (x *UserBaseStatsResp) String() string {
 func (*UserBaseStatsResp) ProtoMessage() {}
 
 func (x *UserBaseStatsResp) ProtoReflect() protoreflect.Message {
-	mi := &file_server_proto_msgTypes[33]
+	mi := &file_server_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1894,7 +1954,7 @@ func (x *UserBaseStatsResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserBaseStatsResp.ProtoReflect.Descriptor instead.
 func (*UserBaseStatsResp) Descriptor() ([]byte, []int) {
-	return file_server_proto_rawDescGZIP(), []int{33}
+	return file_server_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *UserBaseStatsResp) GetCurrentBandwidth() int64 {
@@ -1937,7 +1997,7 @@ type UserStatChartReq struct {
 
 func (x *UserStatChartReq) Reset() {
 	*x = UserStatChartReq{}
-	mi := &file_server_proto_msgTypes[34]
+	mi := &file_server_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1949,7 +2009,7 @@ func (x *UserStatChartReq) String() string {
 func (*UserStatChartReq) ProtoMessage() {}
 
 func (x *UserStatChartReq) ProtoReflect() protoreflect.Message {
-	mi := &file_server_proto_msgTypes[34]
+	mi := &file_server_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1962,7 +2022,7 @@ func (x *UserStatChartReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserStatChartReq.ProtoReflect.Descriptor instead.
 func (*UserStatChartReq) Descriptor() ([]byte, []int) {
-	return file_server_proto_rawDescGZIP(), []int{34}
+	return file_server_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *UserStatChartReq) GetUsername() string {
@@ -2002,7 +2062,7 @@ type UserStatChartResp struct {
 
 func (x *UserStatChartResp) Reset() {
 	*x = UserStatChartResp{}
-	mi := &file_server_proto_msgTypes[35]
+	mi := &file_server_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2014,7 +2074,7 @@ func (x *UserStatChartResp) String() string {
 func (*UserStatChartResp) ProtoMessage() {}
 
 func (x *UserStatChartResp) ProtoReflect() protoreflect.Message {
-	mi := &file_server_proto_msgTypes[35]
+	mi := &file_server_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2027,7 +2087,7 @@ func (x *UserStatChartResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserStatChartResp.ProtoReflect.Descriptor instead.
 func (*UserStatChartResp) Descriptor() ([]byte, []int) {
-	return file_server_proto_rawDescGZIP(), []int{35}
+	return file_server_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *UserStatChartResp) GetStats() []*StatPoint {
@@ -2045,7 +2105,7 @@ type Empty struct {
 
 func (x *Empty) Reset() {
 	*x = Empty{}
-	mi := &file_server_proto_msgTypes[36]
+	mi := &file_server_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2057,7 +2117,7 @@ func (x *Empty) String() string {
 func (*Empty) ProtoMessage() {}
 
 func (x *Empty) ProtoReflect() protoreflect.Message {
-	mi := &file_server_proto_msgTypes[36]
+	mi := &file_server_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2070,7 +2130,7 @@ func (x *Empty) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Empty.ProtoReflect.Descriptor instead.
 func (*Empty) Descriptor() ([]byte, []int) {
-	return file_server_proto_rawDescGZIP(), []int{36}
+	return file_server_proto_rawDescGZIP(), []int{37}
 }
 
 var File_server_proto protoreflect.FileDescriptor
@@ -2168,9 +2228,14 @@ const file_server_proto_rawDesc = "" +
 	"\x0fAddBlacklistReq\x12\x17\n" +
 	"\aip_list\x18\x01 \x03(\tR\x06ipList\"-\n" +
 	"\x12RemoveBlacklistReq\x12\x17\n" +
-	"\aip_list\x18\x01 \x03(\tR\x06ipList\"+\n" +
+	"\aip_list\x18\x01 \x03(\tR\x06ipList\"?\n" +
+	"\x0fGetBlacklistReq\x12\x16\n" +
+	"\x06cursor\x18\x01 \x01(\x04R\x06cursor\x12\x14\n" +
+	"\x05count\x18\x02 \x01(\rR\x05count\"L\n" +
 	"\x10GetBlacklistResp\x12\x17\n" +
-	"\aip_list\x18\x01 \x03(\tR\x06ipList\"&\n" +
+	"\aip_list\x18\x01 \x03(\tR\x06ipList\x12\x1f\n" +
+	"\vnext_cursor\x18\x02 \x01(\x04R\n" +
+	"nextCursor\"&\n" +
 	"\vKickNodeReq\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\"a\n" +
 	"\tStatPoint\x12\x1c\n" +
@@ -2209,7 +2274,7 @@ const file_server_proto_rawDesc = "" +
 	"\bend_time\x18\x04 \x01(\x03R\aendTime\"<\n" +
 	"\x11UserStatChartResp\x12'\n" +
 	"\x05stats\x18\x01 \x03(\v2\x11.server.StatPointR\x05stats\"\a\n" +
-	"\x05Empty2\xf4\b\n" +
+	"\x05Empty2\xfe\b\n" +
 	"\tServerAPI\x125\n" +
 	"\bListNode\x12\x13.server.ListNodeReq\x1a\x14.server.ListNodeResp\x12;\n" +
 	"\n" +
@@ -2226,8 +2291,8 @@ const file_server_proto_rawDesc = "" +
 	"\rGetServerInfo\x12\r.server.Empty\x1a\x19.server.GetServerInfoResp\x12S\n" +
 	"\x12GetNodeAccessToken\x12\x1d.server.GetNodeAccessTokenReq\x1a\x1e.server.GetNodeAccessTokenResp\x12B\n" +
 	"\fAddBlacklist\x12\x17.server.AddBlacklistReq\x1a\x19.server.UserOperationResp\x12H\n" +
-	"\x0fRemoveBlacklist\x12\x1a.server.RemoveBlacklistReq\x1a\x19.server.UserOperationResp\x127\n" +
-	"\fGetBlacklist\x12\r.server.Empty\x1a\x18.server.GetBlacklistResp\x12:\n" +
+	"\x0fRemoveBlacklist\x12\x1a.server.RemoveBlacklistReq\x1a\x19.server.UserOperationResp\x12A\n" +
+	"\fGetBlacklist\x12\x17.server.GetBlacklistReq\x1a\x18.server.GetBlacklistResp\x12:\n" +
 	"\bKickNode\x12\x13.server.KickNodeReq\x1a\x19.server.UserOperationResp\x12G\n" +
 	"\x10GetUserBaseStats\x12\x18.server.UserBaseStatsReq\x1a\x19.server.UserBaseStatsResp\x12G\n" +
 	"\x10GetUserStatChart\x12\x18.server.UserStatChartReq\x1a\x19.server.UserStatChartRespB\x06Z\x04./pbb\x06proto3"
@@ -2244,7 +2309,7 @@ func file_server_proto_rawDescGZIP() []byte {
 	return file_server_proto_rawDescData
 }
 
-var file_server_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
+var file_server_proto_msgTypes = make([]protoimpl.MessageInfo, 38)
 var file_server_proto_goTypes = []any{
 	(*ListNodeReq)(nil),            // 0: server.ListNodeReq
 	(*Node)(nil),                   // 1: server.Node
@@ -2268,21 +2333,22 @@ var file_server_proto_goTypes = []any{
 	(*GetNodeAccessTokenResp)(nil), // 19: server.GetNodeAccessTokenResp
 	(*AddBlacklistReq)(nil),        // 20: server.AddBlacklistReq
 	(*RemoveBlacklistReq)(nil),     // 21: server.RemoveBlacklistReq
-	(*GetBlacklistResp)(nil),       // 22: server.GetBlacklistResp
-	(*KickNodeReq)(nil),            // 23: server.KickNodeReq
-	(*StatPoint)(nil),              // 24: server.StatPoint
-	(*AllStatsMinuteReq)(nil),      // 25: server.AllStatsMinuteReq
-	(*AllStatsHourReq)(nil),        // 26: server.AllStatsHourReq
-	(*AllStatsDayReq)(nil),         // 27: server.AllStatsDayReq
-	(*StatsResp)(nil),              // 28: server.StatsResp
-	(*UserStatsMinuteReq)(nil),     // 29: server.UserStatsMinuteReq
-	(*UserStatsHourReq)(nil),       // 30: server.UserStatsHourReq
-	(*UserStatsDayReq)(nil),        // 31: server.UserStatsDayReq
-	(*UserBaseStatsReq)(nil),       // 32: server.UserBaseStatsReq
-	(*UserBaseStatsResp)(nil),      // 33: server.UserBaseStatsResp
-	(*UserStatChartReq)(nil),       // 34: server.UserStatChartReq
-	(*UserStatChartResp)(nil),      // 35: server.UserStatChartResp
-	(*Empty)(nil),                  // 36: server.Empty
+	(*GetBlacklistReq)(nil),        // 22: server.GetBlacklistReq
+	(*GetBlacklistResp)(nil),       // 23: server.GetBlacklistResp
+	(*KickNodeReq)(nil),            // 24: server.KickNodeReq
+	(*StatPoint)(nil),              // 25: server.StatPoint
+	(*AllStatsMinuteReq)(nil),      // 26: server.AllStatsMinuteReq
+	(*AllStatsHourReq)(nil),        // 27: server.AllStatsHourReq
+	(*AllStatsDayReq)(nil),         // 28: server.AllStatsDayReq
+	(*StatsResp)(nil),              // 29: server.StatsResp
+	(*UserStatsMinuteReq)(nil),     // 30: server.UserStatsMinuteReq
+	(*UserStatsHourReq)(nil),       // 31: server.UserStatsHourReq
+	(*UserStatsDayReq)(nil),        // 32: server.UserStatsDayReq
+	(*UserBaseStatsReq)(nil),       // 33: server.UserBaseStatsReq
+	(*UserBaseStatsResp)(nil),      // 34: server.UserBaseStatsResp
+	(*UserStatChartReq)(nil),       // 35: server.UserStatChartReq
+	(*UserStatChartResp)(nil),      // 36: server.UserStatChartResp
+	(*Empty)(nil),                  // 37: server.Empty
 }
 var file_server_proto_depIdxs = []int32{
 	1,  // 0: server.ListNodeResp.nodes:type_name -> server.Node
@@ -2295,8 +2361,8 @@ var file_server_proto_depIdxs = []int32{
 	4,  // 7: server.User.traffic_limit:type_name -> server.TrafficLimit
 	3,  // 8: server.User.route:type_name -> server.Route
 	14, // 9: server.ListUserResp.users:type_name -> server.User
-	24, // 10: server.StatsResp.stats:type_name -> server.StatPoint
-	24, // 11: server.UserStatChartResp.stats:type_name -> server.StatPoint
+	25, // 10: server.StatsResp.stats:type_name -> server.StatPoint
+	25, // 11: server.UserStatChartResp.stats:type_name -> server.StatPoint
 	0,  // 12: server.ServerAPI.ListNode:input_type -> server.ListNodeReq
 	5,  // 13: server.ServerAPI.CreateUser:input_type -> server.CreateUserReq
 	15, // 14: server.ServerAPI.ListUser:input_type -> server.ListUserReq
@@ -2306,14 +2372,14 @@ var file_server_proto_depIdxs = []int32{
 	12, // 18: server.ServerAPI.DeleteUser:input_type -> server.DeleteUserReq
 	11, // 19: server.ServerAPI.SwitchUserRouteNode:input_type -> server.SwitchUserRouteNodeReq
 	13, // 20: server.ServerAPI.StartOrStopUser:input_type -> server.StartOrStopUserReq
-	36, // 21: server.ServerAPI.GetServerInfo:input_type -> server.Empty
+	37, // 21: server.ServerAPI.GetServerInfo:input_type -> server.Empty
 	18, // 22: server.ServerAPI.GetNodeAccessToken:input_type -> server.GetNodeAccessTokenReq
 	20, // 23: server.ServerAPI.AddBlacklist:input_type -> server.AddBlacklistReq
 	21, // 24: server.ServerAPI.RemoveBlacklist:input_type -> server.RemoveBlacklistReq
-	36, // 25: server.ServerAPI.GetBlacklist:input_type -> server.Empty
-	23, // 26: server.ServerAPI.KickNode:input_type -> server.KickNodeReq
-	32, // 27: server.ServerAPI.GetUserBaseStats:input_type -> server.UserBaseStatsReq
-	34, // 28: server.ServerAPI.GetUserStatChart:input_type -> server.UserStatChartReq
+	22, // 25: server.ServerAPI.GetBlacklist:input_type -> server.GetBlacklistReq
+	24, // 26: server.ServerAPI.KickNode:input_type -> server.KickNodeReq
+	33, // 27: server.ServerAPI.GetUserBaseStats:input_type -> server.UserBaseStatsReq
+	35, // 28: server.ServerAPI.GetUserStatChart:input_type -> server.UserStatChartReq
 	2,  // 29: server.ServerAPI.ListNode:output_type -> server.ListNodeResp
 	6,  // 30: server.ServerAPI.CreateUser:output_type -> server.CreateUserResp
 	16, // 31: server.ServerAPI.ListUser:output_type -> server.ListUserResp
@@ -2327,10 +2393,10 @@ var file_server_proto_depIdxs = []int32{
 	19, // 39: server.ServerAPI.GetNodeAccessToken:output_type -> server.GetNodeAccessTokenResp
 	7,  // 40: server.ServerAPI.AddBlacklist:output_type -> server.UserOperationResp
 	7,  // 41: server.ServerAPI.RemoveBlacklist:output_type -> server.UserOperationResp
-	22, // 42: server.ServerAPI.GetBlacklist:output_type -> server.GetBlacklistResp
+	23, // 42: server.ServerAPI.GetBlacklist:output_type -> server.GetBlacklistResp
 	7,  // 43: server.ServerAPI.KickNode:output_type -> server.UserOperationResp
-	33, // 44: server.ServerAPI.GetUserBaseStats:output_type -> server.UserBaseStatsResp
-	35, // 45: server.ServerAPI.GetUserStatChart:output_type -> server.UserStatChartResp
+	34, // 44: server.ServerAPI.GetUserBaseStats:output_type -> server.UserBaseStatsResp
+	36, // 45: server.ServerAPI.GetUserStatChart:output_type -> server.UserStatChartResp
 	29, // [29:46] is the sub-list for method output_type
 	12, // [12:29] is the sub-list for method input_type
 	12, // [12:12] is the sub-list for extension type_name
@@ -2349,7 +2415,7 @@ func file_server_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_server_proto_rawDesc), len(file_server_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   37,
+			NumMessages:   38,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

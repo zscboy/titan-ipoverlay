@@ -28,13 +28,19 @@ func NewGetBlackListLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetB
 func (l *GetBlackListLogic) GetBlackList(req *types.GetBlacklistReq) (resp *types.GetBlacklistResp, err error) {
 	server := l.svcCtx.Pops[req.PopID]
 	if server == nil {
-		return nil, fmt.Errorf("")
+		return nil, fmt.Errorf("popid %s not exist", req.PopID)
 	}
 
-	getBlacklistResp, err := server.API.GetBlacklist(l.ctx, &serverapi.Empty{})
+	getBlacklistResp, err := server.API.GetBlacklist(l.ctx, &serverapi.GetBlacklistReq{
+		Cursor: req.Cursor,
+		Count:  uint32(req.Count),
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	return &types.GetBlacklistResp{IPList: getBlacklistResp.IpList}, nil
+	return &types.GetBlacklistResp{
+		IPList:     getBlacklistResp.IpList,
+		NextCursor: getBlacklistResp.NextCursor,
+	}, nil
 }

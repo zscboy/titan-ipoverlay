@@ -42,3 +42,7 @@ func GetBlacklist(redis *redis.Redis) ([]string, error) {
 	}
 	return keys, nil
 }
+
+func GetBlacklistPage(redis *redis.Redis, cursor uint64, count int) ([]string, uint64, error) {
+	return redis.Sscan(redisKeyNodeBlacklist, cursor, "", int64(count))
+}

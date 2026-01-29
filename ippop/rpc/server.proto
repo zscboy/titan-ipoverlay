@@ -141,8 +141,14 @@ message RemoveBlacklistReq {
   repeated string ip_list = 1; // max length 100
 }
 
+message GetBlacklistReq {
+  uint64 cursor = 1;
+  uint32 count = 2;
+}
+
 message GetBlacklistResp {
   repeated string ip_list = 1;
+  uint64 next_cursor = 2;
 }
 
 message KickNodeReq {
@@ -228,7 +234,7 @@ service ServerAPI {
   rpc GetNodeAccessToken(GetNodeAccessTokenReq) returns (GetNodeAccessTokenResp);
   rpc AddBlacklist(AddBlacklistReq) returns (UserOperationResp);
   rpc RemoveBlacklist(RemoveBlacklistReq) returns (UserOperationResp);
-  rpc GetBlacklist(Empty) returns (GetBlacklistResp);
+  rpc GetBlacklist(GetBlacklistReq) returns (GetBlacklistResp);
   rpc KickNode(KickNodeReq) returns (UserOperationResp);
 
 

@@ -22,6 +22,7 @@ type (
 	CreateUserResp         = pb.CreateUserResp
 	DeleteUserReq          = pb.DeleteUserReq
 	Empty                  = pb.Empty
+	GetBlacklistReq        = pb.GetBlacklistReq
 	GetBlacklistResp       = pb.GetBlacklistResp
 	GetNodeAccessTokenReq  = pb.GetNodeAccessTokenReq
 	GetNodeAccessTokenResp = pb.GetNodeAccessTokenResp
@@ -66,7 +67,7 @@ type (
 		GetNodeAccessToken(ctx context.Context, in *GetNodeAccessTokenReq, opts ...grpc.CallOption) (*GetNodeAccessTokenResp, error)
 		AddBlacklist(ctx context.Context, in *AddBlacklistReq, opts ...grpc.CallOption) (*UserOperationResp, error)
 		RemoveBlacklist(ctx context.Context, in *RemoveBlacklistReq, opts ...grpc.CallOption) (*UserOperationResp, error)
-		GetBlacklist(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetBlacklistResp, error)
+		GetBlacklist(ctx context.Context, in *GetBlacklistReq, opts ...grpc.CallOption) (*GetBlacklistResp, error)
 		KickNode(ctx context.Context, in *KickNodeReq, opts ...grpc.CallOption) (*UserOperationResp, error)
 		GetUserBaseStats(ctx context.Context, in *UserBaseStatsReq, opts ...grpc.CallOption) (*UserBaseStatsResp, error)
 		GetUserStatChart(ctx context.Context, in *UserStatChartReq, opts ...grpc.CallOption) (*UserStatChartResp, error)
@@ -148,7 +149,7 @@ func (m *defaultServerAPI) RemoveBlacklist(ctx context.Context, in *RemoveBlackl
 	return client.RemoveBlacklist(ctx, in, opts...)
 }
 
-func (m *defaultServerAPI) GetBlacklist(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetBlacklistResp, error) {
+func (m *defaultServerAPI) GetBlacklist(ctx context.Context, in *GetBlacklistReq, opts ...grpc.CallOption) (*GetBlacklistResp, error) {
 	client := pb.NewServerAPIClient(m.cli.Conn())
 	return client.GetBlacklist(ctx, in, opts...)
 }

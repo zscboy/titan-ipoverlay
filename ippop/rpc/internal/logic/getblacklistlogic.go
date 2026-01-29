@@ -24,11 +24,18 @@ func NewGetBlacklistLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetB
 	}
 }
 
-func (l *GetBlacklistLogic) GetBlacklist(in *pb.Empty) (*pb.GetBlacklistResp, error) {
-	ips, err := model.GetBlacklist(l.svcCtx.Redis)
+func (l *GetBlacklistLogic) GetBlacklist(in *pb.GetBlacklistReq) (*pb.GetBlacklistResp, error) {
+	count := int(in.Count)
+	if count <= 0 {
+		count = 100
+	}
+	ips, nextCursor, err := model.GetBlacklistPage(l.svcCtx.Redis, in.Cursor, count)
 	if err != nil {
 		return nil, err
 	}
 
-	return &pb.GetBlacklistResp{IpList: ips}, nil
+	return &pb.GetBlacklistResp{
+		IpList:     ips,
+		NextCursor: nextCursor,
+	}, nil
 }
