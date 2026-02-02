@@ -130,6 +130,7 @@ func (tm *TunnelManager) addTunnel(t *Tunnel) {
 func (tm *TunnelManager) removeTunnel(tun *Tunnel) {
 	// tunnels contain blacklisted node
 	tm.tunnels.Delete(tun.opts.Id)
+	tm.ipPool.RemoveTunnel(tun)
 
 	if tun.opts.IsBlacklisted {
 		logx.Infof("removeTunnel error: %s %s is in blacklist", tun.opts.Id, tun.opts.IP)
@@ -165,8 +166,6 @@ func (tm *TunnelManager) removeTunnel(tun *Tunnel) {
 	} else {
 		atomic.StoreUint64(&tm.rrIdx, 0)
 	}
-
-	tm.ipPool.RemoveTunnel(tun)
 }
 
 func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, nodeIP string) {
