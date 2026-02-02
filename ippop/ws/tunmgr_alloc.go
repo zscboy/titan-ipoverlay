@@ -3,7 +3,6 @@ package ws
 import (
 	"context"
 	"fmt"
-	"sync/atomic"
 	"time"
 	"titan-ipoverlay/ippop/config"
 	"titan-ipoverlay/ippop/model"
@@ -70,42 +69,4 @@ func (tm *TunnelManager) GetLocalTunnel(nodeID string) *Tunnel {
 		return nil
 	}
 	return v.(*Tunnel)
-}
-
-// PickActiveTunnel implements NodeSource interface
-func (tm *TunnelManager) PickActiveTunnel() (*Tunnel, error) {
-	switch tm.config.WS.TunnelSelectPolicy {
-	case config.TunnelSelectRandom:
-		return tm.randomTunnel()
-	case config.TunnelSelectRound:
-		return tm.nextTunnel()
-	default:
-		return tm.randomTunnel()
-	}
-}
-
-func (tm *TunnelManager) randomTunnel() (*Tunnel, error) {
-	tm.tunnelListLock.RLock()
-	defer tm.tunnelListLock.RUnlock()
-
-	n := len(tm.tunnelList)
-	if n == 0 {
-		return nil, fmt.Errorf("no tunnel exist")
-	}
-
-	idx := tm.rng.Intn(n)
-	return tm.tunnelList[idx], nil
-}
-
-func (tm *TunnelManager) nextTunnel() (*Tunnel, error) {
-	tm.tunnelListLock.RLock()
-	defer tm.tunnelListLock.RUnlock()
-
-	n := len(tm.tunnelList)
-	if n == 0 {
-		return nil, fmt.Errorf("no tunnel exist")
-	}
-
-	idx := atomic.AddUint64(&tm.rrIdx, 1)
-	return tm.tunnelList[idx%uint64(n)], nil
 }

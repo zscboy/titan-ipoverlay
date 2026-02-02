@@ -14,7 +14,6 @@ type NodeSource interface {
 	AcquireExclusiveNode(ctx context.Context) (string, *Tunnel, error)
 	ReleaseExclusiveNodes(nodeIDs []string, ips []string)
 	GetLocalTunnel(nodeID string) *Tunnel
-	PickActiveTunnel() (*Tunnel, error)
 	SwitchNodeForUser(user *model.User) error
 }
 
@@ -27,6 +26,7 @@ type UserSession struct {
 	connectCount int32         // Reference count of active connections
 	disconnectAt time.Time     // Time when connectCount became zero
 	idleElement  *list.Element // Pointer to the element in SessionManager's idleList
+	isEphemeral  bool          // If true, release node immediately when count reaches zero
 }
 
 // NodeAllocator is the interface for different node assignment strategies.

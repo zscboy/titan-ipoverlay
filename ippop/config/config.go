@@ -48,7 +48,7 @@ type WS struct {
 	//lint:ignore SA5008 go-zero allows "default" in struct tags
 	TunnelSelectPolicy TunnelSelectPolicy `json:",default=random"`
 	//lint:ignore SA5008 go-zero allows "default" in struct tags
-	NodeAllocateStrategy NodeAllocateStrategy `json:",default=redis"`
+	NodeAllocateStrategy NodeAllocateStrategy `json:",default=ippool"`
 }
 
 type FilterRule struct {

@@ -106,6 +106,19 @@ func (sm *SessionManager) Decrement(sess *UserSession) {
 
 	// 2. If count reaches zero, enter delayed cleanup queue
 	if newCount <= 0 {
+		if sess.isEphemeral {
+			var nodes []string
+			var ips []string
+			if sess.exitIP != "" {
+				ips = append(ips, sess.exitIP)
+			} else {
+				nodes = append(nodes, sess.deviceID)
+			}
+			logx.Infof("SessionManager: immediate release ephemeral session for user %s, device %s", sess.username, sess.deviceID)
+			sm.source.ReleaseExclusiveNodes(nodes, ips)
+			return
+		}
+
 		sm.lock.Lock()
 		defer sm.lock.Unlock()
 
@@ -200,8 +213,18 @@ func NewSessionAllocator(sm *SessionManager, source NodeSource) *SessionAllocato
 }
 func (a *SessionAllocator) Allocate(user *model.User, target *socks5.SocksTargetInfo) (*Tunnel, *UserSession, error) {
 	if target.Session == "" {
-		tun, err := a.source.PickActiveTunnel()
-		return tun, nil, err
+		exitIP, tun, err := a.source.AcquireExclusiveNode(context.Background())
+		if err != nil {
+			return nil, nil, err
+		}
+		sess := &UserSession{
+			username:    user.UserName,
+			deviceID:    tun.opts.Id,
+			exitIP:      exitIP,
+			isEphemeral: true,
+		}
+		atomic.StoreInt32(&sess.connectCount, 1)
+		return tun, sess, nil
 	}
 
 	// Atomic Lookup and Activation

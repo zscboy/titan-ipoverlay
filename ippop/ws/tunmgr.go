@@ -307,10 +307,6 @@ func (tm *TunnelManager) getTunnelByUser(user *model.User) (*Tunnel, error) {
 // NodeSource interface implementation, helper methods, and RPC interface implementations
 // have been moved to tunmgr_alloc.go and tunmgr_rpc.go respectively.
 
-func (tm *TunnelManager) handleUserSessionWhenSocks5TCPClose(session *UserSession) {
-	tm.sessionManager.Decrement(session)
-}
-
 func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks5.SocksTargetInfo) error {
 	logx.Debugf("HandleSocks5TCP, user %s, DomainName %s, port %d, remote:%s, connCount:%d, connTime:%d",
 		targetInfo.Username, targetInfo.DomainName, targetInfo.Port, tcpConn.RemoteAddr().String(), tm.socks5ConnCount.Load(), time.Since(targetInfo.ConnCreateTime).Milliseconds())
