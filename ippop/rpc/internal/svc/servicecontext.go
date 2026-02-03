@@ -8,6 +8,7 @@ import (
 
 type NodeManager interface {
 	Kick(nodeID string) error
+	KickByIPs(ips []string) error
 }
 
 type UserManager interface {

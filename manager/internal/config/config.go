@@ -31,8 +31,9 @@ type Config struct {
 	Redis   redis.RedisConf
 	JwtAuth JwtAuth
 	// todo: will move to center server
-	Pops        []Pop
-	DefaultArea string
-	Geo         Geo
-	Whitelist   []string `json:",optional"`
+	Pops         []Pop
+	DefaultArea  string
+	BlacklistPop string // The POP ID where blacklisted nodes are redirected
+	Geo          Geo
+	Whitelist    []string `json:",optional"`
 }

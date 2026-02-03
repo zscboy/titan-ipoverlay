@@ -34,6 +34,7 @@ const (
 	ServerAPI_RemoveBlacklist_FullMethodName     = "/server.ServerAPI/RemoveBlacklist"
 	ServerAPI_GetBlacklist_FullMethodName        = "/server.ServerAPI/GetBlacklist"
 	ServerAPI_KickNode_FullMethodName            = "/server.ServerAPI/KickNode"
+	ServerAPI_KickNodeByIP_FullMethodName        = "/server.ServerAPI/KickNodeByIP"
 	ServerAPI_GetUserBaseStats_FullMethodName    = "/server.ServerAPI/GetUserBaseStats"
 	ServerAPI_GetUserStatChart_FullMethodName    = "/server.ServerAPI/GetUserStatChart"
 )
@@ -57,6 +58,7 @@ type ServerAPIClient interface {
 	RemoveBlacklist(ctx context.Context, in *RemoveBlacklistReq, opts ...grpc.CallOption) (*UserOperationResp, error)
 	GetBlacklist(ctx context.Context, in *GetBlacklistReq, opts ...grpc.CallOption) (*GetBlacklistResp, error)
 	KickNode(ctx context.Context, in *KickNodeReq, opts ...grpc.CallOption) (*UserOperationResp, error)
+	KickNodeByIP(ctx context.Context, in *KickNodeByIPReq, opts ...grpc.CallOption) (*UserOperationResp, error)
 	GetUserBaseStats(ctx context.Context, in *UserBaseStatsReq, opts ...grpc.CallOption) (*UserBaseStatsResp, error)
 	GetUserStatChart(ctx context.Context, in *UserStatChartReq, opts ...grpc.CallOption) (*UserStatChartResp, error)
 }
@@ -219,6 +221,16 @@ func (c *serverAPIClient) KickNode(ctx context.Context, in *KickNodeReq, opts ..
 	return out, nil
 }
 
+func (c *serverAPIClient) KickNodeByIP(ctx context.Context, in *KickNodeByIPReq, opts ...grpc.CallOption) (*UserOperationResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UserOperationResp)
+	err := c.cc.Invoke(ctx, ServerAPI_KickNodeByIP_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *serverAPIClient) GetUserBaseStats(ctx context.Context, in *UserBaseStatsReq, opts ...grpc.CallOption) (*UserBaseStatsResp, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UserBaseStatsResp)
@@ -258,6 +270,7 @@ type ServerAPIServer interface {
 	RemoveBlacklist(context.Context, *RemoveBlacklistReq) (*UserOperationResp, error)
 	GetBlacklist(context.Context, *GetBlacklistReq) (*GetBlacklistResp, error)
 	KickNode(context.Context, *KickNodeReq) (*UserOperationResp, error)
+	KickNodeByIP(context.Context, *KickNodeByIPReq) (*UserOperationResp, error)
 	GetUserBaseStats(context.Context, *UserBaseStatsReq) (*UserBaseStatsResp, error)
 	GetUserStatChart(context.Context, *UserStatChartReq) (*UserStatChartResp, error)
 	mustEmbedUnimplementedServerAPIServer()
@@ -314,6 +327,9 @@ func (UnimplementedServerAPIServer) GetBlacklist(context.Context, *GetBlacklistR
 }
 func (UnimplementedServerAPIServer) KickNode(context.Context, *KickNodeReq) (*UserOperationResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method KickNode not implemented")
+}
+func (UnimplementedServerAPIServer) KickNodeByIP(context.Context, *KickNodeByIPReq) (*UserOperationResp, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method KickNodeByIP not implemented")
 }
 func (UnimplementedServerAPIServer) GetUserBaseStats(context.Context, *UserBaseStatsReq) (*UserBaseStatsResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetUserBaseStats not implemented")
@@ -612,6 +628,24 @@ func _ServerAPI_KickNode_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ServerAPI_KickNodeByIP_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(KickNodeByIPReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ServerAPIServer).KickNodeByIP(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ServerAPI_KickNodeByIP_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerAPIServer).KickNodeByIP(ctx, req.(*KickNodeByIPReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ServerAPI_GetUserBaseStats_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UserBaseStatsReq)
 	if err := dec(in); err != nil {
@@ -714,6 +748,10 @@ var ServerAPI_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "KickNode",
 			Handler:    _ServerAPI_KickNode_Handler,
+		},
+		{
+			MethodName: "KickNodeByIP",
+			Handler:    _ServerAPI_KickNodeByIP_Handler,
 		},
 		{
 			MethodName: "GetUserBaseStats",

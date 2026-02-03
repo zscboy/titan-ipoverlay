@@ -30,7 +30,7 @@ func (l *RemoveBlackListLogic) RemoveBlackList(req *types.RemoveBlacklistReq) (r
 		return &types.UserOperationResp{ErrMsg: fmt.Sprintf("too many ips, max is %d", maxIPListLen)}, nil
 	}
 
-	server := l.svcCtx.Pops[string(req.PopID)]
+	server := l.svcCtx.Pops[req.PopID]
 	if server == nil {
 		return &types.UserOperationResp{ErrMsg: fmt.Sprintf("pop %s not found", req.PopID)}, nil
 	}

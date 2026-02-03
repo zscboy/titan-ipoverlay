@@ -4,11 +4,40 @@ import (
 	"fmt"
 	"net"
 	"titan-ipoverlay/ippop/model"
+
+	"github.com/zeromicro/go-zero/core/logx"
 )
 
 // Kick implements svc.NodeManager interface
 func (tm *TunnelManager) Kick(nodeID string) error {
 	return tm.KickNode(nodeID)
+}
+
+// KickByIPs implements svc.NodeManager interface
+func (tm *TunnelManager) KickByIPs(ips []string) error {
+	for _, ip := range ips {
+		// 1. Deactivate in pool first to prevent new assignments
+		tm.ipPool.DeactivateIP(ip)
+
+		// 2. Check if the IP is currently assigned to a user session
+		exists, isAssigned := tm.ipPool.GetIPAssignmentStatus(ip)
+		if !exists {
+			continue
+		}
+
+		if isAssigned {
+			logx.Infof("IP %s is currently assigned to a session, skipping kick until released", ip)
+			continue
+		}
+
+		// 3. If not assigned, get all tunnels for this IP and kick
+		tunnels := tm.ipPool.GetTunnelsByIP(ip)
+		for _, t := range tunnels {
+			logx.Infof("IP %s is not assigned, kicking tunnel %s", ip, t.opts.Id)
+			t.waitClose()
+		}
+	}
+	return nil
 }
 
 // SwitchNode implements svc.UserManager interface

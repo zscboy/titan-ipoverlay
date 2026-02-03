@@ -78,6 +78,21 @@ func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*config.Pop, er
 		return nil, fmt.Errorf("can not get remote ip")
 	}
 
+	// Check if IP is blacklisted
+	isBlacklisted, err := model.IsIPBlacklisted(l.svcCtx.Redis, ip)
+	if err != nil {
+		logx.Errorf("IsIPBlacklisted ip:%s, failed:%v", ip, err)
+	}
+
+	if isBlacklisted {
+		logx.Infof("node %s ip %s is in blacklist, redirect to pop %s", req.NodeId, ip, l.svcCtx.Config.BlacklistPop)
+		for _, pop := range l.svcCtx.Config.Pops {
+			if pop.Id == l.svcCtx.Config.BlacklistPop {
+				return &pop, nil
+			}
+		}
+	}
+
 	popID, nodeIP, err := model.GetNodePopIP(l.svcCtx.Redis, req.NodeId)
 	if err != nil {
 		return nil, err

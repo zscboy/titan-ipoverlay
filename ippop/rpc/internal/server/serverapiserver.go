@@ -98,6 +98,11 @@ func (s *ServerAPIServer) KickNode(ctx context.Context, in *pb.KickNodeReq) (*pb
 	return l.KickNode(in)
 }
 
+func (s *ServerAPIServer) KickNodeByIP(ctx context.Context, in *pb.KickNodeByIPReq) (*pb.UserOperationResp, error) {
+	l := logic.NewKickNodeByIPLogic(ctx, s.svcCtx)
+	return l.KickNodeByIP(in)
+}
+
 func (s *ServerAPIServer) GetUserBaseStats(ctx context.Context, in *pb.UserBaseStatsReq) (*pb.UserBaseStatsResp, error) {
 	l := logic.NewGetUserBaseStatsLogic(ctx, s.svcCtx)
 	return l.GetUserBaseStats(in)

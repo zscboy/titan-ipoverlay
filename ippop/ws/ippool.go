@@ -221,6 +221,42 @@ func (p *IPPool) ReleaseIP(ip string) {
 	}
 }
 
+func (p *IPPool) GetTunnelsByIP(ip string) []*Tunnel {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	entry, ok := p.allIPs[ip]
+	if !ok {
+		return nil
+	}
+
+	tunnels := make([]*Tunnel, 0, len(entry.tunnels))
+	for _, t := range entry.tunnels {
+		tunnels = append(tunnels, t)
+	}
+	return tunnels
+}
+
+func (p *IPPool) GetIPAssignmentStatus(ip string) (exists bool, isAssigned bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	entry, ok := p.allIPs[ip]
+	if !ok {
+		return false, false
+	}
+	return true, entry.assignedNodeID != ""
+}
+
+func (p *IPPool) IsIPDeactivated(ip string) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	entry, ok := p.allIPs[ip]
+	if !ok {
+		return false
+	}
+	return entry.isBlacklisted
+}
+
 func (p *IPPool) GetIPCount() (ipCount int, freeCount int, blackCount int, assignedCount int) {
 	p.mu.Lock()
 	defer p.mu.Unlock()

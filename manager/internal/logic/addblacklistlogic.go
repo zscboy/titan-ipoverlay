@@ -25,8 +25,6 @@ func NewAddBlackListLogic(ctx context.Context, svcCtx *svc.ServiceContext) *AddB
 	}
 }
 
-const maxIPListLen = 100
-
 func (l *AddBlackListLogic) AddBlackList(req *types.AddBlacklistReq) (resp *types.UserOperationResp, err error) {
 	if len(req.IPList) > maxIPListLen {
 		return &types.UserOperationResp{ErrMsg: fmt.Sprintf("too many ips, max is %d", maxIPListLen)}, nil

@@ -82,6 +82,11 @@ type GetUserResp struct {
 	PopId string `json:"pop_id"`
 }
 
+type IPBlacklistReq struct {
+	PopID  string   `json:"pop_id,optional"`
+	IPList []string `json:"ip_list"`
+}
+
 type KickNodeReq struct {
 	NodeID string `form:"nodeid"`
 }

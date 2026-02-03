@@ -213,6 +213,10 @@ type (
 		TotalTraffic     int64 `json:"total_traffic"`
 		CurrentConns     int   `json:"current_conns"`
 	}
+	IPBlacklistReq {
+		PopID  string   `json:"pop_id,optional"`
+		IPList []string `json:"ip_list"`
+	}
 )
 
 service server-api {
@@ -275,5 +279,11 @@ service server-api {
 
 	@handler KickNode
 	post /node/kick (KickNodeReq) returns (UserOperationResp)
+
+	@handler addIPBlacklist
+	post /ip/blacklist/add (IPBlacklistReq) returns (UserOperationResp)
+
+	@handler removeIPBlacklist
+	post /ip/blacklist/remove (IPBlacklistReq) returns (UserOperationResp)
 }
 

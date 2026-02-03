@@ -28,6 +28,7 @@ type (
 	GetNodeAccessTokenResp = pb.GetNodeAccessTokenResp
 	GetServerInfoResp      = pb.GetServerInfoResp
 	GetUserReq             = pb.GetUserReq
+	KickNodeByIPReq        = pb.KickNodeByIPReq
 	KickNodeReq            = pb.KickNodeReq
 	ListNodeReq            = pb.ListNodeReq
 	ListNodeResp           = pb.ListNodeResp
@@ -69,6 +70,7 @@ type (
 		RemoveBlacklist(ctx context.Context, in *RemoveBlacklistReq, opts ...grpc.CallOption) (*UserOperationResp, error)
 		GetBlacklist(ctx context.Context, in *GetBlacklistReq, opts ...grpc.CallOption) (*GetBlacklistResp, error)
 		KickNode(ctx context.Context, in *KickNodeReq, opts ...grpc.CallOption) (*UserOperationResp, error)
+		KickNodeByIP(ctx context.Context, in *KickNodeByIPReq, opts ...grpc.CallOption) (*UserOperationResp, error)
 		GetUserBaseStats(ctx context.Context, in *UserBaseStatsReq, opts ...grpc.CallOption) (*UserBaseStatsResp, error)
 		GetUserStatChart(ctx context.Context, in *UserStatChartReq, opts ...grpc.CallOption) (*UserStatChartResp, error)
 	}
@@ -157,6 +159,11 @@ func (m *defaultServerAPI) GetBlacklist(ctx context.Context, in *GetBlacklistReq
 func (m *defaultServerAPI) KickNode(ctx context.Context, in *KickNodeReq, opts ...grpc.CallOption) (*UserOperationResp, error) {
 	client := pb.NewServerAPIClient(m.cli.Conn())
 	return client.KickNode(ctx, in, opts...)
+}
+
+func (m *defaultServerAPI) KickNodeByIP(ctx context.Context, in *KickNodeByIPReq, opts ...grpc.CallOption) (*UserOperationResp, error) {
+	client := pb.NewServerAPIClient(m.cli.Conn())
+	return client.KickNodeByIP(ctx, in, opts...)
 }
 
 func (m *defaultServerAPI) GetUserBaseStats(ctx context.Context, in *UserBaseStatsReq, opts ...grpc.CallOption) (*UserBaseStatsResp, error) {

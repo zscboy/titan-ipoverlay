@@ -57,6 +57,15 @@ func (tm *TunnelManager) ReleaseExclusiveNodes(nodeIDs []string, ips []string) {
 
 	for _, ip := range ips {
 		tm.ipPool.ReleaseIP(ip)
+		// If the IP was marked for deactivation/blacklist while it was assigned,
+		// now that it's released, we can safely kick its tunnels.
+		if tm.ipPool.IsIPDeactivated(ip) {
+			tunnels := tm.ipPool.GetTunnelsByIP(ip)
+			for _, t := range tunnels {
+				logx.Infof("IP %s was released and is deactivated, kicking tunnel %s", ip, t.opts.Id)
+				t.waitClose()
+			}
+		}
 	}
 
 	logx.Infof("TunnelManager.ReleaseExclusiveNodes nodeIDs len:%d, ips len:%d cost %v", len(nodeIDs), len(ips), time.Since(now))
