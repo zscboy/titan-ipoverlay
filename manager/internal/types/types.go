@@ -60,6 +60,17 @@ type GetBlacklistResp struct {
 	NextCursor uint64   `json:"next_cursor"`
 }
 
+type GetIPBlacklistReq struct {
+	Cursor uint64 `form:"cursor,optional"`
+	Count  int    `form:"count,optional"`
+}
+
+type GetIPBlacklistResp struct {
+	IPList     []string `json:"ip_list"`
+	NextCursor uint64   `json:"next_cursor"`
+	Total      int      `json:"total"`
+}
+
 type GetNodePopReq struct {
 	NodeId string `form:"nodeid"`
 }

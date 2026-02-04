@@ -32,6 +32,7 @@ const (
 	onlineTableExpireTime     = 2 * setOnlineTableExpireTick
 	userSessionExpireInterval = 120
 	userSessionExpireDuration = 3 * time.Minute
+	acceptLockShards          = 16384
 )
 
 // UserSession and ExpiredSession are now handled by the allocator module.
@@ -58,6 +59,8 @@ type TunnelManager struct {
 
 	// HealthStatsMap sync.Map
 	ipPool *IPPool
+
+	acceptLocks []sync.Mutex
 }
 
 func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
@@ -73,8 +76,9 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 		filterRules: &Rules{rules: RulesToMap(config.FilterRules.Rules), defaultAction: config.FilterRules.DefaultAction},
 		rng:         rand.New(&lockedSource{s: rand.NewSource(time.Now().UnixNano())}),
 
-		tunnelList: make([]*Tunnel, 0, 100000),
-		ipPool:     NewIPPool(),
+		tunnelList:  make([]*Tunnel, 0, 100000),
+		ipPool:      NewIPPool(),
+		acceptLocks: make([]sync.Mutex, acceptLockShards),
 	}
 
 	tm.sessionManager = NewSessionManager(tm, userSessionExpireDuration)
@@ -128,8 +132,12 @@ func (tm *TunnelManager) addTunnel(t *Tunnel) {
 
 // 删除 tunnel
 func (tm *TunnelManager) removeTunnel(tun *Tunnel) {
-	// tunnels contain blacklisted node
-	tm.tunnels.Delete(tun.opts.Id)
+	// Only delete from tm.tunnels if this specific tunnel is the one currently stored.
+	// This prevents a late-finishing older connection from deleting a newer one.
+	if v, ok := tm.tunnels.Load(tun.opts.Id); ok && v == tun {
+		tm.tunnels.Delete(tun.opts.Id)
+	}
+
 	tm.ipPool.RemoveTunnel(tun)
 
 	if tun.opts.IsBlacklisted {
@@ -168,9 +176,31 @@ func (tm *TunnelManager) removeTunnel(tun *Tunnel) {
 	}
 }
 
+func (tm *TunnelManager) getShardIndex(nodeID string) uint32 {
+	// O(1) tail-sampling optimized for UUID-based IDs
+	n := len(nodeID)
+	if n >= 4 {
+		return (uint32(nodeID[n-1]) |
+			uint32(nodeID[n-2])<<8 |
+			uint32(nodeID[n-3])<<16 |
+			uint32(nodeID[n-4])<<24) % acceptLockShards
+	}
+	if n > 0 {
+		return uint32(nodeID[n-1]) % acceptLockShards
+	}
+	return 0
+}
+
 func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, nodeIP string) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	lockIdx := tm.getShardIndex(req.NodeId)
+
+	tm.acceptLocks[lockIdx].Lock()
+	unlocked := false
+	defer func() {
+		if !unlocked {
+			tm.acceptLocks[lockIdx].Unlock()
+		}
+	}()
 
 	v, ok := tm.tunnels.Load(req.NodeId)
 	if ok {
@@ -178,6 +208,9 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, n
 		logx.Infof("TunnelManager.acceptWebsocket force close tunnel %s ip %s", req.NodeId, nodeIP)
 		oldTun.waitClose()
 	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	logx.Debugf("TunnelManager.acceptWebsocket node id %s", req.NodeId)
 
@@ -216,6 +249,12 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, n
 
 	tun := newTunnel(conn, tm, opts, ctx)
 	tm.addTunnel(tun)
+
+	// Unlock here since the tunnel is successfully added to tm.tunnels
+	// Subsequent connections for the same NodeID will now see this new tunnel.
+	tm.acceptLocks[lockIdx].Unlock()
+	unlocked = true
+
 	// tm.HealthStatsMap.LoadOrStore(node.Id, &HealthStats{})
 
 	defer tm.removeTunnel(tun)

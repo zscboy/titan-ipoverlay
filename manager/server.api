@@ -217,6 +217,15 @@ type (
 		PopID  string   `json:"pop_id,optional"`
 		IPList []string `json:"ip_list"`
 	}
+	GetIPBlacklistReq {
+		Cursor uint64 `form:"cursor,optional"`
+		Count  int    `form:"count,optional"`
+	}
+	GetIPBlacklistResp {
+		IPList     []string `json:"ip_list"`
+		NextCursor uint64   `json:"next_cursor"`
+		Total      int      `json:"total"`
+	}
 )
 
 service server-api {
@@ -285,5 +294,8 @@ service server-api {
 
 	@handler removeIPBlacklist
 	post /ip/blacklist/remove (IPBlacklistReq) returns (UserOperationResp)
+
+	@handler getIPBlacklist
+	get /ip/blacklist/get (GetIPBlacklistReq) returns (GetIPBlacklistResp)
 }
 
