@@ -446,6 +446,12 @@ func (tm *TunnelManager) HandleSocks5UDP(udpConn socks5.UDPConn, udpInfo *socks5
 	return tun.acceptSocks5UDPData(udpConn, udpInfo, data)
 }
 
+func (tm *TunnelManager) reportSOCKS5Error(errorType string) {
+	if tm.perfCollector != nil {
+		tm.perfCollector.ReportSOCKS5Error(errorType)
+	}
+}
+
 func (tm *TunnelManager) reportAuthFailure(userName string) {
 	if tm.perfCollector != nil {
 		tm.perfCollector.ReportAuthFailure(userName)
