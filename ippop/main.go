@@ -36,6 +36,7 @@ func newWS(config config.Config, tunMgr *ws.TunnelManager) *rest.Server {
 	nodews := ws.NewNodeWS(tunMgr)
 	nodePop := ws.NewNodePop(&config)
 	sessionQuery := ws.NewSessionQuery(tunMgr)
+	statsQuery := ws.NewStatsQuery(tunMgr)
 
 	// httpproxy := pophttp.NewHttProxy(tunMgr)
 
@@ -54,8 +55,12 @@ func newWS(config config.Config, tunMgr *ws.TunnelManager) *rest.Server {
 		Path:    "/session/query",
 		Handler: sessionQuery.ServeSessionQuery,
 	})
+	server.AddRoute(rest.Route{
+		Method:  "GET",
+		Path:    "/pop/stats",
+		Handler: statsQuery.ServeStats,
+	})
 	return server
-
 }
 
 func newSocks5(c config.Config, handler socks5.Socks5Handler) *socks5.Socks5Server {

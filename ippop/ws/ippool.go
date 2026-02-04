@@ -22,6 +22,15 @@ type IPPool struct {
 	freeList       *list.List          // List of *ipEntry (available IPs)
 	blacklistCount int                 // New: count of IPs currently blacklisted in the pool
 	assignedCount  int                 // New: count of IPs currently assigned
+	tunnelCount    int                 // New: total count of tunnels in the pool
+}
+
+type PoolStats struct {
+	TotalIPCount     int
+	FreeIPCount      int
+	BlacklistIPCount int
+	AssignedIPCount  int
+	TunnelCount      int
 }
 
 func NewIPPool() *IPPool {
@@ -75,6 +84,7 @@ func (p *IPPool) AddTunnel(t *Tunnel, isBlacklisted bool) {
 	}
 
 	entry.tunnels[nodeID] = t
+	p.tunnelCount++
 }
 
 // RemoveTunnel removes a tunnel. If it was the last tunnel for an IP, the IP is removed.
@@ -88,6 +98,7 @@ func (p *IPPool) RemoveTunnel(t *Tunnel) {
 	}
 
 	delete(entry.tunnels, t.opts.Id)
+	p.tunnelCount--
 
 	// If the tunnel being removed was the one assigned to a session
 	if entry.assignedNodeID == t.opts.Id {
@@ -257,12 +268,14 @@ func (p *IPPool) IsIPDeactivated(ip string) bool {
 	return entry.isBlacklisted
 }
 
-func (p *IPPool) GetIPCount() (ipCount int, freeCount int, blackCount int, assignedCount int) {
+func (p *IPPool) GetPoolStats() PoolStats {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	ipCount = len(p.allIPs)
-	freeCount = p.freeList.Len()
-	blackCount = p.blacklistCount
-	assignedCount = p.assignedCount
-	return
+	return PoolStats{
+		TotalIPCount:     len(p.allIPs),
+		FreeIPCount:      p.freeList.Len(),
+		BlacklistIPCount: p.blacklistCount,
+		AssignedIPCount:  p.assignedCount,
+		TunnelCount:      p.tunnelCount,
+	}
 }

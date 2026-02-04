@@ -439,8 +439,8 @@ func (tm *TunnelManager) keepalive() {
 
 		tickCount++
 		if tickCount > 10 {
-			ipCount, freeCount, blackCount, assignedCount := tm.ipPool.GetIPCount()
-			logx.Infof("TunnelManager.keepalive tunnel count:%d, cost:%v, ipCount:%d, freeCount:%d, blackCount:%d, assignedCount:%d, session len:%d", count, time.Since(now), ipCount, freeCount, blackCount, assignedCount, tm.sessionManager.SessionLen())
+			stats := tm.ipPool.GetPoolStats()
+			logx.Infof("TunnelManager.keepalive tunnel count:%d/%d, cost:%v, ipCount:%d, freeCount:%d, blackCount:%d, assignedCount:%d, session len:%d", count, stats.TunnelCount, time.Since(now), stats.TotalIPCount, stats.FreeIPCount, stats.BlacklistIPCount, stats.AssignedIPCount, tm.sessionManager.SessionLen())
 			tickCount = 0
 		}
 	}
