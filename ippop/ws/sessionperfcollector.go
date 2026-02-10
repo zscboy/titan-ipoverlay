@@ -170,10 +170,6 @@ func (c *SessionPerfCollector) Start() {
 	ticker := time.NewTicker(flushInterval)
 	defer ticker.Stop()
 
-	// 初始值设为 0，确保指标被 Prometheus 发现
-	metrics.ActiveUsers.WithLabelValues(c.nodeID).Set(0)
-	metrics.ActiveSessions.WithLabelValues(c.nodeID).Set(0)
-
 	logx.Info("SessionPerfCollector started")
 
 	// 启动 ClickHouse 批量写入协程，避免阻塞指标采集流程
