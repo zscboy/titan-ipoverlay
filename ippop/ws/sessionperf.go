@@ -139,7 +139,7 @@ func (s *SessionPerfStats) Close() {
 			return
 		}
 
-		s.collector.Collect(SessionPerfRecord{
+		s.collector.Collect(&SessionPerfRecord{
 			SessionID:    s.SessionID,
 			UserName:     s.UserName,
 			TargetDomain: s.TargetDomain,

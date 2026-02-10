@@ -108,8 +108,8 @@ type SessionPerfCollector struct {
 	chEnabled  bool
 	nodeID     string
 	// 通道配置
-	chBufferChan chan SessionPerfRecord // 无锁 channel buffer
-	metricsChan  chan collectorEvent
+	chBufferChan chan *SessionPerfRecord // 无锁 channel buffer
+	metricsChan  chan *collectorEvent
 	// 采集协程内部状态
 	userSessions map[string]int          // 维护用户 -> 会话数
 	metricsCache map[string]*userMetrics // 缓存用户 Counter
@@ -124,8 +124,8 @@ func NewSessionPerfCollector(chConfig config.ClickHouse, nodeID string) *Session
 	c := &SessionPerfCollector{
 		chEnabled:    chConfig.Enable,
 		nodeID:       nodeID,
-		chBufferChan: make(chan SessionPerfRecord, 100000), // ClickHouse 记录缓冲，应对会话爆发
-		metricsChan:  make(chan collectorEvent, 5000000),   // 500万缓冲区，应对 8Gbps 爆发
+		chBufferChan: make(chan *SessionPerfRecord, maxBufferSize*2), // ClickHouse 记录缓冲，应对会话爆发
+		metricsChan:  make(chan *collectorEvent, 5000000),            // 500万缓冲区，应对 8Gbps 爆发
 		userSessions: make(map[string]int),
 		metricsCache: make(map[string]*userMetrics),
 		ctx:          ctx,
@@ -186,7 +186,7 @@ func (c *SessionPerfCollector) Start() {
 			case evtStart:
 				c.handleSessionStart(event.userName)
 			case evtEnd:
-				c.handleSessionEnd(event.record)
+				c.handleSessionEnd(&event.record)
 			case evtSocksError:
 				metrics.SOCKS5Errors.WithLabelValues(event.tag, c.nodeID).Inc()
 			case evtAuthFailure:
@@ -222,28 +222,28 @@ func (c *SessionPerfCollector) clickhouseWorker() {
 
 // handleSessionStart 处理会话开始指标
 func (c *SessionPerfCollector) handleSessionStart(userName string) {
-	metrics.SOCKS5Connections.WithLabelValues(c.nodeID).Inc()
-	metrics.TotalSessions.WithLabelValues(c.nodeID).Inc()
-	metrics.ActiveSessions.WithLabelValues(c.nodeID).Inc()
+	metrics.SOCKS5Connections.WithLabelValues(userName, c.nodeID).Inc()
+	metrics.TotalSessions.WithLabelValues(userName, c.nodeID).Inc()
+	metrics.ActiveSessions.WithLabelValues(userName, c.nodeID).Inc()
 
 	// 更新活跃用户数
 	if count := c.userSessions[userName]; count == 0 {
-		metrics.ActiveUsers.WithLabelValues(c.nodeID).Inc()
+		metrics.ActiveUsers.WithLabelValues(userName, c.nodeID).Inc()
 	}
 	c.userSessions[userName]++
 }
 
 // handleSessionEnd 处理会话结束指标
-func (c *SessionPerfCollector) handleSessionEnd(r SessionPerfRecord) {
+func (c *SessionPerfCollector) handleSessionEnd(r *SessionPerfRecord) {
 	// 基础指标
-	metrics.ActiveSessions.WithLabelValues(c.nodeID).Dec()
-	metrics.SessionDuration.WithLabelValues(c.nodeID).Observe(r.DurationSec)
+	metrics.ActiveSessions.WithLabelValues(r.UserName, c.nodeID).Dec()
+	metrics.SessionDuration.WithLabelValues(r.UserName, c.nodeID).Observe(r.DurationSec)
 
 	// 更新活跃用户数
 	if count := c.userSessions[r.UserName]; count > 0 {
 		c.userSessions[r.UserName]--
 		if c.userSessions[r.UserName] == 0 {
-			metrics.ActiveUsers.WithLabelValues(c.nodeID).Dec()
+			metrics.ActiveUsers.WithLabelValues(r.UserName, c.nodeID).Dec()
 			delete(c.userSessions, r.UserName)
 		}
 	}
@@ -285,7 +285,7 @@ func (c *SessionPerfCollector) Stop() {
 // ReportSessionStart 异步上报会话开始
 func (c *SessionPerfCollector) ReportSessionStart(userName string) {
 	select {
-	case c.metricsChan <- collectorEvent{typ: evtStart, userName: userName}:
+	case c.metricsChan <- &collectorEvent{typ: evtStart, userName: userName}:
 	default:
 		logx.WithContext(c.ctx).Error("SessionPerfCollector: metrics channel full, dropping start event")
 	}
@@ -294,7 +294,7 @@ func (c *SessionPerfCollector) ReportSessionStart(userName string) {
 // ReportTrafficDelta 异步增量上报统计（非阻塞）
 func (c *SessionPerfCollector) ReportTrafficDelta(userName string, delta trafficDelta) {
 	select {
-	case c.metricsChan <- collectorEvent{typ: evtTrafficDelta, userName: userName, delta: delta}:
+	case c.metricsChan <- &collectorEvent{typ: evtTrafficDelta, userName: userName, delta: delta}:
 	default:
 		// 避免阻塞热路径，如果队列满了则忽略
 	}
@@ -333,7 +333,7 @@ func (c *SessionPerfCollector) handleTrafficDelta(userName string, d trafficDelt
 // ReportSOCKS5Error 异步上报 SOCKS5 错误
 func (c *SessionPerfCollector) ReportSOCKS5Error(errType string) {
 	select {
-	case c.metricsChan <- collectorEvent{typ: evtSocksError, tag: errType}:
+	case c.metricsChan <- &collectorEvent{typ: evtSocksError, tag: errType}:
 	default:
 	}
 }
@@ -341,16 +341,16 @@ func (c *SessionPerfCollector) ReportSOCKS5Error(errType string) {
 // ReportAuthFailure 异步上报认证失败
 func (c *SessionPerfCollector) ReportAuthFailure(userName string) {
 	select {
-	case c.metricsChan <- collectorEvent{typ: evtAuthFailure, userName: userName}:
+	case c.metricsChan <- &collectorEvent{typ: evtAuthFailure, userName: userName}:
 	default:
 	}
 }
 
 // Collect 添加数据到缓冲区（完全无锁）
-func (c *SessionPerfCollector) Collect(record SessionPerfRecord) {
+func (c *SessionPerfCollector) Collect(record *SessionPerfRecord) {
 	// 1. 异步发送到处理通道（用于 Prometheus 指标）
 	select {
-	case c.metricsChan <- collectorEvent{typ: evtEnd, record: record}:
+	case c.metricsChan <- &collectorEvent{typ: evtEnd, record: *record}:
 	default:
 		logx.WithContext(c.ctx).Error("SessionPerfCollector: metrics channel full, dropping end record")
 	}
@@ -378,7 +378,7 @@ func (c *SessionPerfCollector) Flush() {
 	}
 
 	// 从 channel 批量读取，无锁操作
-	toFlush := make([]SessionPerfRecord, 0, maxBufferSize)
+	toFlush := make([]*SessionPerfRecord, 0, maxBufferSize)
 	for {
 		select {
 		case record := <-c.chBufferChan:

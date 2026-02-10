@@ -370,7 +370,7 @@ func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks
 		// 如果之后发生错误，需确保上报结束以平衡 ActiveSessions/ActiveUsers 指标
 		defer func() {
 			if err != nil {
-				tm.perfCollector.Collect(SessionPerfRecord{
+				tm.perfCollector.Collect(&SessionPerfRecord{
 					UserName:  targetInfo.Username,
 					Timestamp: time.Now().Unix(),
 				})

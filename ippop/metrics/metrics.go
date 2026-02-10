@@ -21,24 +21,24 @@ var (
 	ActiveSessions = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "ippop_active_sessions",
 		Help: "当前活跃的代理会话数量",
-	}, []string{"node"})
+	}, []string{"user", "node"})
 
 	TotalSessions = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "ippop_total_sessions",
 		Help: "业务转发总次数",
-	}, []string{"node"})
+	}, []string{"user", "node"})
 
 	SessionDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "ippop_session_duration_ms",
 		Help:    "会话持续时间（毫秒）",
 		Buckets: []float64{10, 50, 100, 500, 1000, 5000, 10000, 30000, 60000, 300000}, // 10ms ~ 5min
-	}, []string{"node"})
+	}, []string{"user", "node"})
 
 	// 连接指标
 	SOCKS5Connections = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "ippop_socks5_connections_total",
 		Help: "用户接入连接总数",
-	}, []string{"node"})
+	}, []string{"user", "node"})
 
 	SOCKS5Errors = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "ippop_socks5_errors_total",
@@ -60,7 +60,7 @@ var (
 	ActiveUsers = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "ippop_active_users",
 		Help: "当前活跃用户数",
-	}, []string{"node"})
+	}, []string{"user", "node"})
 
 	UserAuthFailures = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "ippop_user_auth_failures_total",
