@@ -10,12 +10,13 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
 const (
 	// 批量刷新配置
-	maxBufferSize = 100              // 缓冲区满时触发写入
+	maxBufferSize = 1000             // 缓冲区满时触发写入
 	flushInterval = 10 * time.Second // 定时刷新间隔
 )
 
@@ -93,14 +94,25 @@ type collectorEvent struct {
 	delta    trafficDelta // 增量统计
 }
 
+// userMetrics 缓存用户常用的 Prometheus Counter，避免高频 label 查找
+type userMetrics struct {
+	t1Bytes prometheus.Counter
+	t3Bytes prometheus.Counter
+	rxBytes prometheus.Counter
+	txBytes prometheus.Counter
+}
+
 // SessionPerfCollector 会话性能数据批量收集器
 type SessionPerfCollector struct {
-	clickhouse   driver.Conn
-	chEnabled    bool
-	nodeID       string
+	clickhouse driver.Conn
+	chEnabled  bool
+	nodeID     string
+	// 通道配置
 	chBufferChan chan SessionPerfRecord // 无锁 channel buffer
 	metricsChan  chan collectorEvent
-	userSessions map[string]int // 维护用户 -> 会话数，仅在 Start 协程内访问
+	// 采集协程内部状态
+	userSessions map[string]int          // 维护用户 -> 会话数
+	metricsCache map[string]*userMetrics // 缓存用户 Counter
 	ctx          context.Context
 	cancel       context.CancelFunc
 }
@@ -112,9 +124,10 @@ func NewSessionPerfCollector(chConfig config.ClickHouse, nodeID string) *Session
 	c := &SessionPerfCollector{
 		chEnabled:    chConfig.Enable,
 		nodeID:       nodeID,
-		chBufferChan: make(chan SessionPerfRecord, maxBufferSize*2), // 无锁 buffer channel
-		metricsChan:  make(chan collectorEvent, 2000),
+		chBufferChan: make(chan SessionPerfRecord, 100000), // ClickHouse 记录缓冲，应对会话爆发
+		metricsChan:  make(chan collectorEvent, 5000000),   // 500万缓冲区，应对 8Gbps 爆发
 		userSessions: make(map[string]int),
+		metricsCache: make(map[string]*userMetrics),
 		ctx:          ctx,
 		cancel:       cancel,
 	}
@@ -163,6 +176,9 @@ func (c *SessionPerfCollector) Start() {
 
 	logx.Info("SessionPerfCollector started")
 
+	// 启动 ClickHouse 批量写入协程，避免阻塞指标采集流程
+	go c.clickhouseWorker()
+
 	for {
 		select {
 		case event := <-c.metricsChan:
@@ -178,14 +194,27 @@ func (c *SessionPerfCollector) Start() {
 			case evtTrafficDelta:
 				c.handleTrafficDelta(event.userName, event.delta)
 			}
-		case <-ticker.C:
-			c.Flush()
 		case <-c.ctx.Done():
-			c.Flush() // 退出前最后刷新一次
 			if c.clickhouse != nil {
 				c.clickhouse.Close()
 			}
 			logx.Info("SessionPerfCollector stopped")
+			return
+		}
+	}
+}
+
+// clickhouseWorker 独立的 ClickHouse 批量写入协程
+func (c *SessionPerfCollector) clickhouseWorker() {
+	ticker := time.NewTicker(flushInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			c.Flush()
+		case <-c.ctx.Done():
+			c.Flush() // 退出前最后刷新一次
 			return
 		}
 	}
@@ -271,16 +300,33 @@ func (c *SessionPerfCollector) ReportTrafficDelta(userName string, delta traffic
 	}
 }
 
+func (c *SessionPerfCollector) getOrUpdateUserMetrics(userName string) *userMetrics {
+	if m, ok := c.metricsCache[userName]; ok {
+		return m
+	}
+
+	m := &userMetrics{
+		t1Bytes: metrics.T1Bytes.WithLabelValues(userName, c.nodeID),
+		t3Bytes: metrics.T3Bytes.WithLabelValues(userName, c.nodeID),
+		rxBytes: metrics.BytesReceived.WithLabelValues(userName, c.nodeID),
+		txBytes: metrics.BytesSent.WithLabelValues(userName, c.nodeID),
+	}
+	c.metricsCache[userName] = m
+	return m
+}
+
 func (c *SessionPerfCollector) handleTrafficDelta(userName string, d trafficDelta) {
+	m := c.getOrUpdateUserMetrics(userName)
+
 	if d.t1Bytes > 0 {
-		metrics.T1Bytes.WithLabelValues(userName, c.nodeID).Add(float64(d.t1Bytes))
+		m.t1Bytes.Add(float64(d.t1Bytes))
 	}
 	if d.t3Bytes > 0 {
-		metrics.T3Bytes.WithLabelValues(userName, c.nodeID).Add(float64(d.t3Bytes))
-		metrics.BytesSent.WithLabelValues(userName, c.nodeID).Add(float64(d.t3Bytes))
+		m.t3Bytes.Add(float64(d.t3Bytes))
+		m.txBytes.Add(float64(d.t3Bytes))
 	}
 	if d.upBytes > 0 {
-		metrics.BytesReceived.WithLabelValues(userName, c.nodeID).Add(float64(d.upBytes))
+		m.rxBytes.Add(float64(d.upBytes))
 	}
 }
 
