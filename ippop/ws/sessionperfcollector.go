@@ -71,14 +71,26 @@ const (
 	evtEnd
 	evtSocksError
 	evtAuthFailure
+	evtTrafficDelta
 )
+
+// trafficDelta 增量统计
+type trafficDelta struct {
+	t1Bytes int64
+	t1Dur   time.Duration
+	t2Dur   time.Duration
+	t3Bytes int64
+	t3Dur   time.Duration
+	upBytes int64
+}
 
 // collectorEvent 内部事件
 type collectorEvent struct {
 	typ      int // 事件类型
 	userName string
 	record   SessionPerfRecord
-	tag      string // 用于存放 error_type 等标签
+	tag      string       // 用于存放 error_type 等标签
+	delta    trafficDelta // 增量统计
 }
 
 // SessionPerfCollector 会话性能数据批量收集器
@@ -163,6 +175,8 @@ func (c *SessionPerfCollector) Start() {
 				metrics.SOCKS5Errors.WithLabelValues(event.tag, c.nodeID).Inc()
 			case evtAuthFailure:
 				metrics.UserAuthFailures.WithLabelValues(event.userName, c.nodeID).Inc()
+			case evtTrafficDelta:
+				c.handleTrafficDelta(event.userName, event.delta)
 			}
 		case <-ticker.C:
 			c.Flush()
@@ -205,13 +219,13 @@ func (c *SessionPerfCollector) handleSessionEnd(r SessionPerfRecord) {
 		}
 	}
 
-	// T1 指标
+	// 注意：T1Bytes, T3Bytes, BytesSent, BytesReceived 等累加型指标已通过 evtTrafficDelta 增量上报
+	// 这里主要处理直方图和需要全会话数据的汇总指标
 	if r.T1Count > 0 {
 		metrics.T1Throughput.WithLabelValues(r.UserName, c.nodeID).Observe(r.T1SpeedMBps)
-		metrics.T1Bytes.WithLabelValues(r.UserName, c.nodeID).Add(r.T1BytesMB * 1024 * 1024)
 	}
 
-	// T2 指标
+	// T2 指标 (平均处理时间)
 	if r.T2Count > 0 {
 		metrics.T2ProcessingTime.WithLabelValues(r.UserName, c.nodeID).Observe(float64(r.T2AvgUs))
 	}
@@ -219,14 +233,6 @@ func (c *SessionPerfCollector) handleSessionEnd(r SessionPerfRecord) {
 	// T3 指标
 	if r.T3Count > 0 {
 		metrics.T3Throughput.WithLabelValues(r.UserName, c.nodeID).Observe(r.T3SpeedMBps)
-		metrics.T3Bytes.WithLabelValues(r.UserName, c.nodeID).Add(r.T3BytesMB * 1024 * 1024)
-		// 同时更新全局发送指标 (异步)
-		metrics.BytesSent.WithLabelValues(r.UserName, c.nodeID).Add(r.T3BytesMB * 1024 * 1024)
-	}
-
-	// 更新全局接收指标 (上传方向，异步)
-	if r.UploadBytes > 0 {
-		metrics.BytesReceived.WithLabelValues(r.UserName, c.nodeID).Add(float64(r.UploadBytes))
 	}
 
 	// 瓶颈检测
@@ -253,6 +259,28 @@ func (c *SessionPerfCollector) ReportSessionStart(userName string) {
 	case c.metricsChan <- collectorEvent{typ: evtStart, userName: userName}:
 	default:
 		logx.WithContext(c.ctx).Error("SessionPerfCollector: metrics channel full, dropping start event")
+	}
+}
+
+// ReportTrafficDelta 异步增量上报统计（非阻塞）
+func (c *SessionPerfCollector) ReportTrafficDelta(userName string, delta trafficDelta) {
+	select {
+	case c.metricsChan <- collectorEvent{typ: evtTrafficDelta, userName: userName, delta: delta}:
+	default:
+		// 避免阻塞热路径，如果队列满了则忽略
+	}
+}
+
+func (c *SessionPerfCollector) handleTrafficDelta(userName string, d trafficDelta) {
+	if d.t1Bytes > 0 {
+		metrics.T1Bytes.WithLabelValues(userName, c.nodeID).Add(float64(d.t1Bytes))
+	}
+	if d.t3Bytes > 0 {
+		metrics.T3Bytes.WithLabelValues(userName, c.nodeID).Add(float64(d.t3Bytes))
+		metrics.BytesSent.WithLabelValues(userName, c.nodeID).Add(float64(d.t3Bytes))
+	}
+	if d.upBytes > 0 {
+		metrics.BytesReceived.WithLabelValues(userName, c.nodeID).Add(float64(d.upBytes))
 	}
 }
 
