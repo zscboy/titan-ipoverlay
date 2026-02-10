@@ -44,16 +44,15 @@ type TunOptions struct {
 }
 
 type TrafficStats struct {
-	ReadStartTime time.Time
-	ReadDuration  time.Duration
-	ReadBytes     int64
+	ReadStartTime atomic.Pointer[time.Time]
+	ReadDuration  atomic.Int64
+	ReadBytes     atomic.Int64
 
-	DataProcessStartTime time.Time
-	DataProcessDuration  time.Duration
-	// IdleDuration time.Duration
+	DataProcessStartTime atomic.Pointer[time.Time]
+	DataProcessDuration  atomic.Int64
 
-	WriteDuration time.Duration
-	WriteBytes    int64
+	WriteDuration atomic.Int64
+	WriteBytes    atomic.Int64
 }
 
 // Tunnel Tunnel
@@ -376,7 +375,8 @@ func (t *Tunnel) onProxyDataFromProxy(sessionID string, data []byte) {
 func (t *Tunnel) acceptSocks5TCPConn(conn net.Conn, targetInfo *socks5.SocksTargetInfo) error {
 	logx.Debugf("acceptSocks5TCPConn, dest %s:%d", targetInfo.DomainName, targetInfo.Port)
 	if t.proxys.Count() == 0 {
-		t.trafficStats.ReadStartTime = time.Now()
+		now := time.Now()
+		t.trafficStats.ReadStartTime.Store(&now)
 	}
 
 	now := time.Now()
@@ -515,6 +515,11 @@ func (t *Tunnel) acceptSocks5UDPData(conn socks5.UDPConn, udpInfo *socks5.Socks5
 
 	logx.Debugf("Tunnel %s %s acceptSocks5UDPData new UDPProxy %s", t.opts.Id, t.opts.IP, sessionID)
 
+	// 异步上报 UDP 会话开始 (补全监控数据，防止 ActiveSessions 计数不平衡)
+	if t.tunMgr.perfCollector != nil {
+		t.tunMgr.perfCollector.ReportSessionStart(udpInfo.UserName)
+	}
+
 	t.proxys.Store(sessionID, udp)
 	return udp.writeToDest(data)
 }
@@ -568,7 +573,7 @@ func (t *Tunnel) readMessageWithLimitRate() (int, []byte, time.Time, time.Time, 
 
 	// 此时 header 已收到，记录为 T1 (传输) 的开始时间
 	startTime := time.Now()
-	t.trafficStats.ReadStartTime = startTime
+	t.trafficStats.ReadStartTime.Store(&startTime)
 
 	// 读取实际负载数据
 	data, err := io.ReadAll(r)
@@ -577,9 +582,9 @@ func (t *Tunnel) readMessageWithLimitRate() (int, []byte, time.Time, time.Time, 
 		return messageType, nil, startTime, endTime, err
 	}
 
-	t.trafficStats.ReadDuration += endTime.Sub(startTime)
-	t.trafficStats.ReadBytes += int64(len(data))
-	t.trafficStats.DataProcessStartTime = endTime
+	t.trafficStats.ReadDuration.Add(int64(endTime.Sub(startTime)))
+	t.trafficStats.ReadBytes.Add(int64(len(data)))
+	t.trafficStats.DataProcessStartTime.Store(&endTime)
 
 	t.waitPong.Store(0)
 
@@ -651,9 +656,13 @@ func (t *Tunnel) getTrafficStats() *TrafficStats {
 }
 
 func (t *Tunnel) addTrafficStats(writeBytes int, writeDuration time.Duration) {
-	t.trafficStats.WriteBytes += int64(writeBytes)
-	t.trafficStats.WriteDuration += writeDuration
-	t.trafficStats.DataProcessDuration = time.Now().Sub(t.trafficStats.DataProcessStartTime) - writeDuration
+	t.trafficStats.WriteBytes.Add(int64(writeBytes))
+	t.trafficStats.WriteDuration.Add(int64(writeDuration))
+
+	if startTime := t.trafficStats.DataProcessStartTime.Load(); startTime != nil {
+		duration := time.Since(*startTime) - writeDuration
+		t.trafficStats.DataProcessDuration.Add(int64(duration))
+	}
 }
 
 // great than 0.1.1
