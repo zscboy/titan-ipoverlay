@@ -20,18 +20,34 @@ type UDPProxy struct {
 	// timeout
 	timeout int
 
-	tunnel *Tunnel
-	done   chan struct{}
-	once   sync.Once
+	tunnel    *Tunnel
+	done      chan struct{}
+	once      sync.Once
+	perfStats *SessionPerfStats // 性能统计
 }
 
 func newProxyUDP(id string, conn socks5.UDPConn, udpInfo *socks5.Socks5UDPInfo, t *Tunnel, timeout int) *UDPProxy {
-	return &UDPProxy{id: id, conn: conn, udpInfo: udpInfo, tunnel: t, activeTime: time.Now(), timeout: timeout, done: make(chan struct{})}
+	return &UDPProxy{
+		id:         id,
+		conn:       conn,
+		udpInfo:    udpInfo,
+		tunnel:     t,
+		activeTime: time.Now(),
+		timeout:    timeout,
+		done:       make(chan struct{}),
+		perfStats:  NewSessionPerfStats(id, udpInfo.UserName, udpInfo.Dest, t.opts.CountryCode, &t.tunMgr.config.PerfMonitoring, t.tunMgr.perfCollector),
+	}
 }
 
 func (proxy *UDPProxy) writeToSrc(data []byte) error {
 	proxy.activeTime = time.Now()
 	// proxy.tunnel.tunMgr.traffic(proxy.udpInfo.UserName, int64(len(data)))
+
+	// UDP 下载统计：视为 T1 (Client -> POP via WS) 的一部分（暂定）
+	// 注意：UDP 转发逻辑略有不同，这里主要为了统计流量
+	if proxy.perfStats != nil {
+		proxy.perfStats.AddT1Read(int64(len(data)), 0)
+	}
 
 	srcAddr, err := net.ResolveUDPAddr("udp", proxy.udpInfo.Src)
 	if err != nil {
@@ -52,6 +68,11 @@ func (proxy *UDPProxy) writeToSrc(data []byte) error {
 func (proxy *UDPProxy) writeToDest(data []byte) error {
 	proxy.activeTime = time.Now()
 	// proxy.tunnel.tunMgr.traffic(proxy.udpInfo.UserName, int64(len(data)))
+
+	// UDP 上传统计：视为 T4 (User -> POP via SOCKS5)
+	if proxy.perfStats != nil {
+		proxy.perfStats.AddT4Read(int64(len(data)))
+	}
 
 	udpData := pb.UDPData{Addr: proxy.udpInfo.Dest, Data: data}
 	payload, err := proto.Marshal(&udpData)
@@ -76,6 +97,9 @@ func (proxy *UDPProxy) writeToDest(data []byte) error {
 func (proxy *UDPProxy) stop() {
 	proxy.once.Do(func() {
 		close(proxy.done)
+		if proxy.perfStats != nil {
+			proxy.perfStats.Close()
+		}
 	})
 }
 

@@ -3,6 +3,8 @@ package ws
 import (
 	"context"
 	"fmt"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"titan-ipoverlay/ippop/config"
@@ -72,17 +74,24 @@ const (
 	evtEnd
 	evtSocksError
 	evtAuthFailure
-	evtTrafficDelta
 )
 
-// trafficDelta 增量统计
-type trafficDelta struct {
-	t1Bytes int64
-	t1Dur   time.Duration
-	t2Dur   time.Duration
-	t3Bytes int64
-	t3Dur   time.Duration
-	upBytes int64
+// UserTrafficAggregator 用户级别的原子流量聚合器
+type UserTrafficAggregator struct {
+	T1Bytes atomic.Int64
+	T1Dur   atomic.Int64
+	T2Dur   atomic.Int64
+	T3Bytes atomic.Int64
+	T3Dur   atomic.Int64
+	UpBytes atomic.Int64
+
+	// 上次上报给 Prometheus 的快照（用于计算增量）
+	lastT1Bytes int64
+	lastT1Dur   int64
+	lastT2Dur   int64
+	lastT3Bytes int64
+	lastT3Dur   int64
+	lastUpBytes int64
 }
 
 // collectorEvent 内部事件
@@ -90,8 +99,7 @@ type collectorEvent struct {
 	typ      int // 事件类型
 	userName string
 	record   SessionPerfRecord
-	tag      string       // 用于存放 error_type 等标签
-	delta    trafficDelta // 增量统计
+	tag      string // 用于存放 error_type 等标签
 }
 
 // userMetrics 缓存用户常用的 Prometheus Counter，避免高频 label 查找
@@ -111,10 +119,11 @@ type SessionPerfCollector struct {
 	chBufferChan chan *SessionPerfRecord // 无锁 channel buffer
 	metricsChan  chan *collectorEvent
 	// 采集协程内部状态
-	userSessions map[string]int          // 维护用户 -> 会话数
-	metricsCache map[string]*userMetrics // 缓存用户 Counter
-	ctx          context.Context
-	cancel       context.CancelFunc
+	userSessions    map[string]int          // 维护用户 -> 会话数
+	metricsCache    map[string]*userMetrics // 缓存用户 Counter
+	userAggregators sync.Map                // 维护用户 -> *UserTrafficAggregator
+	ctx             context.Context
+	cancel          context.CancelFunc
 }
 
 // NewSessionPerfCollector 创建新的收集器
@@ -170,6 +179,10 @@ func (c *SessionPerfCollector) Start() {
 	ticker := time.NewTicker(flushInterval)
 	defer ticker.Stop()
 
+	// 5 秒一次的 Prometheus 指标同步定时器
+	promTicker := time.NewTicker(5 * time.Second)
+	defer promTicker.Stop()
+
 	logx.Info("SessionPerfCollector started")
 
 	// 启动 ClickHouse 批量写入协程，避免阻塞指标采集流程
@@ -187,9 +200,9 @@ func (c *SessionPerfCollector) Start() {
 				metrics.SOCKS5Errors.WithLabelValues(event.tag, c.nodeID).Inc()
 			case evtAuthFailure:
 				metrics.UserAuthFailures.WithLabelValues(event.userName, c.nodeID).Inc()
-			case evtTrafficDelta:
-				c.handleTrafficDelta(event.userName, event.delta)
 			}
+		case <-promTicker.C:
+			c.flushMetricsToPrometheus()
 		case <-c.ctx.Done():
 			if c.clickhouse != nil {
 				c.clickhouse.Close()
@@ -287,13 +300,76 @@ func (c *SessionPerfCollector) ReportSessionStart(userName string) {
 	}
 }
 
-// ReportTrafficDelta 异步增量上报统计（非阻塞）
-func (c *SessionPerfCollector) ReportTrafficDelta(userName string, delta trafficDelta) {
-	select {
-	case c.metricsChan <- &collectorEvent{typ: evtTrafficDelta, userName: userName, delta: delta}:
-	default:
-		// 避免阻塞热路径，如果队列满了则忽略
+// GetAggregator 获取或创建用户的流量聚合器
+func (c *SessionPerfCollector) GetAggregator(userName string) *UserTrafficAggregator {
+	if v, ok := c.userAggregators.Load(userName); ok {
+		return v.(*UserTrafficAggregator)
 	}
+
+	agg := &UserTrafficAggregator{}
+	v, loaded := c.userAggregators.LoadOrStore(userName, agg)
+	if loaded {
+		return v.(*UserTrafficAggregator)
+	}
+	return agg
+}
+
+// flushMetricsToPrometheus 定时将所有用户的原子累加值同步到 Prometheus
+func (c *SessionPerfCollector) flushMetricsToPrometheus() {
+	c.userAggregators.Range(func(key, value any) bool {
+		userName := key.(string)
+		agg := value.(*UserTrafficAggregator)
+		m := c.getOrUpdateUserMetrics(userName)
+
+		// 获取当前总累加值
+		currT1Bytes := agg.T1Bytes.Load()
+		currT1Dur := agg.T1Dur.Load()
+		currT3Bytes := agg.T3Bytes.Load()
+		currT3Dur := agg.T3Dur.Load()
+		currUpBytes := agg.UpBytes.Load()
+
+		// 1. T1 增量与实时速度
+		deltaT1Bytes := currT1Bytes - agg.lastT1Bytes
+		deltaT1Dur := currT1Dur - agg.lastT1Dur
+		if deltaT1Bytes > 0 {
+			m.t1Bytes.Add(float64(deltaT1Bytes))
+			agg.lastT1Bytes = currT1Bytes
+
+			// 计算即时 Mbps (每 5 秒采样一次)
+			if deltaT1Dur > 0 {
+				mbps := (float64(deltaT1Bytes) / 1024 / 1024) / time.Duration(deltaT1Dur).Seconds()
+				metrics.T1Throughput.WithLabelValues(userName, c.nodeID).Observe(mbps)
+			}
+			agg.lastT1Dur = currT1Dur
+		}
+
+		// 2. T3 增量与实时速度
+		deltaT3Bytes := currT3Bytes - agg.lastT3Bytes
+		deltaT3Dur := currT3Dur - agg.lastT3Dur
+		if deltaT3Bytes > 0 {
+			m.t3Bytes.Add(float64(deltaT3Bytes))
+			m.txBytes.Add(float64(deltaT3Bytes))
+			agg.lastT3Bytes = currT3Bytes
+
+			if deltaT3Dur > 0 {
+				mbps := (float64(deltaT3Bytes) / 1024 / 1024) / time.Duration(deltaT3Dur).Seconds()
+				metrics.T3Throughput.WithLabelValues(userName, c.nodeID).Observe(mbps)
+			}
+			agg.lastT3Dur = currT3Dur
+		}
+
+		// 3. 上传增量
+		deltaUpBytes := currUpBytes - agg.lastUpBytes
+		if deltaUpBytes > 0 {
+			m.rxBytes.Add(float64(deltaUpBytes))
+			agg.lastUpBytes = currUpBytes
+		}
+
+		// 4. 同步 UserTraffic Gauge (当前节点的总累计)
+		metrics.UserTraffic.WithLabelValues(userName, c.nodeID).Set(float64(currT1Bytes + currUpBytes))
+
+		return true
+	})
 }
 
 func (c *SessionPerfCollector) getOrUpdateUserMetrics(userName string) *userMetrics {
@@ -311,20 +387,7 @@ func (c *SessionPerfCollector) getOrUpdateUserMetrics(userName string) *userMetr
 	return m
 }
 
-func (c *SessionPerfCollector) handleTrafficDelta(userName string, d trafficDelta) {
-	m := c.getOrUpdateUserMetrics(userName)
-
-	if d.t1Bytes > 0 {
-		m.t1Bytes.Add(float64(d.t1Bytes))
-	}
-	if d.t3Bytes > 0 {
-		m.t3Bytes.Add(float64(d.t3Bytes))
-		m.txBytes.Add(float64(d.t3Bytes))
-	}
-	if d.upBytes > 0 {
-		m.rxBytes.Add(float64(d.upBytes))
-	}
-}
+// 已移除旧的 handleTrafficDelta，流量统计现在通过聚合器原子更新
 
 // ReportSOCKS5Error 异步上报 SOCKS5 错误
 func (c *SessionPerfCollector) ReportSOCKS5Error(errType string) {
