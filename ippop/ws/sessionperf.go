@@ -61,12 +61,18 @@ func (s *SessionPerfStats) AddT1Read(bytes int64, duration time.Duration) {
 	s.T1BytesReceived += bytes
 	s.T1Duration += duration
 	s.T1Count++
+	if s.collector != nil {
+		s.collector.ReportTrafficDelta(s.UserName, trafficDelta{t1Bytes: bytes, t1Dur: duration})
+	}
 }
 
 // AddT2Process 添加 T2 处理统计
 func (s *SessionPerfStats) AddT2Process(duration time.Duration) {
 	s.T2Duration += duration
 	s.T2Count++
+	if s.collector != nil {
+		s.collector.ReportTrafficDelta(s.UserName, trafficDelta{t2Dur: duration})
+	}
 }
 
 // AddT3Write 添加 T3 写入统计（POP → Target）
@@ -74,11 +80,17 @@ func (s *SessionPerfStats) AddT3Write(bytes int64, duration time.Duration) {
 	s.T3BytesSent += bytes
 	s.T3Duration += duration
 	s.T3Count++
+	if s.collector != nil {
+		s.collector.ReportTrafficDelta(s.UserName, trafficDelta{t3Bytes: bytes, t3Dur: duration})
+	}
 }
 
 // AddT4Read 添加 T4 读取统计（User → POP，上传方向）
 func (s *SessionPerfStats) AddT4Read(bytes int64) {
 	s.T4BytesReceived += bytes
+	if s.collector != nil {
+		s.collector.ReportTrafficDelta(s.UserName, trafficDelta{upBytes: bytes})
+	}
 }
 
 // Close 关闭会话统计并输出日志
