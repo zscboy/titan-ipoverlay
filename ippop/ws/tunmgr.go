@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math/rand"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -51,11 +50,6 @@ type TunnelManager struct {
 
 	socks5ConnCount atomic.Int64
 
-	tunnelListLock sync.RWMutex
-	tunnelList     []*Tunnel
-	rrIdx          uint64
-	rng            *rand.Rand
-
 	ipBlacklist sync.Map
 
 	// HealthStatsMap sync.Map
@@ -77,9 +71,7 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 		userTraffic: newUserTraffic(),
 		userCache:   gcache.New(userCacheSize).LRU().Build(),
 		filterRules: &Rules{rules: RulesToMap(config.FilterRules.Rules), defaultAction: config.FilterRules.DefaultAction},
-		rng:         rand.New(&lockedSource{s: rand.NewSource(time.Now().UnixNano())}),
 
-		tunnelList:    make([]*Tunnel, 0, 100000),
 		ipPool:        NewIPPool(),
 		acceptLocks:   make([]sync.Mutex, acceptLockShards),
 		perfCollector: NewSessionPerfCollector(config.ClickHouse, config.GetNodeID()),
@@ -120,20 +112,6 @@ func (tm *TunnelManager) addTunnel(t *Tunnel) {
 	tm.tunnels.Store(t.opts.Id, t)
 	tm.ipPool.AddTunnel(t, t.opts.IsBlacklisted)
 
-	if t.opts.IsBlacklisted {
-		logx.Infof("addTunnel error: %s %s is in blacklist", t.opts.Id, t.opts.IP)
-		return
-	}
-
-	tm.tunnelListLock.Lock()
-	defer tm.tunnelListLock.Unlock()
-
-	t.index = len(tm.tunnelList)
-	tm.tunnelList = append(tm.tunnelList, t)
-
-	rrIdx := atomic.LoadUint64(&tm.rrIdx)
-	atomic.StoreUint64(&tm.rrIdx, rrIdx%uint64(len(tm.tunnelList)))
-
 	// Prometheus 指标：增加活跃隧道数
 	metrics.ActiveTunnels.WithLabelValues(tm.config.GetNodeID()).Inc()
 }
@@ -147,41 +125,6 @@ func (tm *TunnelManager) removeTunnel(tun *Tunnel) {
 	}
 
 	tm.ipPool.RemoveTunnel(tun)
-
-	if tun.opts.IsBlacklisted {
-		logx.Infof("removeTunnel error: %s %s is in blacklist", tun.opts.Id, tun.opts.IP)
-		return
-	}
-
-	tm.tunnelListLock.Lock()
-	defer tm.tunnelListLock.Unlock()
-
-	idx := tun.index
-	last := len(tm.tunnelList) - 1
-	if idx < 0 || idx > last {
-		logx.Errorf("removeTunnel error: invalid index %d for tunnel %s, current list size %d", idx, tun.opts.Id, len(tm.tunnelList))
-		return
-	}
-
-	// 如果不是最后一个，交换
-	if idx != last {
-		lastTunnel := tm.tunnelList[last]
-		tm.tunnelList[idx] = lastTunnel
-		lastTunnel.index = idx
-	}
-
-	// 删除最后一个
-	tm.tunnelList[last] = nil
-	tm.tunnelList = tm.tunnelList[:last]
-
-	// 标记已移除（防止重复 remove）
-	tun.index = -1
-
-	if len(tm.tunnelList) > 0 {
-		atomic.StoreUint64(&tm.rrIdx, tm.rrIdx%uint64(len(tm.tunnelList)))
-	} else {
-		atomic.StoreUint64(&tm.rrIdx, 0)
-	}
 
 	// Prometheus 指标：减少活跃隧道数
 	metrics.ActiveTunnels.WithLabelValues(tm.config.GetNodeID()).Dec()
