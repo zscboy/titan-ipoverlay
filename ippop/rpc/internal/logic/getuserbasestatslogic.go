@@ -32,7 +32,7 @@ func (l *GetUserBaseStatsLogic) GetUserBaseStats(in *pb.UserBaseStatsReq) (*pb.U
 	if err != nil {
 		return nil, err
 	}
-	logx.Debugf("timestamp:%d, traffic", timestamp, traffic)
+	logx.Debugf("timestamp:%d, traffic:%d", timestamp, traffic)
 	currentBandwidth := int64(0)
 	if timestamp > (time.Now().Unix() - l.fiveMinute) {
 		currentBandwidth = traffic / l.fiveMinute
@@ -41,6 +41,10 @@ func (l *GetUserBaseStatsLogic) GetUserBaseStats(in *pb.UserBaseStatsReq) (*pb.U
 	user, err := model.GetUser(l.svcCtx.Redis, in.Username)
 	if err != nil {
 		return nil, err
+	}
+
+	if user == nil {
+		return &pb.UserBaseStatsResp{CurrentBandwidth: currentBandwidth}, nil
 	}
 
 	// TODO: Add connection count
