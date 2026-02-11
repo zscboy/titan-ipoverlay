@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"time"
-	"titan-ipoverlay/ippop/config"
 	"titan-ipoverlay/ippop/model"
 
 	"github.com/zeromicro/go-zero/core/logx"
@@ -12,27 +11,11 @@ import (
 
 // AcquireExclusiveNode implements NodeSource interface
 func (tm *TunnelManager) AcquireExclusiveNode(ctx context.Context) (string, *Tunnel, error) {
-	if tm.config.WS.NodeAllocateStrategy == config.NodeAllocateIPPool {
-		ip, tun := tm.ipPool.AcquireIP()
-		if tun == nil {
-			return "", nil, fmt.Errorf("no free ip found in pool")
-		}
-		return ip, tun, nil
+	ip, tun := tm.ipPool.AcquireIP()
+	if tun == nil {
+		return "", nil, fmt.Errorf("no free ip found in pool")
 	}
-
-	nodeIDBytes, err := model.AllocateFreeNode(ctx, tm.redis)
-	if err != nil {
-		return "", nil, err
-	}
-	nodeID := string(nodeIDBytes)
-	v, ok := tm.tunnels.Load(nodeID)
-	if !ok {
-		// If tunnel is not online locally, we don't put it back to free pool
-		// because the free pool should only contain online/available nodes.
-		logx.Errorf("AcquireExclusiveNode error: node %s allocated but not found in local tunnels", nodeID)
-		return "", nil, fmt.Errorf("node %s allocated but not found in local tunnels", nodeID)
-	}
-	return "", v.(*Tunnel), nil
+	return ip, tun, nil
 }
 
 // ReleaseExclusiveNodes implements NodeSource interface
