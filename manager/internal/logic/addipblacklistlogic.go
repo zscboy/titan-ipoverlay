@@ -41,6 +41,10 @@ func (l *AddIPBlacklistLogic) AddIPBlacklist(req *types.IPBlacklistReq) (resp *t
 		return &types.UserOperationResp{ErrMsg: err.Error()}, nil
 	}
 
+	for _, ip := range req.IPList {
+		l.svcCtx.BlacklistMap.Store(ip, true)
+	}
+
 	// 3. Kick nodes from the specified POP immediately
 	server := l.svcCtx.Pops[req.PopID]
 	if server == nil {

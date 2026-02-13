@@ -2,8 +2,11 @@ package svc
 
 import (
 	"context"
+	"fmt"
+	"sync"
 	"titan-ipoverlay/ippop/rpc/serverapi"
 	"titan-ipoverlay/manager/internal/config"
+	"titan-ipoverlay/manager/model"
 
 	"github.com/golang/groupcache/singleflight"
 	"github.com/zeromicro/go-zero/core/stores/redis"
@@ -27,6 +30,7 @@ type ServiceContext struct {
 	IPGroup        *singleflight.Group
 	RegionStrategy map[string][]string
 	VendorStrategy map[string][]string
+	BlacklistMap   sync.Map
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
@@ -42,7 +46,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		vendorStrategy[rule.Key] = rule.PopIds
 	}
 
-	return &ServiceContext{
+	sc := &ServiceContext{
 		Config:         c,
 		Redis:          redis,
 		Pops:           newPops(c),
@@ -50,6 +54,22 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		RegionStrategy: regionStrategy,
 		VendorStrategy: vendorStrategy,
 	}
+
+	sc.loadBlacklist()
+	return sc
+}
+
+func (sc *ServiceContext) loadBlacklist() {
+	ips, err := model.GetAllIPBlacklist(sc.Redis)
+	if err != nil {
+		fmt.Printf("loadBlacklist error: %v\n", err)
+		return
+	}
+
+	for _, ip := range ips {
+		sc.BlacklistMap.Store(ip, true)
+	}
+	fmt.Printf("loaded %d blacklisted ips into sync.Map\n", len(ips))
 }
 
 // TODO: can not get server info in here, server may be stop

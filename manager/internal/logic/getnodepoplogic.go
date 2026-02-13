@@ -14,6 +14,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/zeromicro/go-zero/core/logx"
+	"github.com/zeromicro/go-zero/core/stores/redis"
 )
 
 const (
@@ -73,8 +74,9 @@ func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*svc.Pop, error
 	}
 
 	// 1. Check Blacklist Priority (P1)
-	isBlacklisted, err := model.IsIPBlacklisted(l.svcCtx.Redis, ip)
-	if err == nil && isBlacklisted {
+	_, isBlacklisted := l.svcCtx.BlacklistMap.Load(ip)
+
+	if isBlacklisted {
 		blacklistPopID := l.svcCtx.Config.Strategy.BlacklistPopId
 		logx.Infof("node %s ip %s is in blacklist, redirect to blacklist pop %s", req.NodeId, ip, blacklistPopID)
 		if pop, ok := l.svcCtx.Pops[blacklistPopID]; ok {
@@ -84,7 +86,9 @@ func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*svc.Pop, error
 
 	// 2. Sticky allocation (keep existing pop if IP hasn't changed)
 	popID, nodeIP, err := model.GetNodePopIP(l.svcCtx.Redis, req.NodeId)
-	if err == nil && len(popID) > 0 {
+	if err != nil {
+		logx.Errorf("GetNodePopIP error: %v", err)
+	} else if len(popID) > 0 {
 		if ip == string(nodeIP) {
 			if pop, ok := l.svcCtx.Pops[string(popID)]; ok {
 				logx.Debugf("node %s ip %s already exist pop %s", req.NodeId, nodeIP, popID)
@@ -96,10 +100,14 @@ func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*svc.Pop, error
 
 	// 3. Region Strategy (P2)
 	location, err := l.getLocalInfo(ip)
-	if err == nil {
+	if err != nil {
+		logx.Errorf("getLocalInfo error: %v", err)
+	} else {
 		if popIds, ok := l.svcCtx.RegionStrategy[location.Country]; ok {
 			pop, err := l.selectPopFromList(l.ctx, popIds)
-			if err == nil && pop != nil {
+			if err != nil {
+				logx.Errorf("selectPopFromList error (Region): %v", err)
+			} else if pop != nil {
 				logx.Debugf("node %s matched region %s, allocate pop:%s", req.NodeId, location.Country, pop.Config.Id)
 				l.saveNodePop(req.NodeId, pop.Config.Id, ip)
 				return pop, nil
@@ -111,7 +119,9 @@ func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*svc.Pop, error
 	if len(req.Vendor) > 0 {
 		if popIds, ok := l.svcCtx.VendorStrategy[req.Vendor]; ok {
 			pop, err := l.selectPopFromList(l.ctx, popIds)
-			if err == nil && pop != nil {
+			if err != nil {
+				logx.Errorf("selectPopFromList error (Vendor): %v", err)
+			} else if pop != nil {
 				logx.Debugf("node %s matched vendor %s, allocate pop:%s", req.NodeId, req.Vendor, pop.Config.Id)
 				l.saveNodePop(req.NodeId, pop.Config.Id, ip)
 				return pop, nil
@@ -177,6 +187,8 @@ func (l *GetNodePopLogic) getLocalInfo(ip string) (*Location, error) {
 	loc, err := model.GetIPLocation(l.svcCtx.Redis, ip)
 	if err == nil {
 		return &Location{IP: loc.IP, City: loc.City, Province: loc.Province, Country: loc.Country}, nil
+	} else if err != redis.Nil {
+		logx.Errorf("GetIPLocation error: %v", err)
 	}
 
 	v, err := l.svcCtx.IPGroup.Do(ip, func() (interface{}, error) {
