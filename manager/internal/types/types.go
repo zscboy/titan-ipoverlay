@@ -72,7 +72,9 @@ type GetIPBlacklistResp struct {
 }
 
 type GetNodePopReq struct {
-	NodeId string `form:"nodeid"`
+	NodeId  string `form:"nodeid"`
+	Vendor  string `form:"vendor,optional"`
+	Version string `form:"version,optional"`
 }
 
 type GetNodePopResp struct {

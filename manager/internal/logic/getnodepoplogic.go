@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"time"
 
-	"titan-ipoverlay/manager/internal/config"
 	"titan-ipoverlay/manager/internal/svc"
 	"titan-ipoverlay/manager/internal/types"
 	"titan-ipoverlay/manager/model"
@@ -52,124 +51,126 @@ func NewGetNodePopLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetNod
 }
 
 func (l *GetNodePopLogic) GetNodePop(req *types.GetNodePopReq) (resp *types.GetNodePopResp, err error) {
-	podConfig, err := l.allocatePop(req)
+	popEntity, err := l.allocatePop(req)
 	if err != nil {
 		return nil, err
 	}
 
-	server := l.getPodServer(podConfig.Id)
-	if server == nil {
-		return nil, fmt.Errorf("not found pop for node %s", req.NodeId)
-	}
-
-	tokenBytes, err := l.generateJwtToken(server.AccessSecret, server.AccessExpire, req.NodeId)
+	tokenBytes, err := l.generateJwtToken(popEntity.AccessSecret, popEntity.AccessExpire, req.NodeId)
 	if err != nil {
 		return nil, err
 	}
 
-	logx.Debugf("GetNodePop, %s accessPoint %s, getTokenResp:%s", req.NodeId, podConfig.WSURL, string(tokenBytes))
-	return &types.GetNodePopResp{ServerURL: podConfig.WSURL, AccessToken: string(tokenBytes)}, nil
+	logx.Debugf("GetNodePop, %s accessPoint %s, getTokenResp:%s", req.NodeId, popEntity.Config.WSURL, string(tokenBytes))
+	return &types.GetNodePopResp{ServerURL: popEntity.Config.WSURL, AccessToken: string(tokenBytes)}, nil
 }
 
-func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*config.Pop, error) {
+func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*svc.Pop, error) {
 	ipValue := l.ctx.Value("Remote-IP")
 	ip := ipValue.(string)
 	if len(ip) == 0 {
 		return nil, fmt.Errorf("can not get remote ip")
 	}
 
-	// Check if IP is blacklisted
+	// 1. Check Blacklist Priority (P1)
 	isBlacklisted, err := model.IsIPBlacklisted(l.svcCtx.Redis, ip)
-	if err != nil {
-		logx.Errorf("IsIPBlacklisted ip:%s, failed:%v", ip, err)
-	}
-
-	if isBlacklisted {
-		logx.Infof("node %s ip %s is in blacklist, redirect to pop %s", req.NodeId, ip, l.svcCtx.Config.BlacklistPop)
-		for _, pop := range l.svcCtx.Config.Pops {
-			if pop.Id == l.svcCtx.Config.BlacklistPop {
-				return &pop, nil
-			}
+	if err == nil && isBlacklisted {
+		blacklistPopID := l.svcCtx.Config.Strategy.BlacklistPopId
+		logx.Infof("node %s ip %s is in blacklist, redirect to blacklist pop %s", req.NodeId, ip, blacklistPopID)
+		if pop, ok := l.svcCtx.Pops[blacklistPopID]; ok {
+			return pop, nil
 		}
 	}
 
+	// 2. Sticky allocation (keep existing pop if IP hasn't changed)
 	popID, nodeIP, err := model.GetNodePopIP(l.svcCtx.Redis, req.NodeId)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(popID) > 0 {
-		for _, pop := range l.svcCtx.Config.Pops {
-			if pop.Id == string(popID) {
-				if ip == string(nodeIP) {
-					logx.Debugf("node %s ip %s already exist pop %s", req.NodeId, nodeIP, pop.Id)
-					return &pop, nil
-				}
-
-				logx.Debugf("node %s change ip %s to %s, old pop:%s, will check location info", req.NodeId, string(nodeIP), ip, popID)
-				break
+	if err == nil && len(popID) > 0 {
+		if ip == string(nodeIP) {
+			if pop, ok := l.svcCtx.Pops[string(popID)]; ok {
+				logx.Debugf("node %s ip %s already exist pop %s", req.NodeId, nodeIP, popID)
+				return pop, nil
 			}
 		}
+		logx.Debugf("node %s change ip %s to %s, old pop:%s, will re-allocate", req.NodeId, string(nodeIP), ip, popID)
 	}
 
+	// 3. Region Strategy (P2)
 	location, err := l.getLocalInfo(ip)
-	if err != nil {
-		logx.Errorf("getLocalInfo ip:%s, failed:%v", ip, err)
-		return nil, fmt.Errorf("getLocalInfo failed:%v", err)
-	}
-
-	popIDs := make([]string, 0, len(l.svcCtx.Config.Pops))
-	for _, pop := range l.svcCtx.Config.Pops {
-		popIDs = append(popIDs, pop.Id)
-
-	}
-
-	nodeCountMap, err := model.NodeCountOfPops(l.ctx, l.svcCtx.Redis, popIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, pop := range l.svcCtx.Config.Pops {
-		if pop.Area == location.Country {
-			count, ok := nodeCountMap[pop.Id]
-			if !ok {
-				continue
+	if err == nil {
+		if popIds, ok := l.svcCtx.RegionStrategy[location.Country]; ok {
+			pop, err := l.selectPopFromList(l.ctx, popIds)
+			if err == nil && pop != nil {
+				logx.Debugf("node %s matched region %s, allocate pop:%s", req.NodeId, location.Country, pop.Config.Id)
+				l.saveNodePop(req.NodeId, pop.Config.Id, ip)
+				return pop, nil
 			}
-
-			if count >= int64(pop.MaxCount) {
-				continue
-			}
-
-			if err := model.SetNodePopIP(l.svcCtx.Redis, req.NodeId, pop.Id, ip); err != nil {
-				logx.Errorf("allocatePop SetNodePop error %v", err)
-			}
-
-			logx.Debugf("new node %s location %v, allocate pop:%s", req.NodeId, location, pop.Id)
-			return &pop, nil
 		}
 	}
 
-	for _, pop := range l.svcCtx.Config.Pops {
-		if pop.Area == l.svcCtx.Config.DefaultArea {
-			if err := model.SetNodePopIP(l.svcCtx.Redis, req.NodeId, pop.Id, ip); err != nil {
-				logx.Errorf("allocatePop SetNodePop error %v", err)
+	// 4. Vendor Strategy (P3)
+	if len(req.Vendor) > 0 {
+		if popIds, ok := l.svcCtx.VendorStrategy[req.Vendor]; ok {
+			pop, err := l.selectPopFromList(l.ctx, popIds)
+			if err == nil && pop != nil {
+				logx.Debugf("node %s matched vendor %s, allocate pop:%s", req.NodeId, req.Vendor, pop.Config.Id)
+				l.saveNodePop(req.NodeId, pop.Config.Id, ip)
+				return pop, nil
 			}
-
-			logx.Debugf("new node %s location %v not exit, allocate default area %v, allocate pop:%s", req.NodeId, location, l.svcCtx.Config.DefaultArea, pop.Id)
-			return &pop, nil
 		}
 	}
 
-	return nil, fmt.Errorf("no pop found for %s, location:%v", req.NodeId, location)
+	// 5. Default Strategy (P4)
+	defaultPopID := l.svcCtx.Config.Strategy.DefaultPopId
+	if pop, ok := l.svcCtx.Pops[defaultPopID]; ok {
+		logx.Debugf("node %s allocate default pop:%s", req.NodeId, defaultPopID)
+		l.saveNodePop(req.NodeId, defaultPopID, ip)
+		return pop, nil
+	}
+
+	return nil, fmt.Errorf("no pop found for %s, location:%v, vendor:%s", req.NodeId, location, req.Vendor)
 }
 
-func (l *GetNodePopLogic) getPodServer(id string) *svc.Pop {
-	for podID, pop := range l.svcCtx.Pops {
-		if podID == id {
-			return pop
+func (l *GetNodePopLogic) saveNodePop(nodeID, popID, ip string) {
+	if err := model.SetNodePopIP(l.svcCtx.Redis, nodeID, popID, ip); err != nil {
+		logx.Errorf("allocatePop SetNodePop error %v", err)
+	}
+}
+
+func (l *GetNodePopLogic) selectPopFromList(ctx context.Context, popIds []string) (*svc.Pop, error) {
+	if len(popIds) == 0 {
+		return nil, nil
+	}
+
+	nodeCountMap, err := model.NodeCountOfPops(ctx, l.svcCtx.Redis, popIds)
+	if err != nil {
+		return nil, err
+	}
+
+	var bestPop *svc.Pop
+	var minLoadRatio float64 = 2.0
+
+	for _, id := range popIds {
+		popEntity, ok := l.svcCtx.Pops[id]
+		if !ok {
+			continue
+		}
+
+		count := nodeCountMap[id]
+		if count >= int64(popEntity.Config.MaxCount) && popEntity.Config.MaxCount > 0 {
+			continue
+		}
+
+		loadRatio := 0.0
+		if popEntity.Config.MaxCount > 0 {
+			loadRatio = float64(count) / float64(popEntity.Config.MaxCount)
+		}
+
+		if loadRatio < minLoadRatio {
+			minLoadRatio = loadRatio
+			bestPop = popEntity
 		}
 	}
-	return nil
+	return bestPop, nil
 }
 
 func (l *GetNodePopLogic) getLocalInfo(ip string) (*Location, error) {
@@ -201,9 +202,9 @@ func (l *GetNodePopLogic) getLocalInfo(ip string) (*Location, error) {
 }
 
 func (l *GetNodePopLogic) httpGetLocationInfo(ip string) (*Location, error) {
-	logx.Infof("get %s local info from %s", ip, l.svcCtx.Config.Geo.API)
+	logx.Infof("get %s local info from %s", ip, l.svcCtx.Config.GeoAPI.API)
 
-	url := fmt.Sprintf("%s?ip=%s", l.svcCtx.Config.Geo.API, ip)
+	url := fmt.Sprintf("%s?ip=%s", l.svcCtx.Config.GeoAPI.API, ip)
 
 	client := &http.Client{
 		Timeout: 3 * time.Second,

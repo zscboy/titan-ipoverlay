@@ -21,9 +21,21 @@ type Pop struct {
 	MaxCount    int
 }
 
-type Geo struct {
+type GeoAPI struct {
 	API string
 	Key string
+}
+
+type StrategyRule struct {
+	Key    string
+	PopIds []string
+}
+
+type StrategyConfig struct {
+	BlacklistPopId string
+	RegionRules    []StrategyRule
+	VendorRules    []StrategyRule
+	DefaultPopId   string
 }
 
 type Config struct {
@@ -31,9 +43,8 @@ type Config struct {
 	Redis   redis.RedisConf
 	JwtAuth JwtAuth
 	// todo: will move to center server
-	Pops         []Pop
-	DefaultArea  string
-	BlacklistPop string // The POP ID where blacklisted nodes are redirected
-	Geo          Geo
-	Whitelist    []string `json:",optional"`
+	Pops      []Pop
+	Strategy  StrategyConfig
+	GeoAPI    GeoAPI
+	Whitelist []string `json:",optional"`
 }

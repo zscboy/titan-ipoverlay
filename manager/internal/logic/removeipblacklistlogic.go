@@ -36,10 +36,10 @@ func (l *RemoveIPBlacklistLogic) RemoveIPBlacklist(req *types.IPBlacklistReq) (r
 		return &types.UserOperationResp{ErrMsg: err.Error()}, nil
 	}
 
-	// 2. Use the configured BlacklistPop to kick nodes
+	// 2. Use the configured BlacklistPopId to kick nodes
 	// These nodes are currently connected to the BlacklistPop. By kicking them now,
 	// when they reconnect, the manager will re-allocate them to a normal POP because they're no longer blacklisted.
-	blacklistPopID := l.svcCtx.Config.BlacklistPop
+	blacklistPopID := l.svcCtx.Config.Strategy.BlacklistPopId
 	if blacklistPopID != "" {
 		server := l.svcCtx.Pops[blacklistPopID]
 		if server == nil {

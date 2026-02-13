@@ -28,7 +28,7 @@ func (l *GetPopsLogic) GetPops() (resp *types.GetPopsResp, err error) {
 	popIDs := make([]string, 0, len(l.svcCtx.Config.Pops))
 	pops := make([]*types.Pop, 0, len(l.svcCtx.Config.Pops))
 	for id, pop := range l.svcCtx.Pops {
-		p := &types.Pop{ID: id, Name: pop.Name, Area: pop.Area, Socks5Addr: pop.Socks5Addr, CountryCode: pop.CountryCode}
+		p := &types.Pop{ID: id, Name: pop.Config.Name, Area: pop.Config.Area, Socks5Addr: pop.Socks5Addr, CountryCode: pop.Config.CountryCode}
 		pops = append(pops, p)
 
 		popIDs = append(popIDs, id)
