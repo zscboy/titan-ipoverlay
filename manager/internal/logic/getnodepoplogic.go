@@ -87,46 +87,41 @@ func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*svc.Pop, error
 	// 2. Sticky allocation (keep existing pop if IP hasn't changed)
 	popID, nodeIP, err := model.GetNodePopIP(l.svcCtx.Redis, req.NodeId)
 	if err != nil {
-		logx.Errorf("GetNodePopIP error: %v", err)
-	} else if len(popID) > 0 {
-		if ip == string(nodeIP) {
-			if pop, ok := l.svcCtx.Pops[string(popID)]; ok {
-				logx.Debugf("node %s ip %s already exist pop %s", req.NodeId, nodeIP, popID)
-				return pop, nil
-			}
+		logx.Errorf("GetNodePopIP error: %v, node %s ip %s", err, req.NodeId, ip)
+		return nil, err
+	}
+
+	if len(popID) > 0 && ip == string(nodeIP) {
+		if pop, ok := l.svcCtx.Pops[string(popID)]; ok {
+			logx.Debugf("node %s ip %s already exist pop %s", req.NodeId, nodeIP, popID)
+			return pop, nil
+		} else {
+			logx.Errorf("node %s ip %s already exist pop %s, but pop not exist", req.NodeId, nodeIP, popID)
 		}
+	} else {
 		logx.Debugf("node %s change ip %s to %s, old pop:%s, will re-allocate", req.NodeId, string(nodeIP), ip, popID)
 	}
 
 	// 3. Region Strategy (P2)
 	location, err := l.getLocalInfo(ip)
 	if err != nil {
-		logx.Errorf("getLocalInfo error: %v", err)
-	} else {
-		if popIds, ok := l.svcCtx.RegionStrategy[location.Country]; ok {
-			pop, err := l.selectPopFromList(l.ctx, popIds)
-			if err != nil {
-				logx.Errorf("selectPopFromList error (Region): %v", err)
-			} else if pop != nil {
-				logx.Debugf("node %s matched region %s, allocate pop:%s", req.NodeId, location.Country, pop.Config.Id)
-				l.saveNodePop(req.NodeId, pop.Config.Id, ip)
-				return pop, nil
-			}
-		}
+		logx.Errorf("GetIPLocation error: %v, node %s, ip %s", err, req.NodeId)
+		return nil, err
+	}
+
+	if pop, err := l.matchAndAllocatePop(l.svcCtx.RegionStrategy[location.Country], "region "+location.Country, req.NodeId, ip); err != nil {
+		logx.Errorf("matchAndAllocatePop region error: %v", err)
+		return nil, err
+	} else if pop != nil {
+		return pop, nil
 	}
 
 	// 4. Vendor Strategy (P3)
-	if len(req.Vendor) > 0 {
-		if popIds, ok := l.svcCtx.VendorStrategy[req.Vendor]; ok {
-			pop, err := l.selectPopFromList(l.ctx, popIds)
-			if err != nil {
-				logx.Errorf("selectPopFromList error (Vendor): %v", err)
-			} else if pop != nil {
-				logx.Debugf("node %s matched vendor %s, allocate pop:%s", req.NodeId, req.Vendor, pop.Config.Id)
-				l.saveNodePop(req.NodeId, pop.Config.Id, ip)
-				return pop, nil
-			}
-		}
+	if pop, err := l.matchAndAllocatePop(l.svcCtx.VendorStrategy[req.Vendor], "vendor "+req.Vendor, req.NodeId, ip); err != nil {
+		logx.Errorf("matchAndAllocatePop vendor error: %v", err)
+		return nil, err
+	} else if pop != nil {
+		return pop, nil
 	}
 
 	// 5. Default Strategy (P4)
@@ -138,6 +133,25 @@ func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*svc.Pop, error
 	}
 
 	return nil, fmt.Errorf("no pop found for %s, location:%v, vendor:%s", req.NodeId, location, req.Vendor)
+}
+
+func (l *GetNodePopLogic) matchAndAllocatePop(popIds []string, strategyName, nodeID, ip string) (*svc.Pop, error) {
+	if len(popIds) == 0 {
+		return nil, nil
+	}
+
+	pop, err := l.selectPopFromList(l.ctx, popIds)
+	if err != nil {
+		return nil, err
+	}
+
+	if pop != nil {
+		logx.Debugf("node %s matched %s, allocate pop:%s", nodeID, strategyName, pop.Config.Id)
+		l.saveNodePop(nodeID, pop.Config.Id, ip)
+		return pop, nil
+	}
+
+	return nil, fmt.Errorf("no pop found for %s, strategy: %s", nodeID, strategyName)
 }
 
 func (l *GetNodePopLogic) saveNodePop(nodeID, popID, ip string) {

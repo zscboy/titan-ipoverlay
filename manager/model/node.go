@@ -6,30 +6,34 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/stores/redis"
 )
 
 // popAndIP = pop:ip, ip allow empty
-func SetNodePopIP(redis *redis.Redis, nodeID, pop, ip string) error {
-	popID, _, err := GetNodePopIP(redis, nodeID)
+func SetNodePopIP(rds *redis.Redis, nodeID, pop, ip string) error {
+	popID, _, err := GetNodePopIP(rds, nodeID)
+	if err != nil {
+		return err
+	}
+
+	ctx := context.Background()
+	pipe, err := rds.TxPipeline()
 	if err != nil {
 		return err
 	}
 
 	if len(popID) > 0 {
 		if string(popID) != pop {
-			_, err = redis.Srem(fmt.Sprintf(redisKeyPopNodes, popID), nodeID)
-			if err != nil {
-				return err
-			}
+			pipe.SRem(ctx, fmt.Sprintf(redisKeyPopNodes, popID), nodeID)
+			logx.Debugf("remove node %s from pop %s, add to new pop %s", nodeID, popID, pop)
 		}
 	}
 
-	_, err = redis.Sadd(fmt.Sprintf(redisKeyPopNodes, pop), nodeID)
-	if err != nil {
-		return err
-	}
-	return redis.Hset(redisKeyNodes, nodeID, fmt.Sprintf("%s:%s", pop, ip))
+	pipe.SAdd(ctx, fmt.Sprintf(redisKeyPopNodes, pop), nodeID)
+	pipe.HSet(ctx, redisKeyNodes, nodeID, fmt.Sprintf("%s:%s", pop, ip))
+	_, err = pipe.Exec(ctx)
+	return err
 }
 
 func GetNodePopIP(red *redis.Redis, nodeID string) ([]byte, []byte, error) {
