@@ -11,12 +11,14 @@ import (
 	"time"
 	"titan-ipoverlay/ippop/socks5"
 	"titan-ipoverlay/ippop/ws/pb"
+	"unsafe"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/zeromicro/go-zero/core/logx"
 	"golang.org/x/mod/semver"
 	"golang.org/x/time/rate"
+	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -197,27 +199,69 @@ func (t *Tunnel) serve() {
 }
 
 func (t *Tunnel) onMessage(data []byte) error {
-	msg := &pb.Message{}
-	err := proto.Unmarshal(data, msg)
-	if err != nil {
-		return err
+	// msg := &pb.Message{}
+	// err := proto.Unmarshal(data, msg)
+	// if err != nil {
+	// 	return err
+	// }
+	var msgType pb.MessageType
+	var sessionID string
+	var payload []byte
+	// 遍历解码 Protobuf 数据流
+	for len(data) > 0 {
+		num, typ, n := protowire.ConsumeTag(data)
+		if n < 0 {
+			return fmt.Errorf("invalid tag")
+		}
+		data = data[n:]
+		switch num {
+		case 1: // type (Varint)
+			v, n := protowire.ConsumeVarint(data)
+			if n < 0 {
+				return fmt.Errorf("invalid varint")
+			}
+			msgType = pb.MessageType(v)
+			data = data[n:]
+		case 2: // session_id (Length-delimited string)
+			v, n := protowire.ConsumeBytes(data)
+			if n < 0 {
+				return fmt.Errorf("invalid bytes for session_id")
+			}
+			sessionID = unsafe.String(unsafe.SliceData(v), len(v))
+			data = data[n:]
+		case 3: // payload (Length-delimited bytes)
+			v, n := protowire.ConsumeBytes(data)
+			if n < 0 {
+				return fmt.Errorf("invalid bytes for payload")
+			}
+			// 核心优化：这里是真正的零拷贝，v 直接是指向 data 内部的切片
+			payload = v
+			data = data[n:]
+		default:
+			// 跳过未知字段
+			n := protowire.ConsumeFieldValue(num, typ, data)
+			if n < 0 {
+				return fmt.Errorf("invalid field")
+			}
+			data = data[n:]
+		}
 	}
 
-	switch msg.Type {
+	switch msgType {
 	case pb.MessageType_COMMAND:
 		// return t.onControlMessage(msg.GetSessionId(), msg.Payload)
 	case pb.MessageType_PROXY_SESSION_CREATE:
-		return t.onProxySessionCreateReply(msg.GetSessionId(), msg.Payload)
+		return t.onProxySessionCreateReply(sessionID, payload)
 	case pb.MessageType_PROXY_SESSION_DATA:
-		return t.onProxySessionDataFromTunnel(msg.GetSessionId(), msg.Payload)
+		return t.onProxySessionDataFromTunnel(sessionID, payload)
 	case pb.MessageType_PROXY_SESSION_CLOSE:
-		return t.onProxySessionClose(msg.GetSessionId())
+		return t.onProxySessionClose(sessionID)
 	case pb.MessageType_PROXY_SESSION_HALF_CLOSE:
-		return t.onProxySessionHalfClose(msg.GetSessionId())
+		return t.onProxySessionHalfClose(sessionID)
 	case pb.MessageType_PROXY_UDP_DATA:
-		return t.onProxyUDPDataFromTunnel(msg.GetSessionId(), msg.Payload)
+		return t.onProxyUDPDataFromTunnel(sessionID, payload)
 	default:
-		logx.Errorf("Tunnel %s %s onMessage, unsupported message type:%d", t.opts.Id, t.opts.IP, msg.Type)
+		logx.Errorf("Tunnel %s %s onMessage, unsupported message type:%d", t.opts.Id, t.opts.IP, msgType)
 
 	}
 	return nil
