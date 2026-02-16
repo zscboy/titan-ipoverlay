@@ -279,3 +279,33 @@ func (p *IPPool) GetPoolStats() PoolStats {
 		TunnelCount:      p.tunnelCount,
 	}
 }
+
+// FreeIPInfo contains IP and its associated NodeIDs
+type FreeIPInfo struct {
+	IP      string   `json:"ip"`
+	NodeIDs []string `json:"node_ids"`
+}
+
+// GetFreeIPsFromTail retrieves free IPs from the tail of the free list.
+func (p *IPPool) GetFreeIPsFromTail(count int) []FreeIPInfo {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if count <= 0 {
+		return nil
+	}
+
+	res := make([]FreeIPInfo, 0, count)
+	for e := p.freeList.Back(); e != nil && len(res) < count; e = e.Prev() {
+		entry := e.Value.(*ipEntry)
+		nodeIDs := make([]string, 0, len(entry.tunnels))
+		for nodeID := range entry.tunnels {
+			nodeIDs = append(nodeIDs, nodeID)
+		}
+		res = append(res, FreeIPInfo{
+			IP:      entry.ip,
+			NodeIDs: nodeIDs,
+		})
+	}
+	return res
+}

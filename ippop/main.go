@@ -37,6 +37,7 @@ func newWS(config config.Config, tunMgr *ws.TunnelManager) *rest.Server {
 	nodePop := ws.NewNodePop(&config)
 	sessionQuery := ws.NewSessionQuery(tunMgr)
 	statsQuery := ws.NewStatsQuery(tunMgr)
+	ippoolQuery := ws.NewIPPoolQuery(tunMgr)
 
 	// httpproxy := pophttp.NewHttProxy(tunMgr)
 
@@ -59,6 +60,11 @@ func newWS(config config.Config, tunMgr *ws.TunnelManager) *rest.Server {
 		Method:  "GET",
 		Path:    "/pop/stats",
 		Handler: statsQuery.ServeStats,
+	})
+	server.AddRoute(rest.Route{
+		Method:  "GET",
+		Path:    "/ippool/free",
+		Handler: ippoolQuery.ServeFreeIPs,
 	})
 	return server
 }
