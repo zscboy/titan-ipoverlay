@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"titan-ipoverlay/manager/internal/svc"
@@ -19,6 +20,8 @@ import (
 
 const (
 	NodeAccessPointDefaultKey = "Default"
+	StrategyNameRegion        = "region"
+	StrategyNameVendor        = "vendor"
 )
 
 type Location struct {
@@ -78,28 +81,45 @@ func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*svc.Pop, error
 
 	if isBlacklisted {
 		blacklistPopID := l.svcCtx.Config.Strategy.BlacklistPopId
-		logx.Infof("node %s ip %s is in blacklist, redirect to blacklist pop %s", req.NodeId, ip, blacklistPopID)
+		logx.Infof("allocatePop node %s ip %s is in blacklist, redirect to blacklist pop %s", req.NodeId, ip, blacklistPopID)
 		if pop, ok := l.svcCtx.Pops[blacklistPopID]; ok {
 			return pop, nil
 		}
 	}
 
-	// 2. Sticky allocation (keep existing pop if IP hasn't changed)
+	// 2. Sticky allocation (keep existing pop if IP hasn't changed or matches Vendor Strategy)
 	popID, nodeIP, err := model.GetNodePopIP(l.svcCtx.Redis, req.NodeId)
 	if err != nil {
 		logx.Errorf("GetNodePopIP error: %v, node %s ip %s", err, req.NodeId, ip)
 		return nil, err
 	}
 
-	if len(popID) > 0 && ip == string(nodeIP) {
-		if pop, ok := l.svcCtx.Pops[string(popID)]; ok {
-			logx.Debugf("node %s ip %s already exist pop %s", req.NodeId, nodeIP, popID)
-			return pop, nil
+	if len(popID) > 0 {
+		pop, exists := l.svcCtx.Pops[string(popID)]
+
+		// Case A: IP matches perfectly
+		if ip == string(nodeIP) {
+			if exists {
+				logx.Debugf("allocatePop node %s ip %s sticky to existing pop %s", req.NodeId, nodeIP, popID)
+				return pop, nil
+			}
+			logx.Errorf("allocatePop node %s ip %s sticky pop %s not found in memory", req.NodeId, nodeIP, popID)
 		} else {
-			logx.Errorf("node %s ip %s already exist pop %s, but pop not exist", req.NodeId, nodeIP, popID)
+			// Case B: IP changed, check if we should keep it anyway (Vendor Strategy)
+			_, hasVendorStrategy := l.svcCtx.VendorStrategy[req.Vendor]
+			if hasVendorStrategy {
+				if exists {
+					logx.Infof("allocatePop node %s vendor %s strategy: keep pop %s despite ip change (%s -> %s)", req.NodeId, req.Vendor, popID, string(nodeIP), ip)
+					return pop, nil
+				}
+				logx.Errorf("allocatePop node %s vendor strategy: sticky pop %s not found", req.NodeId, popID)
+			} else {
+				// Case C: IP changed and no Vendor Strategy, need to re-allocate
+				logx.Debugf("allocatePop node %s ip changed (%s -> %s), will re-allocate from pop %s", req.NodeId, string(nodeIP), ip, popID)
+			}
 		}
 	} else {
-		logx.Debugf("node %s change ip %s to %s, old pop:%s, will re-allocate", req.NodeId, string(nodeIP), ip, popID)
+		logx.Debugf("allocatePop node %s ip %s not found in memory, will allocate", req.NodeId, ip)
 	}
 
 	// 3. Region Strategy (P2)
@@ -109,7 +129,7 @@ func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*svc.Pop, error
 		return nil, err
 	}
 
-	if pop, err := l.matchAndAllocatePop(l.svcCtx.RegionStrategy[location.Country], "region "+location.Country, req.NodeId, ip); err != nil {
+	if pop, err := l.matchAndAllocatePop(l.svcCtx.RegionStrategy[location.Country], StrategyNameRegion+location.Country, req.NodeId, ip); err != nil {
 		logx.Errorf("matchAndAllocatePop region error: %v", err)
 		return nil, err
 	} else if pop != nil {
@@ -117,7 +137,7 @@ func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*svc.Pop, error
 	}
 
 	// 4. Vendor Strategy (P3)
-	if pop, err := l.matchAndAllocatePop(l.svcCtx.VendorStrategy[req.Vendor], "vendor "+req.Vendor, req.NodeId, ip); err != nil {
+	if pop, err := l.matchAndAllocatePop(l.svcCtx.VendorStrategy[req.Vendor], StrategyNameVendor+req.Vendor, req.NodeId, ip); err != nil {
 		logx.Errorf("matchAndAllocatePop vendor error: %v", err)
 		return nil, err
 	} else if pop != nil {
@@ -140,7 +160,7 @@ func (l *GetNodePopLogic) matchAndAllocatePop(popIds []string, strategyName, nod
 		return nil, nil
 	}
 
-	pop, err := l.selectPopFromList(l.ctx, popIds)
+	pop, err := l.selectPopFromList(l.ctx, strategyName, popIds)
 	if err != nil {
 		return nil, err
 	}
@@ -160,41 +180,30 @@ func (l *GetNodePopLogic) saveNodePop(nodeID, popID, ip string) {
 	}
 }
 
-func (l *GetNodePopLogic) selectPopFromList(ctx context.Context, popIds []string) (*svc.Pop, error) {
+func (l *GetNodePopLogic) selectPopFromList(ctx context.Context, strategyName string, popIds []string) (*svc.Pop, error) {
 	if len(popIds) == 0 {
 		return nil, nil
 	}
 
-	nodeCountMap, err := model.NodeCountOfPops(ctx, l.svcCtx.Redis, popIds)
-	if err != nil {
-		return nil, err
-	}
+	// 获取或初始化该策略的计数器
+	val, _ := l.svcCtx.StrategyRR.LoadOrStore(strategyName, new(uint64))
+	counter := val.(*uint64)
 
-	var bestPop *svc.Pop
-	var minLoadRatio float64 = 2.0
+	// 使用原子操作增加该策略的计数器
+	idx := atomic.AddUint64(counter, 1)
+	n := uint64(len(popIds))
 
-	for _, id := range popIds {
-		popEntity, ok := l.svcCtx.Pops[id]
-		if !ok {
-			continue
-		}
+	// 尝试轮询列表中的每一个 ID
+	for i := uint64(0); i < n; i++ {
+		targetIdx := (idx + i) % n
+		id := popIds[targetIdx]
 
-		count := nodeCountMap[id]
-		if count >= int64(popEntity.Config.MaxCount) && popEntity.Config.MaxCount > 0 {
-			continue
-		}
-
-		loadRatio := 0.0
-		if popEntity.Config.MaxCount > 0 {
-			loadRatio = float64(count) / float64(popEntity.Config.MaxCount)
-		}
-
-		if loadRatio < minLoadRatio {
-			minLoadRatio = loadRatio
-			bestPop = popEntity
+		if popEntity, ok := l.svcCtx.Pops[id]; ok {
+			return popEntity, nil
 		}
 	}
-	return bestPop, nil
+
+	return nil, fmt.Errorf("selectPopFromList no pop found for %s, strategy: %s", strategyName, popIds)
 }
 
 func (l *GetNodePopLogic) getLocalInfo(ip string) (*Location, error) {

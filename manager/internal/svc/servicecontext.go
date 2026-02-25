@@ -31,6 +31,7 @@ type ServiceContext struct {
 	RegionStrategy map[string][]string
 	VendorStrategy map[string][]string
 	BlacklistMap   sync.Map
+	StrategyRR     sync.Map // map[string]*uint64
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
