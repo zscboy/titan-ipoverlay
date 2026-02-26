@@ -7,25 +7,22 @@ import (
 )
 
 func getClientIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		for _, ip := range strings.Split(xff, ",") {
+			ip = strings.TrimSpace(ip)
+			if ip != "" {
+				return ip
+			}
+		}
+	}
+
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return xri
+	}
+
 	remoteIP, _, _ := net.SplitHostPort(r.RemoteAddr)
-	ip := net.ParseIP(remoteIP)
-	if ip == nil {
-		return remoteIP
+	if remoteIP == "" {
+		return r.RemoteAddr
 	}
-
-	if ip.IsLoopback() || ip.IsPrivate() {
-		ip := r.Header.Get("X-Forwarded-For")
-		if ip != "" {
-			ips := strings.Split(ip, ",")
-			return strings.TrimSpace(ips[0])
-		}
-
-		ip = r.Header.Get("X-Real-IP")
-		if ip != "" {
-			return ip
-		}
-
-	}
-
 	return remoteIP
 }
