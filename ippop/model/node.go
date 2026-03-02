@@ -91,38 +91,18 @@ func SetNodeNetDelay(redis *redis.Redis, nodeID string, delay uint64) error {
 // need to check node if nil
 func GetNode(ctx context.Context, redis *redis.Redis, id string) (*Node, error) {
 	key := fmt.Sprintf(redisKeyNode, id)
-
-	pipe, err := redis.TxPipeline()
-	if err != nil {
-		return nil, err
-	}
-
-	hgetallCmd := pipe.HGetAll(ctx, key)
-	onlineCmd := pipe.SIsMember(ctx, redisKeyNodeOnline, id)
-	// blacklistCmd := pipe.SIsMember(ctx, redisKeyNodeBlacklist, id)
-
-	_, err = pipe.Exec(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	m, err := hgetallCmd.Result()
+	m, err := redis.Hgetall(key)
 	if err != nil {
 		return nil, err
 	}
 	if len(m) == 0 {
 		return nil, nil
 	}
-
 	node := &Node{}
 	if err := mapToStruct(m, node); err != nil {
 		return nil, err
 	}
-
 	node.Id = id
-	node.Online, _ = onlineCmd.Result()
-	// node.IsBlacklisted, _ = blacklistCmd.Result()
-
 	return node, nil
 }
 
