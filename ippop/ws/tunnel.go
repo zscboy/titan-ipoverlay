@@ -56,6 +56,16 @@ type TrafficStats struct {
 	WriteBytes    int64
 }
 
+// UploadTester handles upload bandwidth test state
+type UploadTester struct {
+	IsTesting  atomic.Bool
+	SessionID  string
+	TotalBytes atomic.Uint64
+	StartTime  time.Time
+	ResultChan chan *pb.UploadTestResult
+	Timer      *time.Timer
+}
+
 // Tunnel Tunnel
 type Tunnel struct {
 	conn      *websocket.Conn
@@ -84,6 +94,8 @@ type Tunnel struct {
 	trafficStats *TrafficStats
 
 	IdleStartTime *time.Time
+
+	uploadTester *UploadTester
 }
 
 func newTunnel(conn *websocket.Conn, tunMgr *TunnelManager, opts *TunOptions, ctx context.Context) *Tunnel {
@@ -94,6 +106,7 @@ func newTunnel(conn *websocket.Conn, tunMgr *TunnelManager, opts *TunOptions, ct
 		rateLimiterLock: sync.Mutex{},
 		trafficStats:    &TrafficStats{},
 		ctx:             ctx,
+		uploadTester:    &UploadTester{},
 	}
 	t.setRateLimit(opts.DownloadRateLimti, opts.UploadRateLimit)
 
@@ -260,6 +273,11 @@ func (t *Tunnel) onMessage(data []byte) error {
 		return t.onProxySessionHalfClose(sessionID)
 	case pb.MessageType_PROXY_UDP_DATA:
 		return t.onProxyUDPDataFromTunnel(sessionID, payload)
+	case pb.MessageType_UPLOAD_TEST_DATA:
+		t.uploadTester.TotalBytes.Add(uint64(len(payload)))
+		return nil
+	case pb.MessageType_UPLOAD_TEST_REQ:
+		return t.onUploadTestRequest(sessionID, payload)
 	default:
 		logx.Errorf("Tunnel %s %s onMessage, unsupported message type:%d", t.opts.Id, t.opts.IP, msgType)
 
@@ -665,7 +683,103 @@ func (t *Tunnel) addTrafficStats(writeBytes int, writeDuration time.Duration) {
 	t.trafficStats.DataProcessDuration = time.Now().Sub(t.trafficStats.DataProcessStartTime) - writeDuration
 }
 
-// great than 1.0.0
+func (t *Tunnel) StartUploadTest(ctx context.Context, duration int) (*pb.UploadTestResult, error) {
+	if t.uploadTester.IsTesting.Swap(true) {
+		return nil, fmt.Errorf("tunnel %s already in testing", t.opts.Id)
+	}
+
+	sessionID := uuid.NewString()
+	t.uploadTester.SessionID = sessionID
+	t.uploadTester.StartTime = time.Now()
+	t.uploadTester.TotalBytes.Store(0)
+	t.uploadTester.ResultChan = make(chan *pb.UploadTestResult, 1)
+
+	// Start timer for safety
+	t.uploadTester.Timer = time.AfterFunc(time.Duration(duration+3)*time.Second, func() {
+		if t.uploadTester.IsTesting.Load() && t.uploadTester.SessionID == sessionID {
+			logx.Errorf("Tunnel %s upload test timeout", t.opts.Id)
+			t.stopUploadTest(false, "timeout")
+		}
+	})
+
+	// Send START command to Node
+	req := &pb.UploadTestRequest{
+		Action:    pb.UploadTestRequest_START,
+		Duration:  int32(duration),
+		SessionId: sessionID,
+	}
+	payload, _ := proto.Marshal(req)
+	msg := &pb.Message{
+		Type:      pb.MessageType_UPLOAD_TEST_REQ,
+		SessionId: sessionID,
+		Payload:   payload,
+	}
+	data, _ := proto.Marshal(msg)
+	if err := t.write(data); err != nil {
+		t.uploadTester.IsTesting.Store(false)
+		return nil, err
+	}
+
+	logx.Infof("Tunnel %s started upload test, session:%s, duration:%ds", t.opts.Id, sessionID, duration)
+
+	select {
+	case result := <-t.uploadTester.ResultChan:
+		return result, nil
+	case <-ctx.Done():
+		t.stopUploadTest(false, "context cancelled")
+		return nil, ctx.Err()
+	}
+}
+
+func (t *Tunnel) onUploadTestRequest(sessionID string, payload []byte) error {
+	req := &pb.UploadTestRequest{}
+	if err := proto.Unmarshal(payload, req); err != nil {
+		return err
+	}
+
+	if req.Action == pb.UploadTestRequest_STOP {
+		if t.uploadTester.IsTesting.Load() && t.uploadTester.SessionID == req.SessionId {
+			t.stopUploadTest(true, "")
+		}
+	}
+	return nil
+}
+
+func (t *Tunnel) stopUploadTest(success bool, errMsg string) {
+	if !t.uploadTester.IsTesting.Swap(false) {
+		return
+	}
+
+	if t.uploadTester.Timer != nil {
+		t.uploadTester.Timer.Stop()
+	}
+
+	durationMs := time.Since(t.uploadTester.StartTime).Milliseconds()
+	totalBytes := t.uploadTester.TotalBytes.Load()
+	mbps := 0.0
+	if durationMs > 0 {
+		mbps = float64(totalBytes*8) / float64(durationMs*1000)
+	}
+
+	result := &pb.UploadTestResult{
+		SessionId:  t.uploadTester.SessionID,
+		NodeId:     t.opts.Id,
+		TotalBytes: totalBytes,
+		DurationMs: int32(durationMs),
+		Mbps:       mbps,
+		Success:    success,
+		ErrorMsg:   errMsg,
+	}
+
+	logx.Infof("Tunnel %s upload test finished, session:%s, success:%v, mbps:%.2f", t.opts.Id, t.uploadTester.SessionID, success, mbps)
+
+	select {
+	case t.uploadTester.ResultChan <- result:
+	default:
+	}
+}
+
+// great than 0.1.1
 func (t *Tunnel) isNodeVersionGreatThanV100() bool {
 	return semver.Compare("v"+t.opts.Version, "v1.0.0") > 0
 }

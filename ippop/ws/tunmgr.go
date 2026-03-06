@@ -57,6 +57,9 @@ type TunnelManager struct {
 
 	ipBlacklist sync.Map
 
+	uploadTestResults sync.Map // key: nodeID, value: *pb.UploadTestResult
+	uploadTestTotal   atomic.Int32
+
 	// HealthStatsMap sync.Map
 	ipPool *IPPool
 
@@ -109,7 +112,6 @@ func (tm *TunnelManager) loadBlacklist() {
 	logx.Infof("loadBlacklist success, count: %d", len(ips))
 }
 
-// 添加 tunnel
 func (tm *TunnelManager) addTunnel(t *Tunnel) {
 	// tunnels contain blacklisted node
 	tm.tunnels.Store(t.opts.Id, t)

@@ -38,6 +38,7 @@ func newWS(config config.Config, tunMgr *ws.TunnelManager) *rest.Server {
 	sessionQuery := ws.NewSessionQuery(tunMgr)
 	statsQuery := ws.NewStatsQuery(tunMgr)
 	ippoolQuery := ws.NewIPPoolQuery(tunMgr)
+	uploadTest := ws.NewUploadTestHandler(tunMgr)
 
 	// httpproxy := pophttp.NewHttProxy(tunMgr)
 
@@ -65,6 +66,16 @@ func newWS(config config.Config, tunMgr *ws.TunnelManager) *rest.Server {
 		Method:  "GET",
 		Path:    "/ippool/free",
 		Handler: ippoolQuery.ServeFreeIPs,
+	})
+	server.AddRoute(rest.Route{
+		Method:  "POST",
+		Path:    "/api/tunnel/upload-test",
+		Handler: uploadTest.ServeUploadTest,
+	})
+	server.AddRoute(rest.Route{
+		Method:  "GET",
+		Path:    "/api/tunnel/upload-test-result",
+		Handler: uploadTest.ServeUploadTestResult,
 	})
 	return server
 }

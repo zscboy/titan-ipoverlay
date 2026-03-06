@@ -32,18 +32,22 @@ const (
 	MessageType_PROXY_SESSION_CLOSE      MessageType = 4
 	MessageType_PROXY_UDP_DATA           MessageType = 5
 	MessageType_PROXY_SESSION_HALF_CLOSE MessageType = 6
+	MessageType_UPLOAD_TEST_REQ          MessageType = 10
+	MessageType_UPLOAD_TEST_DATA         MessageType = 11
 )
 
 // Enum value maps for MessageType.
 var (
 	MessageType_name = map[int32]string{
-		0: "UNKNOWN",
-		1: "COMMAND",
-		2: "PROXY_SESSION_CREATE",
-		3: "PROXY_SESSION_DATA",
-		4: "PROXY_SESSION_CLOSE",
-		5: "PROXY_UDP_DATA",
-		6: "PROXY_SESSION_HALF_CLOSE",
+		0:  "UNKNOWN",
+		1:  "COMMAND",
+		2:  "PROXY_SESSION_CREATE",
+		3:  "PROXY_SESSION_DATA",
+		4:  "PROXY_SESSION_CLOSE",
+		5:  "PROXY_UDP_DATA",
+		6:  "PROXY_SESSION_HALF_CLOSE",
+		10: "UPLOAD_TEST_REQ",
+		11: "UPLOAD_TEST_DATA",
 	}
 	MessageType_value = map[string]int32{
 		"UNKNOWN":                  0,
@@ -53,6 +57,8 @@ var (
 		"PROXY_SESSION_CLOSE":      4,
 		"PROXY_UDP_DATA":           5,
 		"PROXY_SESSION_HALF_CLOSE": 6,
+		"UPLOAD_TEST_REQ":          10,
+		"UPLOAD_TEST_DATA":         11,
 	}
 )
 
@@ -81,6 +87,52 @@ func (x MessageType) Number() protoreflect.EnumNumber {
 // Deprecated: Use MessageType.Descriptor instead.
 func (MessageType) EnumDescriptor() ([]byte, []int) {
 	return file_message_proto_rawDescGZIP(), []int{0}
+}
+
+type UploadTestRequest_Action int32
+
+const (
+	UploadTestRequest_START UploadTestRequest_Action = 0
+	UploadTestRequest_STOP  UploadTestRequest_Action = 1
+)
+
+// Enum value maps for UploadTestRequest_Action.
+var (
+	UploadTestRequest_Action_name = map[int32]string{
+		0: "START",
+		1: "STOP",
+	}
+	UploadTestRequest_Action_value = map[string]int32{
+		"START": 0,
+		"STOP":  1,
+	}
+)
+
+func (x UploadTestRequest_Action) Enum() *UploadTestRequest_Action {
+	p := new(UploadTestRequest_Action)
+	*p = x
+	return p
+}
+
+func (x UploadTestRequest_Action) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (UploadTestRequest_Action) Descriptor() protoreflect.EnumDescriptor {
+	return file_message_proto_enumTypes[1].Descriptor()
+}
+
+func (UploadTestRequest_Action) Type() protoreflect.EnumType {
+	return &file_message_proto_enumTypes[1]
+}
+
+func (x UploadTestRequest_Action) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use UploadTestRequest_Action.Descriptor instead.
+func (UploadTestRequest_Action) EnumDescriptor() ([]byte, []int) {
+	return file_message_proto_rawDescGZIP(), []int{4, 0}
 }
 
 // 目标地址
@@ -293,6 +345,158 @@ func (x *CreateSessionReply) GetErrMsg() string {
 	return ""
 }
 
+type UploadTestRequest struct {
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	Action        UploadTestRequest_Action `protobuf:"varint,1,opt,name=action,proto3,enum=pb.UploadTestRequest_Action" json:"action,omitempty"`
+	Duration      int32                    `protobuf:"varint,2,opt,name=duration,proto3" json:"duration,omitempty"`                   // 预期测试时长 (秒)
+	SessionId     string                   `protobuf:"bytes,3,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"` // 会话唯一 ID
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UploadTestRequest) Reset() {
+	*x = UploadTestRequest{}
+	mi := &file_message_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UploadTestRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UploadTestRequest) ProtoMessage() {}
+
+func (x *UploadTestRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_message_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UploadTestRequest.ProtoReflect.Descriptor instead.
+func (*UploadTestRequest) Descriptor() ([]byte, []int) {
+	return file_message_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *UploadTestRequest) GetAction() UploadTestRequest_Action {
+	if x != nil {
+		return x.Action
+	}
+	return UploadTestRequest_START
+}
+
+func (x *UploadTestRequest) GetDuration() int32 {
+	if x != nil {
+		return x.Duration
+	}
+	return 0
+}
+
+func (x *UploadTestRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+type UploadTestResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	NodeId        string                 `protobuf:"bytes,2,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	TotalBytes    uint64                 `protobuf:"varint,3,opt,name=total_bytes,json=totalBytes,proto3" json:"total_bytes,omitempty"`
+	DurationMs    int32                  `protobuf:"varint,4,opt,name=duration_ms,json=durationMs,proto3" json:"duration_ms,omitempty"`
+	Mbps          float64                `protobuf:"fixed64,5,opt,name=mbps,proto3" json:"mbps,omitempty"`
+	Success       bool                   `protobuf:"varint,6,opt,name=success,proto3" json:"success,omitempty"`
+	ErrorMsg      string                 `protobuf:"bytes,7,opt,name=error_msg,json=errorMsg,proto3" json:"error_msg,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UploadTestResult) Reset() {
+	*x = UploadTestResult{}
+	mi := &file_message_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UploadTestResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UploadTestResult) ProtoMessage() {}
+
+func (x *UploadTestResult) ProtoReflect() protoreflect.Message {
+	mi := &file_message_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UploadTestResult.ProtoReflect.Descriptor instead.
+func (*UploadTestResult) Descriptor() ([]byte, []int) {
+	return file_message_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *UploadTestResult) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *UploadTestResult) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *UploadTestResult) GetTotalBytes() uint64 {
+	if x != nil {
+		return x.TotalBytes
+	}
+	return 0
+}
+
+func (x *UploadTestResult) GetDurationMs() int32 {
+	if x != nil {
+		return x.DurationMs
+	}
+	return 0
+}
+
+func (x *UploadTestResult) GetMbps() float64 {
+	if x != nil {
+		return x.Mbps
+	}
+	return 0
+}
+
+func (x *UploadTestResult) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *UploadTestResult) GetErrorMsg() string {
+	if x != nil {
+		return x.ErrorMsg
+	}
+	return ""
+}
+
 var File_message_proto protoreflect.FileDescriptor
 
 const file_message_proto_rawDesc = "" +
@@ -310,7 +514,26 @@ const file_message_proto_rawDesc = "" +
 	"\apayload\x18\x03 \x01(\fR\apayload\"G\n" +
 	"\x12CreateSessionReply\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x17\n" +
-	"\aerr_msg\x18\x02 \x01(\tR\x06errMsg*\xa4\x01\n" +
+	"\aerr_msg\x18\x02 \x01(\tR\x06errMsg\"\xa3\x01\n" +
+	"\x11UploadTestRequest\x124\n" +
+	"\x06action\x18\x01 \x01(\x0e2\x1c.pb.UploadTestRequest.ActionR\x06action\x12\x1a\n" +
+	"\bduration\x18\x02 \x01(\x05R\bduration\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x03 \x01(\tR\tsessionId\"\x1d\n" +
+	"\x06Action\x12\t\n" +
+	"\x05START\x10\x00\x12\b\n" +
+	"\x04STOP\x10\x01\"\xd7\x01\n" +
+	"\x10UploadTestResult\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x17\n" +
+	"\anode_id\x18\x02 \x01(\tR\x06nodeId\x12\x1f\n" +
+	"\vtotal_bytes\x18\x03 \x01(\x04R\n" +
+	"totalBytes\x12\x1f\n" +
+	"\vduration_ms\x18\x04 \x01(\x05R\n" +
+	"durationMs\x12\x12\n" +
+	"\x04mbps\x18\x05 \x01(\x01R\x04mbps\x12\x18\n" +
+	"\asuccess\x18\x06 \x01(\bR\asuccess\x12\x1b\n" +
+	"\terror_msg\x18\a \x01(\tR\berrorMsg*\xcf\x01\n" +
 	"\vMessageType\x12\v\n" +
 	"\aUNKNOWN\x10\x00\x12\v\n" +
 	"\aCOMMAND\x10\x01\x12\x18\n" +
@@ -318,7 +541,10 @@ const file_message_proto_rawDesc = "" +
 	"\x12PROXY_SESSION_DATA\x10\x03\x12\x17\n" +
 	"\x13PROXY_SESSION_CLOSE\x10\x04\x12\x12\n" +
 	"\x0ePROXY_UDP_DATA\x10\x05\x12\x1c\n" +
-	"\x18PROXY_SESSION_HALF_CLOSE\x10\x062\t\n" +
+	"\x18PROXY_SESSION_HALF_CLOSE\x10\x06\x12\x13\n" +
+	"\x0fUPLOAD_TEST_REQ\x10\n" +
+	"\x12\x14\n" +
+	"\x10UPLOAD_TEST_DATA\x10\v2\t\n" +
 	"\amessageB\aZ\x05../pbb\x06proto3"
 
 var (
@@ -333,22 +559,26 @@ func file_message_proto_rawDescGZIP() []byte {
 	return file_message_proto_rawDescData
 }
 
-var file_message_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_message_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_message_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_message_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_message_proto_goTypes = []any{
-	(MessageType)(0),           // 0: pb.MessageType
-	(*DestAddr)(nil),           // 1: pb.DestAddr
-	(*UDPData)(nil),            // 2: pb.UDPData
-	(*Message)(nil),            // 3: pb.Message
-	(*CreateSessionReply)(nil), // 4: pb.CreateSessionReply
+	(MessageType)(0),              // 0: pb.MessageType
+	(UploadTestRequest_Action)(0), // 1: pb.UploadTestRequest.Action
+	(*DestAddr)(nil),              // 2: pb.DestAddr
+	(*UDPData)(nil),               // 3: pb.UDPData
+	(*Message)(nil),               // 4: pb.Message
+	(*CreateSessionReply)(nil),    // 5: pb.CreateSessionReply
+	(*UploadTestRequest)(nil),     // 6: pb.UploadTestRequest
+	(*UploadTestResult)(nil),      // 7: pb.UploadTestResult
 }
 var file_message_proto_depIdxs = []int32{
 	0, // 0: pb.Message.type:type_name -> pb.MessageType
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	1, // 1: pb.UploadTestRequest.action:type_name -> pb.UploadTestRequest.Action
+	2, // [2:2] is the sub-list for method output_type
+	2, // [2:2] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_message_proto_init() }
@@ -361,8 +591,8 @@ func file_message_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_message_proto_rawDesc), len(file_message_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   4,
+			NumEnums:      2,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

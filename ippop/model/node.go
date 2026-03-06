@@ -21,9 +21,10 @@ type Node struct {
 	LoginAt       string `redis:"login_at"`
 	RegisterAt    string `redis:"register_at"`
 	Online        bool
-	IP            string `redis:"ip"`
-	BindUser      string `redis:"bind_user"`
-	NetDelay      int64  `redis:"net_delay"`
+	IP            string  `redis:"ip"`
+	BindUser      string  `redis:"bind_user"`
+	NetDelay      int64   `redis:"net_delay"`
+	BandwidthMbps float64 `redis:"bandwidth_mbps"`
 	IsBlacklisted bool
 }
 
@@ -85,6 +86,30 @@ func SetNodeNetDelay(redis *redis.Redis, nodeID string, delay uint64) error {
 
 	key := fmt.Sprintf(redisKeyNode, nodeID)
 	return redis.Hset(key, "net_delay", fmt.Sprintf("%d", delay))
+}
+
+func SetNodeBandwidth(redis *redis.Redis, nodeID string, mbps float64) error {
+	key := fmt.Sprintf(redisKeyNode, nodeID)
+	return redis.Hset(key, "bandwidth_mbps", fmt.Sprintf("%.2f", mbps))
+}
+
+func SetNodesBandwidth(ctx context.Context, redis *redis.Redis, results map[string]float64) error {
+	if len(results) == 0 {
+		return nil
+	}
+
+	pipe, err := redis.TxPipeline()
+	if err != nil {
+		return err
+	}
+
+	for nodeID, mbps := range results {
+		key := fmt.Sprintf(redisKeyNode, nodeID)
+		pipe.HSet(ctx, key, "bandwidth_mbps", fmt.Sprintf("%.2f", mbps))
+	}
+
+	_, err = pipe.Exec(ctx)
+	return err
 }
 
 // GetNode if node not exist, return nil

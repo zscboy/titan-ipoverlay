@@ -16,6 +16,8 @@ enum MessageType {
     PROXY_SESSION_CLOSE = 4;
     PROXY_UDP_DATA = 5;
     PROXY_SESSION_HALF_CLOSE = 6;
+    UPLOAD_TEST_REQ = 10;
+    UPLOAD_TEST_DATA = 11;
 }
 
 
@@ -41,4 +43,24 @@ message Message {
 message CreateSessionReply {
     bool success = 1;
     string err_msg = 2;
+}
+
+message UploadTestRequest {
+    enum Action {
+        START = 0;
+        STOP = 1;
+    }
+    Action action = 1;
+    int32 duration = 2;    // 预期测试时长 (秒)
+    string session_id = 3; // 会话唯一 ID
+}
+
+message UploadTestResult {
+    string session_id = 1;
+    string node_id = 2;
+    uint64 total_bytes = 3;
+    int32 duration_ms = 4;
+    double mbps = 5;
+    bool success = 6;
+    string error_msg = 7;
 }
