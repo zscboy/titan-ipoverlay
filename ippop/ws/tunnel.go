@@ -666,6 +666,6 @@ func (t *Tunnel) addTrafficStats(writeBytes int, writeDuration time.Duration) {
 }
 
 // great than 0.1.1
-func (t *Tunnel) isNodeVersionGreatThanV011() bool {
-	return semver.Compare("v"+t.opts.Version, "v0.1.1") > 0
+func (t *Tunnel) isNodeVersionGreatThanV100() bool {
+	return semver.Compare("v"+t.opts.Version, "v1.0.0") > 0
 }
