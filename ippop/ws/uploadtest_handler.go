@@ -3,6 +3,7 @@ package ws
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"sync"
 
@@ -14,7 +15,7 @@ import (
 )
 
 type UploadTestReq struct {
-	NodeIDs  []string `json:"node_ids"`
+	NodeIDs  []string `json:"node_ids,optional"`
 	Count    int      `json:"count"`    // take count IPs from pool
 	Duration int      `json:"duration"` // seconds
 }
@@ -32,7 +33,17 @@ func NewUploadTestHandler(tunMgr *TunnelManager) *UploadTestHandler {
 	return &UploadTestHandler{tunMgr: tunMgr}
 }
 
+func (h *UploadTestHandler) isLocalRequest(r *http.Request) bool {
+	host, _, _ := net.SplitHostPort(r.RemoteAddr)
+	return host == "127.0.0.1" || host == "::1" || host == "localhost"
+}
+
 func (h *UploadTestHandler) ServeUploadTest(w http.ResponseWriter, r *http.Request) {
+	if !h.isLocalRequest(r) {
+		httpx.ErrorCtx(r.Context(), w, fmt.Errorf("forbidden: only 127.0.0.1 is allowed"))
+		return
+	}
+
 	var req UploadTestReq
 	if err := httpx.Parse(r, &req); err != nil {
 		httpx.ErrorCtx(r.Context(), w, err)
@@ -147,6 +158,11 @@ type UploadTestResultReq struct {
 }
 
 func (h *UploadTestHandler) ServeUploadTestResult(w http.ResponseWriter, r *http.Request) {
+	if !h.isLocalRequest(r) {
+		httpx.ErrorCtx(r.Context(), w, fmt.Errorf("forbidden: only 127.0.0.1 is allowed"))
+		return
+	}
+
 	var req UploadTestResultReq
 	if err := httpx.Parse(r, &req); err != nil {
 		httpx.ErrorCtx(r.Context(), w, err)
