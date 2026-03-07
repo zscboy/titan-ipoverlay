@@ -106,7 +106,7 @@ func (proxy *TCPProxy) proxyConn() error {
 	for {
 		n, err := conn.Read(buf)
 		if err != nil {
-			if err == io.EOF && proxy.tunnel.isNodeVersionGreatThanV011() {
+			if err == io.EOF && proxy.tunnel.isNodeVersionGreatThanV100() {
 				logx.Infof("session %s: SOCKS5 client closed write direction (EOF)", proxy.id)
 
 				proxy.tunnel.onProxyTCPConnHalfClose(proxy.id)

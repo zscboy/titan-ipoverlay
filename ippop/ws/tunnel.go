@@ -283,7 +283,7 @@ func (t *Tunnel) notifySessionCreateRequest(sessionID string, payload []byte) er
 }
 
 func (t *Tunnel) onProxySessionCreateReply(sessionID string, payload []byte) error {
-	if !t.isNodeVersionGreatThanV011() {
+	if !t.isNodeVersionGreatThanV100() {
 		return t.notifySessionCreateRequest(sessionID, payload)
 	}
 
@@ -427,7 +427,7 @@ func (t *Tunnel) acceptSocks5TCPConn(conn net.Conn, targetInfo *socks5.SocksTarg
 }
 
 func (t *Tunnel) createClientWithDest(dest *pb.DestAddr, sessionID string) error {
-	if t.isNodeVersionGreatThanV011() {
+	if t.isNodeVersionGreatThanV100() {
 		return t.createClientWithDestV2(dest, sessionID)
 	}
 	return t.createClientWithDestV1(dest, sessionID)
@@ -665,7 +665,7 @@ func (t *Tunnel) addTrafficStats(writeBytes int, writeDuration time.Duration) {
 	t.trafficStats.DataProcessDuration = time.Now().Sub(t.trafficStats.DataProcessStartTime) - writeDuration
 }
 
-// great than 0.1.1
+// great than 1.0.0
 func (t *Tunnel) isNodeVersionGreatThanV100() bool {
 	return semver.Compare("v"+t.opts.Version, "v1.0.0") > 0
 }
