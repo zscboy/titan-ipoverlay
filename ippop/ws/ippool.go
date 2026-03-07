@@ -309,3 +309,27 @@ func (p *IPPool) GetFreeIPsFromTail(count int) []FreeIPInfo {
 	}
 	return res
 }
+
+// GetFreeIPsFromHead retrieves free IPs from the head of the free list.
+func (p *IPPool) GetFreeIPsFromHead(count int) []FreeIPInfo {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if count <= 0 {
+		return nil
+	}
+
+	res := make([]FreeIPInfo, 0, count)
+	for e := p.freeList.Front(); e != nil && len(res) < count; e = e.Next() {
+		entry := e.Value.(*ipEntry)
+		nodeIDs := make([]string, 0, len(entry.tunnels))
+		for nodeID := range entry.tunnels {
+			nodeIDs = append(nodeIDs, nodeID)
+		}
+		res = append(res, FreeIPInfo{
+			IP:      entry.ip,
+			NodeIDs: nodeIDs,
+		})
+	}
+	return res
+}

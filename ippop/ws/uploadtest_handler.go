@@ -15,6 +15,7 @@ import (
 
 type UploadTestReq struct {
 	NodeIDs  []string `json:"node_ids"`
+	Count    int      `json:"count"`    // take count IPs from pool
 	Duration int      `json:"duration"` // seconds
 }
 
@@ -38,8 +39,24 @@ func (h *UploadTestHandler) ServeUploadTest(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	if len(req.NodeIDs) == 0 {
-		httpx.ErrorCtx(r.Context(), w, fmt.Errorf("node_ids is required"))
+	nodeIDs := req.NodeIDs
+	if req.Count > 0 {
+		poolNodes := h.tunMgr.GetTunnelsFromPool(req.Count)
+		// Merge and deduplicate
+		nodeMap := make(map[string]struct{})
+		for _, id := range nodeIDs {
+			nodeMap[id] = struct{}{}
+		}
+		for _, id := range poolNodes {
+			if _, ok := nodeMap[id]; !ok {
+				nodeIDs = append(nodeIDs, id)
+				nodeMap[id] = struct{}{}
+			}
+		}
+	}
+
+	if len(nodeIDs) == 0 {
+		httpx.ErrorCtx(r.Context(), w, fmt.Errorf("node_ids or count is required"))
 		return
 	}
 
@@ -48,8 +65,8 @@ func (h *UploadTestHandler) ServeUploadTest(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Limit max batch size to 2000
-	if len(req.NodeIDs) > 2000 {
-		httpx.ErrorCtx(r.Context(), w, fmt.Errorf("too many node_ids, max 2000"))
+	if len(nodeIDs) > 2000 {
+		httpx.ErrorCtx(r.Context(), w, fmt.Errorf("too many nodes to test, max 2000 (requested %d)", len(nodeIDs)))
 		return
 	}
 
@@ -63,7 +80,7 @@ func (h *UploadTestHandler) ServeUploadTest(w http.ResponseWriter, r *http.Reque
 
 	// Clear old results and set new total
 	h.tunMgr.ClearUploadTestResults()
-	h.tunMgr.SetUploadTestTotal(len(req.NodeIDs))
+	h.tunMgr.SetUploadTestTotal(len(nodeIDs))
 
 	// Async start tests
 	go func() {
@@ -71,7 +88,7 @@ func (h *UploadTestHandler) ServeUploadTest(w http.ResponseWriter, r *http.Reque
 		var mu sync.Mutex
 		var wg sync.WaitGroup
 
-		for _, nodeID := range req.NodeIDs {
+		for _, nodeID := range nodeIDs {
 			tun := h.tunMgr.GetLocalTunnel(nodeID)
 			if tun == nil {
 				h.tunMgr.SaveUploadTestResult(&pb.UploadTestResult{
@@ -121,7 +138,7 @@ func (h *UploadTestHandler) ServeUploadTest(w http.ResponseWriter, r *http.Reque
 		}
 	}()
 
-	httpx.OkJsonCtx(r.Context(), w, map[string]string{"status": "test_initiated", "count": fmt.Sprintf("%d", len(req.NodeIDs))})
+	httpx.OkJsonCtx(r.Context(), w, map[string]string{"status": "test_initiated", "count": fmt.Sprintf("%d", len(nodeIDs))})
 }
 
 type UploadTestResultReq struct {

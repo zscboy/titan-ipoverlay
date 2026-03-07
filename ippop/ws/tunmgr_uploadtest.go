@@ -71,3 +71,17 @@ func (tm *TunnelManager) GetUploadTestStats() *UploadTestStats {
 	}
 	return stats
 }
+
+func (tm *TunnelManager) GetTunnelsFromPool(count int) []string {
+	if count <= 0 {
+		return nil
+	}
+	freeIPs := tm.ipPool.GetFreeIPsFromHead(count)
+	nodeIDs := make([]string, 0, len(freeIPs))
+	for _, info := range freeIPs {
+		if len(info.NodeIDs) > 0 {
+			nodeIDs = append(nodeIDs, info.NodeIDs[0]) // just take the first tunnel for this IP
+		}
+	}
+	return nodeIDs
+}
