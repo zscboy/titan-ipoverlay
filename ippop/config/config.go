@@ -81,6 +81,25 @@ type PerfMonitoring struct {
 	AbnormalDurationSeconds int64 `json:",default=60"` // 异常会话阈值（秒）
 }
 
+type QoSConf struct {
+	//lint:ignore SA5008 go-zero allows "default" in struct tags
+	RedlineSpeedKbps int64 `json:",default=300"`
+	//lint:ignore SA5008 go-zero allows "default" in struct tags
+	CircuitBreakerKbps int64 `json:",default=50"`
+	//lint:ignore SA5008 go-zero allows "default" in struct tags
+	PatienceWindowSec int64 `json:",default=10"`
+	//lint:ignore SA5008 go-zero allows "default" in struct tags
+	RollingWindowSec int64 `json:",default=15"`
+	//lint:ignore SA5008 go-zero allows "default" in struct tags
+	StrikeLimit int64 `json:",default=3"`
+	//lint:ignore SA5008 go-zero allows "default" in struct tags
+	EwmaAlpha float64 `json:",default=0.2"`
+	//lint:ignore SA5008 go-zero allows "default" in struct tags
+	EnableBandwidthBlacklist bool `json:",default=false"`
+	//lint:ignore SA5008 go-zero allows "default" in struct tags
+	ProbationDurationSec int64 `json:",default=3600"`
+}
+
 type ClickHouse struct {
 	Enable   bool
 	Addr     string // e.g., "127.0.0.1:9000"
@@ -109,6 +128,9 @@ type Config struct {
 
 	//lint:ignore SA5008 go-zero allows "optional" in struct tags
 	ClickHouse ClickHouse `json:",optional"`
+
+	//lint:ignore SA5008 go-zero allows "optional" in struct tags
+	QoS QoSConf `json:",optional"`
 
 	JwtAuth JwtAuth
 	Socks5  Socks5
