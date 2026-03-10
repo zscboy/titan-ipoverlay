@@ -898,3 +898,7 @@ func (t *Tunnel) stopUploadTest(success bool, errMsg string) {
 func (t *Tunnel) isNodeVersionGreatThanV100() bool {
 	return semver.Compare("v"+t.opts.Version, "v1.0.0") > 0
 }
+
+func (t *Tunnel) addUserTrafficStats(username string, downloadTraffic int64, uploadTraffic int64) {
+	t.tunMgr.addUserTrafficStats(username, downloadTraffic, uploadTraffic)
+}
