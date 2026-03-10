@@ -35,7 +35,7 @@ func (p *HttpProxy) HandleProxy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		logx.Errorf("user auth %v", err.Error())
+		logx.Errorf("user auth %v, remote:%s", err.Error(), r.RemoteAddr)
 		w.Header().Set("Proxy-Authenticate", `Basic realm="Restricted"`)
 		w.WriteHeader(http.StatusProxyAuthRequired)
 		_, _ = w.Write([]byte("407 Proxy Authentication Required\n"))

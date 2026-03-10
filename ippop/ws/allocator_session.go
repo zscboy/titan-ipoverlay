@@ -12,7 +12,7 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
-const defaultMaxErrorCount = 3
+const defaultMaxErrorCount = 5
 
 type sessionKey struct {
 	username  string
