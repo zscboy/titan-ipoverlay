@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 	"titan-ipoverlay/ippop/model"
 	"titan-ipoverlay/ippop/socks5"
@@ -26,7 +27,20 @@ type UserSession struct {
 	connectCount int32         // Reference count of active connections
 	disconnectAt time.Time     // Time when connectCount became zero
 	idleElement  *list.Element // Pointer to the element in SessionManager's idleList
+	errorCount   int32         // Cumulative error count
 	isEphemeral  bool          // If true, release node immediately when count reaches zero
+}
+
+func (s *UserSession) ReportError() int32 {
+	return atomic.AddInt32(&s.errorCount, 1)
+}
+
+func (s *UserSession) ResetError() {
+	atomic.StoreInt32(&s.errorCount, 0)
+}
+
+func (s *UserSession) GetErrorCount() int32 {
+	return atomic.LoadInt32(&s.errorCount)
 }
 
 // NodeAllocator is the interface for different node assignment strategies.

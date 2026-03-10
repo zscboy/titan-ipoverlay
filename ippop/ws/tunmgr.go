@@ -389,7 +389,15 @@ func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks
 		defer tm.sessionManager.Decrement(userSession)
 	}
 
-	return tun.acceptSocks5TCPConn(tcpConn, targetInfo)
+	err = tun.acceptSocks5TCPConn(tcpConn, targetInfo)
+	if err != nil {
+		if userSession != nil {
+			userSession.ReportError()
+		}
+	} else if userSession != nil {
+		userSession.ResetError()
+	}
+	return err
 }
 
 func (tm *TunnelManager) HandleSocks5UDP(udpConn socks5.UDPConn, udpInfo *socks5.Socks5UDPInfo, data []byte) error {

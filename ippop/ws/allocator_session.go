@@ -12,6 +12,8 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
+const defaultMaxErrorCount = 3
+
 type sessionKey struct {
 	username  string
 	sessionID string
@@ -23,6 +25,7 @@ type SessionManager struct {
 	idleList       *list.List
 	expireDuration time.Duration
 	source         NodeSource
+	maxErrorCount  int32
 }
 
 func NewSessionManager(source NodeSource, expire time.Duration) *SessionManager {
@@ -31,6 +34,7 @@ func NewSessionManager(source NodeSource, expire time.Duration) *SessionManager 
 		idleList:       list.New(),
 		expireDuration: expire,
 		source:         source,
+		maxErrorCount:  defaultMaxErrorCount, // Default threshold
 	}
 	go sm.cleanerTask()
 	return sm
@@ -230,10 +234,18 @@ func (a *SessionAllocator) Allocate(user *model.User, target *socks5.SocksTarget
 	// Atomic Lookup and Activation
 	sess, tun := a.sm.GetAndActivate(user.UserName, target.Session)
 	if tun != nil {
-		return tun, sess, nil
+		// If error count threshold reached, trigger re-allocation
+		if sess.GetErrorCount() < a.sm.maxErrorCount {
+			return tun, sess, nil
+		}
+		logx.Infof("SessionManager: session %s for user %s reached error threshold %d, triggering re-allocation", target.Session, user.UserName, sess.GetErrorCount())
+		// Release old node/IP
+		a.source.ReleaseExclusiveNodes([]string{sess.deviceID}, []string{sess.exitIP})
+		// Clear current allocation to trigger new one
+		a.sm.UpdateAllocation(sess, "", "")
 	}
 
-	// If we reach here, either sess is nil OR tun is dead.
+	// If we reach here, either sess is nil OR tun is dead OR it reached error threshold.
 	// Allocate new exclusive node
 	exitIP, tun, err := a.source.AcquireExclusiveNode(context.Background())
 	if err != nil {
@@ -245,6 +257,8 @@ func (a *SessionAllocator) Allocate(user *model.User, target *socks5.SocksTarget
 	} else {
 		// Update existing session with new device node and IP
 		a.sm.UpdateAllocation(sess, tun.opts.Id, exitIP)
+		// Reset error count on successful re-allocation
+		sess.ResetError()
 	}
 
 	a.sm.Activate(sess)
