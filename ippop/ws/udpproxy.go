@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"fmt"
 	"net"
 	"time"
 	"titan-ipoverlay/ippop/socks5"
@@ -35,7 +36,7 @@ func newProxyUDP(id string, conn socks5.UDPConn, udpInfo *socks5.Socks5UDPInfo, 
 		activeTime: time.Now(),
 		timeout:    timeout,
 		done:       make(chan struct{}),
-		perfStats:  NewSessionPerfStats(id, udpInfo.UserName, udpInfo.Dest, t.opts.CountryCode, &t.tunMgr.config.PerfMonitoring, t.tunMgr.perfCollector),
+		perfStats:  NewSessionPerfStats(id, udpInfo.UserName, udpInfo.Dest, t.opts.CountryCode, t.tunMgr.perfCollector.nodeID, t.opts.Id, &t.tunMgr.config.PerfMonitoring, &t.tunMgr.config.QoS, t.tunMgr.perfCollector),
 	}
 }
 
@@ -98,6 +99,23 @@ func (proxy *UDPProxy) stop() {
 	proxy.once.Do(func() {
 		close(proxy.done)
 		if proxy.perfStats != nil {
+			// QoS 结算：三振出局制 (柔性降级)
+			t3Bytes := proxy.perfStats.T3BytesSent.Load()
+			t3Dur := time.Duration(proxy.perfStats.T3Duration.Load()).Seconds()
+			if t3Dur > 0 {
+				speedMBps := (float64(t3Bytes) / t3Dur) / 1024 / 1024
+				redlineMBps := float64(proxy.tunnel.tunMgr.config.QoS.RedlineSpeedKbps) / 1024.0
+
+				// 仅对有一定流量的 UDP 会话进行打分
+				if t3Bytes > 2*1024 {
+					if speedMBps < redlineMBps {
+						proxy.tunnel.tunMgr.AddStrike(proxy.tunnel.opts.Id, proxy.tunnel.opts.IP,
+							fmt.Sprintf("UDP Session slow: %.2fKBps < %vKBps", speedMBps*1024, proxy.tunnel.tunMgr.config.QoS.RedlineSpeedKbps))
+					} else {
+						proxy.tunnel.tunMgr.ClearStrike(proxy.tunnel.opts.Id)
+					}
+				}
+			}
 			proxy.perfStats.Close()
 		}
 	})
@@ -117,4 +135,8 @@ func (proxy *UDPProxy) waitTimeout() {
 			}
 		}
 	}
+}
+
+func (proxy *UDPProxy) GetPerfStats() *SessionPerfStats {
+	return proxy.perfStats
 }

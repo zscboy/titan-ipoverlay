@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -93,20 +94,58 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 	go tm.setNodeOnlineDataExpire()
 	go tm.startUserTrafficTimer()
 	go tm.perfCollector.Start()
+	go tm.syncBlacklistLoop()
 	return tm
 }
 
+func (tm *TunnelManager) syncBlacklistLoop() {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		tm.loadBlacklist()
+	}
+}
+
 func (tm *TunnelManager) loadBlacklist() {
+	// 1. 获取所有过期的假释 IP，并从黑名单和 ZSET 中原子移除 (O(1) 网络开销)
+	expiredIPs, err := model.ProcessExpiredProbations(tm.redis)
+	if err != nil {
+		logx.Errorf("QoS: Failed to process expired probations: %v", err)
+	}
+	if len(expiredIPs) > 0 {
+		logx.Infof("QoS: Probation period ended for IPs %v, removed from Redis SET", expiredIPs)
+	}
+
 	ips, err := model.GetBlacklist(tm.redis)
 	if err != nil {
 		logx.Errorf("loadBlacklist error: %v", err)
 		return
 	}
 
+	currentIPs := make(map[string]struct{})
 	for _, ip := range ips {
-		tm.ipBlacklist.Store(ip, struct{}{})
+		currentIPs[ip] = struct{}{}
 	}
-	logx.Infof("loadBlacklist success, count: %d", len(ips))
+
+	// 移除本地已解封的 IP
+	tm.ipBlacklist.Range(func(key, value interface{}) bool {
+		ip := key.(string)
+		if _, ok := currentIPs[ip]; !ok {
+			logx.Infof("QoS: IP %s has been removed from Redis blacklist, re-activating locally", ip)
+			tm.ipBlacklist.Delete(ip)
+			tm.ipPool.ActivateIP(ip)
+		}
+		return true
+	})
+
+	// 更新本地新增的黑名单 IP
+	for _, ip := range ips {
+		if _, ok := tm.ipBlacklist.Load(ip); !ok {
+			tm.ipBlacklist.Store(ip, struct{}{})
+			tm.ipPool.DeactivateIP(ip)
+		}
+	}
 }
 
 func (tm *TunnelManager) addTunnel(t *Tunnel) {
@@ -145,6 +184,94 @@ func (tm *TunnelManager) getShardIndex(nodeID string) uint32 {
 		return uint32(nodeID[n-1]) % acceptLockShards
 	}
 	return 0
+}
+
+// BlacklistNode 将节点拉黑 (异步写 Redis 和审计日志)
+func (tm *TunnelManager) BlacklistNode(ip string, nodeID string, reason string) {
+	logx.Errorf("QoS: Blacklisting node %s (IP: %s), Reason: %s", nodeID, ip, reason)
+
+	// 异步更新 Redis 黑名单
+	go func() {
+		// 如果开关关闭，直接跳过自动拉黑逻辑
+		if !tm.config.QoS.EnableBandwidthBlacklist {
+			logx.Infof("QoS: Bandwidth blacklist is disabled in config. Skipping automatic blacklist for IP %s", ip)
+			return
+		}
+
+		if err := model.AddBlacklist(tm.redis, []string{ip}); err != nil {
+			logx.Errorf("QoS: Failed to add IP %s to Redis blacklist: %v", ip, err)
+		}
+
+		// 如果是带宽原因触发的黑名单，设置一个“自动假释期” (TTL)
+		// 这样即便 py_check 不跑，节点也会在过期后自动尝试返回
+		if strings.Contains(reason, "bandwidth") || strings.Contains(reason, "Strike") || strings.Contains(reason, "Circuit") {
+			probationSeconds := tm.config.QoS.ProbationDurationSec
+			if probationSeconds <= 0 {
+				probationSeconds = 3600 // 默认 60 分钟
+			}
+			expireTime := time.Now().Unix() + probationSeconds
+			if err := model.AddProbation(tm.redis, ip, expireTime); err != nil {
+				logx.Errorf("QoS: Failed to add IP %s to probation set: %v", ip, err)
+			}
+			logx.Infof("QoS: IP %s set with %d-second probation period", ip, probationSeconds)
+		}
+
+		// 记录审计日志
+		if err := model.AddBlacklistAudit(tm.redis, nodeID, ip, "BLACKLIST", reason); err != nil {
+			logx.Errorf("QoS: Failed to add blacklist audit: %v", err)
+		}
+	}()
+
+	// 更新本地缓存和活跃池
+	tm.ipBlacklist.Store(ip, struct{}{})
+	tm.ipPool.DeactivateIP(ip)
+
+	// 节点被拉黑后不再主动断开连接，仅仅是在分配层面隔离
+	// tm.KickNode(nodeID)
+}
+
+// RemoveBlacklistNodes 将多个节点移出黑名单
+func (tm *TunnelManager) RemoveBlacklistNodes(ips []string, reason string) {
+	logx.Infof("QoS: Removing IPs from blacklist: %v, Reason: %s", ips, reason)
+
+	go func() {
+		if err := model.RemoveBlacklist(tm.redis, ips); err != nil {
+			logx.Errorf("QoS: Failed to remove IPs from Redis blacklist: %v", err)
+		}
+		for _, ip := range ips {
+			model.AddBlacklistAudit(tm.redis, "multiple", ip, "REMOVE", reason)
+		}
+	}()
+
+	for _, ip := range ips {
+		tm.ipBlacklist.Delete(ip)
+		tm.ipPool.ActivateIP(ip)
+	}
+}
+
+// AddStrike 增加节点的 Strike 计数 (异步)
+func (tm *TunnelManager) AddStrike(nodeID string, ip string, reason string) {
+	go func() {
+		strike, err := model.AddNodeStrike(tm.redis, nodeID)
+		if err != nil {
+			logx.Errorf("QoS: Failed to add strike for node %s: %v", nodeID, err)
+			return
+		}
+
+		logx.Infof("QoS: Node %s (IP: %s) strike added: %d/3, Reason: %s", nodeID, ip, strike, reason)
+
+		if strike >= int(tm.config.QoS.StrikeLimit) {
+			if tm.config.QoS.EnableBandwidthBlacklist {
+				tm.BlacklistNode(ip, nodeID, fmt.Sprintf("Strike limit reached (%d): %s", strike, reason))
+			} else {
+				logx.Infof("QoS: node %s (IP: %s) reached strike limit (%d), but automatic blacklist is disabled", nodeID, ip, strike)
+			}
+		}
+	}()
+}
+
+func (tm *TunnelManager) ClearStrike(nodeID string) {
+	go model.ClearNodeStrike(tm.redis, nodeID)
 }
 
 func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, nodeIP string) {
@@ -204,6 +331,10 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, n
 	}
 
 	tun := newTunnel(conn, tm, opts, ctx)
+	// QoS: 从 Redis 加载节点的 Strike 历史计数，实现状态继承
+	if strike, err := model.GetNodeStrike(tm.redis, req.NodeId); err == nil {
+		tun.strikeCount.Store(uint32(strike))
+	}
 	tm.addTunnel(tun)
 
 	// Unlock here since the tunnel is successfully added to tm.tunnels

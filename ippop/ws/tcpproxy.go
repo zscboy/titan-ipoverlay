@@ -32,7 +32,7 @@ func newTCPProxy(id string, conn net.Conn, t *Tunnel, userName, targetDomain, co
 		targetDomain: targetDomain,
 		activeTime:   time.Now(),
 		done:         make(chan struct{}),
-		perfStats:    NewSessionPerfStats(id, userName, targetDomain, countryCode, &t.tunMgr.config.PerfMonitoring, t.tunMgr.perfCollector),
+		perfStats:    NewSessionPerfStats(id, userName, targetDomain, countryCode, t.tunMgr.perfCollector.nodeID, t.opts.Id, &t.tunMgr.config.PerfMonitoring, &t.tunMgr.config.QoS, t.tunMgr.perfCollector),
 	}
 }
 
@@ -43,6 +43,26 @@ func (proxy *TCPProxy) close() {
 		}
 
 		if proxy.perfStats != nil {
+			// QoS 结算：三振出局制 (柔性降级)
+			// 计算 T3 平均速率 (MBps)
+			t3Bytes := proxy.perfStats.T3BytesSent.Load()
+			t3Dur := time.Duration(proxy.perfStats.T3Duration.Load()).Seconds()
+			if t3Dur > 0 {
+				speedMBps := (float64(t3Bytes) / t3Dur) / 1024 / 1024
+				redlineMBps := float64(proxy.tunnel.tunMgr.config.QoS.RedlineSpeedKbps) / 1024.0
+
+				// 仅对超过 10KB 的会话进行打分，防止极小流量导致的误差
+				if t3Bytes > 10*1024 {
+					if speedMBps < redlineMBps {
+						proxy.tunnel.tunMgr.AddStrike(proxy.tunnel.opts.Id, proxy.tunnel.opts.IP,
+							fmt.Sprintf("Session slow: %.2fKBps < %vKBps", speedMBps*1024, proxy.tunnel.tunMgr.config.QoS.RedlineSpeedKbps))
+					} else {
+						// 表现良好，清空以往扣分
+						proxy.tunnel.tunMgr.ClearStrike(proxy.tunnel.opts.Id)
+					}
+				}
+			}
+
 			proxy.perfStats.Close()
 		}
 		close(proxy.done)
@@ -159,4 +179,8 @@ func (proxy *TCPProxy) proxyConn() error {
 		proxy.tunnel.onProxyDataFromProxy(proxy.id, buf[:n])
 		proxy.perfStats.AddT4Read(int64(n))
 	}
+}
+
+func (proxy *TCPProxy) GetPerfStats() *SessionPerfStats {
+	return proxy.perfStats
 }

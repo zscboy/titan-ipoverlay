@@ -2,6 +2,7 @@ package ws
 
 import (
 	"container/list"
+	"math/rand"
 	"sync"
 )
 
@@ -186,12 +187,29 @@ func (p *IPPool) DeactivateIP(ip string) {
 }
 
 // AcquireIP picks a free IP and one of its nodes.
-// It marks the IP as busy so no other session can take it.
+// It uses a randomized selection from the head of the free list to balance load.
 func (p *IPPool) AcquireIP() (string, *Tunnel) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	listLen := p.freeList.Len()
+	if listLen == 0 {
+		return "", nil
+	}
+
+	// 随机从前 20 个可用 IP 中选取一个，平衡负载并避免检测
+	n := 20
+	if listLen < n {
+		n = listLen
+	}
+	idx := rand.Intn(n)
+
+	// 遍历到选中的索引
 	element := p.freeList.Front()
+	for i := 0; i < idx && element != nil; i++ {
+		element = element.Next()
+	}
+
 	if element == nil {
 		return "", nil
 	}
@@ -200,14 +218,15 @@ func (p *IPPool) AcquireIP() (string, *Tunnel) {
 	p.freeList.Remove(element)
 	entry.element = nil
 
-	// Pick a tunnel and record its ID
+	// 在结点的所有隧道中随机选择一个（如果存在多个）
+	// 由于 map 遍历本质上具有一定的随机性，这里直接遍历第一个即可
 	for id, t := range entry.tunnels {
 		entry.assignedNodeID = id
 		p.assignedCount++
 		return entry.ip, t
 	}
 
-	return "", nil // Should not happen if Add/Remove is correct
+	return "", nil
 }
 
 // ReleaseIP returns an IP to the free list if it still has active nodes and is not blacklisted.
