@@ -21,6 +21,8 @@ type TCPProxy struct {
 	done            chan struct{}
 	closeOnce       sync.Once
 	perfStats       *SessionPerfStats // 性能统计
+	downloadTraffic int64
+	uploadTraffic   int64
 }
 
 func newTCPProxy(id string, conn net.Conn, t *Tunnel, userName, targetDomain, countryCode string) *TCPProxy {
@@ -65,6 +67,8 @@ func (proxy *TCPProxy) close() {
 
 			proxy.perfStats.Close()
 		}
+
+		proxy.tunnel.addUserTrafficStats(proxy.userName, proxy.downloadTraffic, proxy.uploadTraffic)
 		close(proxy.done)
 	})
 }
@@ -99,6 +103,8 @@ func (proxy *TCPProxy) write(data []byte, t2StartTime time.Time) error {
 	// T3 开始时间（准备写入 SOCKS5 用户）
 	t3StartTime := time.Now()
 	proxy.activeTime = t3StartTime
+
+	proxy.uploadTraffic += int64(len(data))
 
 	// T2: 内部处理时间（从 WebSocket 读取完成到 SOCKS5 写入开始）
 	t2Duration := t3StartTime.Sub(t2StartTime)
@@ -178,6 +184,7 @@ func (proxy *TCPProxy) proxyConn() error {
 		// 转发数据到 WebSocket（发送给 Client）
 		proxy.tunnel.onProxyDataFromProxy(proxy.id, buf[:n])
 		proxy.perfStats.AddT4Read(int64(n))
+		proxy.downloadTraffic += int64(n)
 	}
 }
 
