@@ -24,4 +24,9 @@ const (
 	// sort set, free = unbind + online
 	redisKeyNodeFree      = "titan:node:free"
 	redisKeyNodeBlacklist = "titan:node:blacklist"
+
+	// QoS: Strike 计数 (String, 带有 TTL)
+	redisKeyNodeStrike = "titan:node:strike:%s"
+	// QoS: 黑名单记录审计列表 (List)
+	redisKeyNodeBlacklistAudit = "titan:node:blacklist:audit"
 )

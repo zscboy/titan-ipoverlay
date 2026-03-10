@@ -2,6 +2,7 @@ package ws
 
 import (
 	"fmt"
+	"math"
 	"sync/atomic"
 	"time"
 
@@ -17,11 +18,14 @@ type SessionPerfStats struct {
 	UserName     string
 	TargetDomain string // 目标域名
 	CountryCode  string // 国家码 (新增)
+	PopNodeID    string // POP 节点 ID
+	ClientNodeID string // 边缘节点 ID
 	StartTime    time.Time
 	EndTime      atomic.Pointer[time.Time]
 
 	// 配置
 	perfConfig *config.PerfMonitoring
+	qosConfig  *config.QoSConf
 
 	// 收集器引用
 	collector  *SessionPerfCollector
@@ -43,17 +47,78 @@ type SessionPerfStats struct {
 
 	// T4: 用户 → IPPop (SOCKS5 读取)
 	T4BytesReceived atomic.Int64
+
+	// QoS: EWMA 滚动平均速率 (Bps)
+	T3SpeedEWMA atomic.Uint64 // 存储为 uint64 的 float64 字节位
+	lastUpdate  atomic.Int64  // 上次更新时间戳 (纳秒)
+
+	// QoS: 记录低速开始时间（纳秒），用于熔断判断
+	lowSpeedStart atomic.Int64
+}
+
+func (s *SessionPerfStats) updateSpeedEWMA(bytes int64) {
+	now := time.Now().UnixNano()
+	last := s.lastUpdate.Swap(now)
+	if last == 0 {
+		return // 第一次调用仅记录时间
+	}
+
+	deltaT := float64(now-last) / float64(time.Second)
+	if deltaT <= 0 {
+		return
+	}
+
+	instantSpeed := float64(bytes) / deltaT
+	alpha := 0.2 // 默认平滑因子
+	if s.qosConfig != nil && s.qosConfig.EwmaAlpha > 0 {
+		alpha = s.qosConfig.EwmaAlpha
+	}
+
+	for {
+		oldBits := s.T3SpeedEWMA.Load()
+		currentSpeed := math.Float64frombits(oldBits)
+
+		var newSpeed float64
+		if currentSpeed == 0 {
+			newSpeed = instantSpeed
+		} else {
+			newSpeed = alpha*instantSpeed + (1-alpha)*currentSpeed
+		}
+
+		newBits := math.Float64bits(newSpeed)
+		if s.T3SpeedEWMA.CompareAndSwap(oldBits, newBits) {
+			break
+		}
+	}
+}
+
+// GetT3SpeedEWMA 获取当前 EWMA 速率 (MBps)
+func (s *SessionPerfStats) GetT3SpeedEWMA() float64 {
+	bits := s.T3SpeedEWMA.Load()
+	return math.Float64frombits(bits) / 1024 / 1024
+}
+
+// IsInPatienceWindow 是否处于宽容启动期
+func (s *SessionPerfStats) IsInPatienceWindow() bool {
+	window := time.Second * 10 // 默认值
+	if s.qosConfig != nil && s.qosConfig.PatienceWindowSec > 0 {
+		window = time.Duration(s.qosConfig.PatienceWindowSec) * time.Second
+	}
+	return time.Since(s.StartTime) < window
 }
 
 // NewSessionPerfStats 创建新的会话性能统计
-func NewSessionPerfStats(sessionID, userName, targetDomain, countryCode string, perfConfig *config.PerfMonitoring, collector *SessionPerfCollector) *SessionPerfStats {
+func NewSessionPerfStats(sessionID, userName, targetDomain, countryCode, popNodeID, clientNodeID string, perfConfig *config.PerfMonitoring, qosConfig *config.QoSConf, collector *SessionPerfCollector) *SessionPerfStats {
 	s := &SessionPerfStats{
 		SessionID:    sessionID,
 		UserName:     userName,
 		TargetDomain: targetDomain,
 		CountryCode:  countryCode,
+		PopNodeID:    popNodeID,
+		ClientNodeID: clientNodeID,
 		StartTime:    time.Now(),
 		perfConfig:   perfConfig,
+		qosConfig:    qosConfig,
 		collector:    collector,
 	}
 
@@ -91,6 +156,9 @@ func (s *SessionPerfStats) AddT3Write(bytes int64, duration time.Duration) {
 	s.T3BytesSent.Add(bytes)
 	s.T3Duration.Add(int64(duration))
 	s.T3Count.Add(1)
+
+	// 更新 QoS EWMA 速率
+	s.updateSpeedEWMA(bytes)
 
 	if s.aggregator != nil {
 		s.aggregator.T3Bytes.Add(bytes)
@@ -169,6 +237,8 @@ func (s *SessionPerfStats) Close() {
 			UserName:     s.UserName,
 			TargetDomain: s.TargetDomain,
 			CountryCode:  s.CountryCode,
+			PopNodeID:    s.PopNodeID,
+			ClientNodeID: s.ClientNodeID,
 			DurationSec:  totalDuration.Seconds(),
 			T1BytesMB:    float64(t1BytesReceived) / 1024 / 1024,
 			T1SpeedMBps:  t1Speed,

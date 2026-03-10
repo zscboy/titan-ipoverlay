@@ -30,10 +30,13 @@ func newWS(config config.Config, tunMgr *ws.TunnelManager) *rest.Server {
 	statsQuery := ws.NewStatsQuery(tunMgr)
 	ippoolQuery := ws.NewIPPoolQuery(tunMgr)
 	uploadTest := ws.NewUploadTestHandler(tunMgr)
+<<<<<<< HEAD
 	nodeList := ws.NewNodeListQuery(tunMgr)
+=======
+	qosHandler := ws.NewQoSHandler(tunMgr)
+>>>>>>> 309ca98 (black list)
 
-	// httpproxy := pophttp.NewHttProxy(tunMgr)
-
+	// ws routes
 	server.AddRoute(rest.Route{
 		Method:  "GET",
 		Path:    "/ws/node",
@@ -69,11 +72,42 @@ func newWS(config config.Config, tunMgr *ws.TunnelManager) *rest.Server {
 		Path:    "/api/tunnel/upload-test-result",
 		Handler: uploadTest.ServeUploadTestResult,
 	})
+<<<<<<< HEAD
 	server.AddRoute(rest.Route{
 		Method:  "GET",
 		Path:    "/node/online/csv",
 		Handler: nodeList.ServeNodeListCSV,
 	})
+=======
+
+	// QoS 运维接口
+	server.AddRoute(rest.Route{
+		Method:  "POST",
+		Path:    "/api/qos/blacklist/add",
+		Handler: qosHandler.ServeBlacklistAdd,
+	})
+	server.AddRoute(rest.Route{
+		Method:  "POST",
+		Path:    "/api/qos/blacklist/remove",
+		Handler: qosHandler.ServeBlacklistRemove,
+	})
+	server.AddRoute(rest.Route{
+		Method:  "POST",
+		Path:    "/api/qos/blacklist/clear",
+		Handler: qosHandler.ServeBlacklistClear,
+	})
+	server.AddRoute(rest.Route{
+		Method:  "GET",
+		Path:    "/api/qos/blacklist/audit",
+		Handler: qosHandler.ServeBlacklistAudit,
+	})
+	server.AddRoute(rest.Route{
+		Method:  "GET",
+		Path:    "/api/qos/blacklist/list",
+		Handler: qosHandler.ServeBlacklistList,
+	})
+
+>>>>>>> 309ca98 (black list)
 	return server
 }
 

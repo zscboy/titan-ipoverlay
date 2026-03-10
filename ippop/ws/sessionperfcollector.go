@@ -2,6 +2,7 @@ package ws
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -10,8 +11,7 @@ import (
 	"titan-ipoverlay/ippop/config"
 	"titan-ipoverlay/ippop/metrics"
 
-	"github.com/ClickHouse/clickhouse-go/v2"
-	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
+	_ "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -22,30 +22,31 @@ const (
 	flushInterval = 10 * time.Second // 定时刷新间隔
 )
 
-// ClickHouse 建表 SQL (按小时分区，3天TTL)
+// ClickHouse 建表 SQL (按小时分区，7天TTL)
 const createTableSQL = `
 CREATE TABLE IF NOT EXISTS session_perf (
-    session_id    String,
-    user_name     String,
-    target_domain String,
-    country_code  String,
-    node_id       String,
-    duration_sec  Float64,
-    t1_bytes_mb   Float64,
-    t1_speed_mbps Float64,
-    t1_count      Int64,
-    t2_avg_us     Int64,
-    t2_total_ms   Int64,
-    t2_count      Int64,
-    t3_bytes_mb   Float64,
-    t3_speed_mbps Float64,
-    t3_count      Int64,
-    bottleneck    String,
-    created_at    DateTime DEFAULT now()
+    session_id     String,
+    user_name      String,
+    target_domain  String,
+    country_code   String,
+    pop_node_id    String,
+    client_node_id String,
+    duration_sec   Float64,
+    t1_bytes_mb    Float64,
+    t1_speed_mbps  Float64,
+    t1_count       Int64,
+    t2_avg_us      Int64,
+    t2_total_ms    Int64,
+    t2_count       Int64,
+    t3_bytes_mb    Float64,
+    t3_speed_mbps  Float64,
+    t3_count       Int64,
+    bottleneck     String,
+    created_at     DateTime DEFAULT now()
 ) ENGINE = MergeTree()
 PARTITION BY toStartOfHour(created_at)
 ORDER BY (user_name, created_at)
-TTL created_at + INTERVAL 3 DAY
+TTL created_at + INTERVAL 7 DAY
 `
 
 // SessionPerfRecord 会话性能记录
@@ -54,6 +55,8 @@ type SessionPerfRecord struct {
 	UserName     string  `json:"user"`
 	TargetDomain string  `json:"domain"`
 	CountryCode  string  `json:"country"`
+	PopNodeID    string  `json:"pop_id"`
+	ClientNodeID string  `json:"client_id"`
 	DurationSec  float64 `json:"dur"`
 	T1BytesMB    float64 `json:"t1_mb"`
 	T1SpeedMBps  float64 `json:"t1_spd"`
@@ -112,9 +115,9 @@ type userMetrics struct {
 
 // SessionPerfCollector 会话性能数据批量收集器
 type SessionPerfCollector struct {
-	clickhouse driver.Conn
-	chEnabled  bool
-	nodeID     string
+	db        *sql.DB
+	chEnabled bool
+	nodeID    string
 	// 通道配置
 	chBufferChan chan *SessionPerfRecord // 无锁 channel buffer
 	metricsChan  chan *collectorEvent
@@ -143,30 +146,30 @@ func NewSessionPerfCollector(chConfig config.ClickHouse, nodeID string) *Session
 
 	// 初始化 ClickHouse 连接
 	if chConfig.Enable {
-		conn, err := clickhouse.Open(&clickhouse.Options{
-			Addr: []string{chConfig.Addr},
-			Auth: clickhouse.Auth{
-				Database: chConfig.Database,
-				Username: chConfig.Username,
-				Password: chConfig.Password,
-			},
-			Settings: clickhouse.Settings{
-				"max_execution_time": 60,
-			},
-			DialTimeout:     10 * time.Second,
-			MaxOpenConns:    5,
-			MaxIdleConns:    2,
-			ConnMaxLifetime: time.Hour,
-		})
+		logx.Infof("SessionPerfCollector: Initializing ClickHouse connection to %s (Version: 2026-03-04-C)", chConfig.Addr)
+		// 经过调试发现，直接使用 clickhouse.Open 可能导致协议识别错误 (packet [72])
+		// 使用标准库 database/sql.Open + DSN 是最稳健的 HTTP 连接方式
+		dsn := fmt.Sprintf("http://%s:%s@%s/%s?dial_timeout=10s&max_execution_time=60",
+			chConfig.Username, chConfig.Password, chConfig.Addr, chConfig.Database)
+
+		db, err := sql.Open("clickhouse", dsn)
 		if err != nil {
-			logx.Errorf("SessionPerfCollector: ClickHouse connect error: %v", err)
+			logx.Errorf("SessionPerfCollector: ClickHouse open error: %v", err)
 		} else {
-			c.clickhouse = conn
-			// 自动建表 (增加 node_id 字段的支持)
-			if err := conn.Exec(ctx, createTableSQL); err != nil {
-				logx.Errorf("SessionPerfCollector: Create table error: %v", err)
+			db.SetMaxOpenConns(5)
+			db.SetMaxIdleConns(2)
+			db.SetConnMaxLifetime(time.Hour)
+
+			// 验证连接并自动建表
+			if err := db.Ping(); err != nil {
+				logx.Errorf("SessionPerfCollector: ClickHouse ping error: %v", err)
 			} else {
-				logx.Info("SessionPerfCollector: ClickHouse connected and table ready")
+				c.db = db
+				if _, err := db.Exec(createTableSQL); err != nil {
+					logx.Errorf("SessionPerfCollector: Create table error: %v", err)
+				} else {
+					logx.Info("SessionPerfCollector: ClickHouse connected and table ready")
+				}
 			}
 		}
 	}
@@ -204,8 +207,8 @@ func (c *SessionPerfCollector) Start() {
 		case <-promTicker.C:
 			c.flushMetricsToPrometheus()
 		case <-c.ctx.Done():
-			if c.clickhouse != nil {
-				c.clickhouse.Close()
+			if c.db != nil {
+				c.db.Close()
 			}
 			logx.Info("SessionPerfCollector stopped")
 			return
@@ -432,7 +435,7 @@ func (c *SessionPerfCollector) Collect(record *SessionPerfRecord) {
 
 // Flush 批量写入 ClickHouse（从 channel 批量读取）
 func (c *SessionPerfCollector) Flush() {
-	if !c.chEnabled || c.clickhouse == nil {
+	if !c.chEnabled || c.db == nil {
 		return
 	}
 
@@ -455,41 +458,46 @@ flush:
 	}
 
 	// 批量 INSERT
-	ctx := context.Background()
-	batch, err := c.clickhouse.PrepareBatch(ctx, "INSERT INTO session_perf")
+	tx, err := c.db.Begin()
 	if err != nil {
-		logx.Errorf("SessionPerfCollector Flush: PrepareBatch error: %v", err)
+		logx.Errorf("SessionPerfCollector Flush: Begin transaction error: %v", err)
 		return
 	}
+	defer tx.Rollback()
+
+	const insertSQL = `INSERT INTO session_perf (
+		session_id, user_name, target_domain, country_code, 
+		pop_node_id, client_node_id,
+		duration_sec, t1_bytes_mb, t1_speed_mbps, t1_count,
+		t2_avg_us, t2_total_ms, t2_count,
+		t3_bytes_mb, t3_speed_mbps, t3_count, bottleneck, created_at
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+
+	stmt, err := tx.Prepare(insertSQL)
+	if err != nil {
+		logx.Errorf("SessionPerfCollector Flush: Prepare error: %v", err)
+		return
+	}
+	defer stmt.Close()
 
 	for _, r := range toFlush {
 		createdAt := time.Unix(r.Timestamp, 0)
-		err := batch.Append(
-			r.SessionID,
-			r.UserName,
-			r.TargetDomain,
-			r.CountryCode,
-			c.nodeID, // 增加 node_id
-			r.DurationSec,
-			r.T1BytesMB,
-			r.T1SpeedMBps,
-			r.T1Count,
-			r.T2AvgUs,
-			r.T2TotalMs,
-			r.T2Count,
-			r.T3BytesMB,
-			r.T3SpeedMBps,
-			r.T3Count,
-			r.Bottleneck,
+		_, err := stmt.Exec(
+			r.SessionID, r.UserName, r.TargetDomain, r.CountryCode,
+			r.PopNodeID, r.ClientNodeID,
+			r.DurationSec, r.T1BytesMB, r.T1SpeedMBps, r.T1Count,
+			r.T2AvgUs, r.T2TotalMs, r.T2Count,
+			r.T3BytesMB, r.T3SpeedMBps, r.T3Count, r.Bottleneck,
 			createdAt,
 		)
 		if err != nil {
-			logx.Errorf("SessionPerfCollector Flush: Append error: %v", err)
+			logx.Errorf("SessionPerfCollector Flush: Exec error: %v", err)
+			return
 		}
 	}
 
-	if err := batch.Send(); err != nil {
-		logx.Errorf("SessionPerfCollector Flush: Send error: %v", err)
+	if err := tx.Commit(); err != nil {
+		logx.Errorf("SessionPerfCollector Flush: Commit error: %v", err)
 	} else {
 		logx.Debugf("SessionPerfCollector Flush: wrote %d records to ClickHouse", len(toFlush))
 	}
@@ -502,12 +510,11 @@ func (c *SessionPerfCollector) BufferSize() int {
 
 // Query 查询会话数据 (示例方法)
 func (c *SessionPerfCollector) QueryByUser(userName string, limit int) ([]SessionPerfRecord, error) {
-	if !c.chEnabled || c.clickhouse == nil {
+	if !c.chEnabled || c.db == nil {
 		return nil, fmt.Errorf("ClickHouse not enabled")
 	}
 
-	ctx := context.Background()
-	rows, err := c.clickhouse.Query(ctx, `
+	rows, err := c.db.Query(`
 		SELECT session_id, user_name, target_domain, duration_sec, 
 		       t1_bytes_mb, t1_speed_mbps, t1_count,
 		       t2_avg_us, t2_total_ms, t2_count,

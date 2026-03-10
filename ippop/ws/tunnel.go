@@ -100,6 +100,9 @@ type Tunnel struct {
 	IdleStartTime *time.Time
 
 	uploadTester *UploadTester
+
+	// QoS: 该节点当前的 Strike 计数 (0-3)
+	strikeCount atomic.Uint32
 }
 
 func newTunnel(conn *websocket.Conn, tunMgr *TunnelManager, opts *TunOptions, ctx context.Context) *Tunnel {
@@ -193,7 +196,75 @@ func (t *Tunnel) onPong(data []byte) {
 	t.waitPong.Store(0)
 }
 
+// QoSProxy 具有性能统计接口的代理对象
+type QoSProxy interface {
+	GetPerfStats() *SessionPerfStats
+}
+
+func (t *Tunnel) qosMonitor() {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-t.ctx.Done():
+			return
+		case <-ticker.C:
+			if t.closed.Load() {
+				return
+			}
+			t.proxys.Range(func(key, value any) bool {
+				proxy, ok := value.(QoSProxy)
+				if !ok {
+					return true
+				}
+
+				stats := proxy.GetPerfStats()
+				if stats == nil {
+					return true
+				}
+
+				// 宽容期跳过监测
+				if stats.IsInPatienceWindow() {
+					return true
+				}
+
+				speedMBps := stats.GetT3SpeedEWMA()
+				circuitBreakerMBps := float64(t.tunMgr.config.QoS.CircuitBreakerKbps) / 1024.0
+
+				if speedMBps < circuitBreakerMBps {
+					now := time.Now().UnixNano()
+					lowStart := stats.lowSpeedStart.Load()
+					if lowStart == 0 {
+						stats.lowSpeedStart.Store(now)
+					} else {
+						duration := time.Duration(now - lowStart)
+						if duration > 30*time.Second {
+							logx.Errorf("QoS: Hard Circuit Breaker triggered for session %s on node %s (Speed: %.2f KBps < %d KBps for 30s)",
+								stats.SessionID, t.opts.Id, speedMBps*1024, t.tunMgr.config.QoS.CircuitBreakerKbps)
+
+							// 极端熔断：如果开启了自动黑名单，则拉黑
+							if t.tunMgr.config.QoS.EnableBandwidthBlacklist {
+								t.tunMgr.BlacklistNode(t.opts.IP, t.opts.Id, fmt.Sprintf("Hard Circuit Breaker: Speed %.2fKBps < %dKBps for 30s", speedMBps*1024, t.tunMgr.config.QoS.CircuitBreakerKbps))
+							} else {
+								logx.Infof("QoS: node %s (IP: %s) triggered hard circuit breaker, but automatic blacklist is disabled", t.opts.Id, t.opts.IP)
+							}
+							return false // 停止遍历
+						}
+					}
+				} else {
+					// 速率恢复，清空监测计时
+					stats.lowSpeedStart.Store(0)
+				}
+
+				return true
+			})
+		}
+	}
+}
+
 func (t *Tunnel) serve() {
+	go t.qosMonitor()
 	for {
 		// T1 开始：由 readMessageWithLimitRate 内部精确捕获消息到达时间
 		_, message, t1StartTime, t1EndTime, err := t.readMessageWithLimitRate()
