@@ -671,3 +671,7 @@ func (tm *TunnelManager) startUserTrafficTimer() {
 
 	}
 }
+
+func (tm *TunnelManager) addUserTrafficStats(user string, downloadTraffic int64, uploadTraffic int64) {
+	tm.userTraffic.add(user, downloadTraffic+uploadTraffic)
+}
