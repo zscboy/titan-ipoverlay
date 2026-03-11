@@ -380,9 +380,9 @@ func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks
 	}
 
 	if targetInfo.Session != "" {
-		logx.Infof("HandleSocks5TCP: user %s session %s allocated on node %s", targetInfo.Username, targetInfo.Session, tun.opts.Id)
+		logx.Infof("HandleSocks5TCP: user %s session %s allocated on node %s, target %s:%d", targetInfo.Username, targetInfo.Session, tun.opts.Id, targetInfo.DomainName, targetInfo.Port)
 	} else {
-		logx.Debugf("HandleSocks5TCP: user %s allocated on node %s", targetInfo.Username, tun.opts.Id)
+		logx.Debugf("HandleSocks5TCP: user %s allocated on node %s, target %s:%s", targetInfo.Username, tun.opts.Id, targetInfo.DomainName, targetInfo.Port)
 	}
 
 	if userSession != nil {
