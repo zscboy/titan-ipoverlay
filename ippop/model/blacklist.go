@@ -34,7 +34,7 @@ func GetBlacklist(redis *redis.Redis) ([]string, error) {
 	var keys []string
 	var cursor uint64
 	for {
-		res, nextCursor, err := redis.Sscan(redisKeyNodeBlacklist, cursor, "", 100)
+		res, nextCursor, err := redis.Sscan(redisKeyNodeBlacklist, cursor, "", 1000)
 		if err != nil {
 			return nil, err
 		}

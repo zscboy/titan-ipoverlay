@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -177,6 +178,24 @@ func NewSessionPerfCollector(chConfig config.ClickHouse, nodeID string) *Session
 	return c
 }
 
+// sanitizeUser 清洗用户名标签，防止 Session ID 或非法输入导致基数爆炸
+func (c *SessionPerfCollector) sanitizeUser(userName string) string {
+	if userName == "" {
+		return "_EMPTY_"
+	}
+
+	// 1. 如果包含 -session-，只截取前缀做为基础用户名
+	parts := strings.Split(userName, "-session-")
+	baseName := parts[0]
+
+	// 2. 限制长度，防止恶意超长字符串
+	if len(baseName) > 64 {
+		baseName = baseName[:64]
+	}
+
+	return baseName
+}
+
 // Start 启动后台刷新协程
 func (c *SessionPerfCollector) Start() {
 	ticker := time.NewTicker(flushInterval)
@@ -196,13 +215,19 @@ func (c *SessionPerfCollector) Start() {
 		case event := <-c.metricsChan:
 			switch event.typ {
 			case evtStart:
-				c.handleSessionStart(event.userName)
+				c.handleSessionStart(c.sanitizeUser(event.userName))
 			case evtEnd:
+				// record 中的 UserName 在创建时已经通过 sanitizeUser 预处理
 				c.handleSessionEnd(&event.record)
 			case evtSocksError:
 				metrics.SOCKS5Errors.WithLabelValues(event.tag, c.nodeID).Inc()
 			case evtAuthFailure:
-				metrics.UserAuthFailures.WithLabelValues(event.userName, c.nodeID).Inc()
+				// 对认证失败的用户名进行更严格的过滤，仅保留可能的业务用户
+				sanitized := c.sanitizeUser(event.userName)
+				if len(sanitized) < 3 || len(sanitized) > 32 {
+					sanitized = "_INVALID_ATTEMPT_"
+				}
+				metrics.UserAuthFailures.WithLabelValues(sanitized, c.nodeID).Inc()
 			}
 		case <-promTicker.C:
 			c.flushMetricsToPrometheus()
@@ -321,8 +346,9 @@ func (c *SessionPerfCollector) GetAggregator(userName string) *UserTrafficAggreg
 func (c *SessionPerfCollector) flushMetricsToPrometheus() {
 	c.userAggregators.Range(func(key, value any) bool {
 		userName := key.(string)
+		sanitizedUser := c.sanitizeUser(userName)
 		agg := value.(*UserTrafficAggregator)
-		m := c.getOrUpdateUserMetrics(userName)
+		m := c.getOrUpdateUserMetrics(sanitizedUser)
 
 		// 获取当前总累加值
 		currT1Bytes := agg.T1Bytes.Load()
@@ -369,7 +395,7 @@ func (c *SessionPerfCollector) flushMetricsToPrometheus() {
 		}
 
 		// 4. 同步 UserTraffic Gauge (当前节点的总累计)
-		metrics.UserTraffic.WithLabelValues(userName, c.nodeID).Set(float64(currT1Bytes + currUpBytes))
+		metrics.UserTraffic.WithLabelValues(sanitizedUser, c.nodeID).Set(float64(currT1Bytes + currUpBytes))
 
 		return true
 	})
