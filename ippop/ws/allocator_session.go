@@ -231,37 +231,56 @@ func (a *SessionAllocator) Allocate(user *model.User, target *socks5.SocksTarget
 		return tun, sess, nil
 	}
 
-	// Atomic Lookup and Activation
+	// Atomic Lookup and Activation.
+	// Note: GetAndActivate increments connectCount if and only if a local tunnel is found.
 	sess, tun := a.sm.GetAndActivate(user.UserName, target.Session)
+
+	// Keep track if GetAndActivate already incremented the reference count.
+	hasActiveRef := (tun != nil)
+
 	if tun != nil {
 		// If error count threshold reached, trigger re-allocation
 		if sess.GetErrorCount() < a.sm.maxErrorCount {
 			return tun, sess, nil
 		}
 		logx.Infof("SessionManager: session %s for user %s reached error threshold %d, triggering re-allocation", target.Session, user.UserName, sess.GetErrorCount())
-		// Release old node/IP
-		a.source.ReleaseExclusiveNodes([]string{sess.deviceID}, []string{sess.exitIP})
+
+		// Release old node/IP (mutually exclusive check)
+		if len(sess.exitIP) > 0 {
+			a.source.ReleaseExclusiveNodes(nil, []string{sess.exitIP})
+		} else {
+			a.source.ReleaseExclusiveNodes([]string{sess.deviceID}, nil)
+		}
+
 		// Clear current allocation to trigger new one
 		a.sm.UpdateAllocation(sess, "", "")
 	}
 
-	// If we reach here, either sess is nil OR tun is dead OR it reached error threshold.
+	// If we reach here, either sess is nil OR tun is dead (nil) OR it reached error threshold.
 	// Allocate new exclusive node
 	exitIP, tun, err := a.source.AcquireExclusiveNode(context.Background())
 	if err != nil {
+		// If we had an active reference from GetAndActivate, we must release it
+		if hasActiveRef {
+			a.sm.Decrement(sess)
+		}
 		return nil, nil, err
 	}
 
 	if sess == nil {
 		sess = a.sm.Create(user.UserName, target.Session, tun.opts.Id, exitIP)
+		a.sm.Activate(sess) // Set count to 1
 	} else {
 		// Update existing session with new device node and IP
 		a.sm.UpdateAllocation(sess, tun.opts.Id, exitIP)
 		// Reset error count on successful re-allocation
 		sess.ResetError()
-	}
 
-	a.sm.Activate(sess)
+		// If we didn't have an active reference yet (because GetAndActivate returned nil tun), activate it now
+		if !hasActiveRef {
+			a.sm.Activate(sess)
+		}
+	}
 
 	return tun, sess, nil
 }
