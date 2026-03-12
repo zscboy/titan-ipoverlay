@@ -22,6 +22,11 @@ type Pop struct {
 	AccessExpire int64
 }
 
+type NodeCacheItem struct {
+	PopID string
+	IP    string
+}
+
 type ServiceContext struct {
 	Config         config.Config
 	Redis          *redis.Redis
@@ -32,6 +37,7 @@ type ServiceContext struct {
 	VendorStrategy map[string][]string
 	BlacklistMap   sync.Map
 	StrategyRR     sync.Map // map[string]*uint64
+	NodePopCache   sync.Map // map[string]*NodeCacheItem
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {

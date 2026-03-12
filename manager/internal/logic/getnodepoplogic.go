@@ -88,17 +88,17 @@ func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*svc.Pop, error
 	}
 
 	// 2. Sticky allocation (keep existing pop if IP hasn't changed or matches Vendor Strategy)
-	popID, nodeIP, err := model.GetNodePopIP(l.svcCtx.Redis, req.NodeId)
+	popID, nodeIP, err := l.getNodePopIP(req.NodeId)
 	if err != nil {
 		logx.Errorf("GetNodePopIP error: %v, node %s ip %s", err, req.NodeId, ip)
 		return nil, err
 	}
 
 	if len(popID) > 0 {
-		pop, exists := l.svcCtx.Pops[string(popID)]
+		pop, exists := l.svcCtx.Pops[popID]
 
 		// Case A: IP matches perfectly
-		if ip == string(nodeIP) {
+		if ip == nodeIP {
 			if exists {
 				logx.Debugf("allocatePop node %s ip %s sticky to existing pop %s", req.NodeId, nodeIP, popID)
 				return pop, nil
@@ -109,13 +109,13 @@ func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*svc.Pop, error
 			_, hasVendorStrategy := l.svcCtx.VendorStrategy[req.Vendor]
 			if hasVendorStrategy {
 				if exists {
-					logx.Infof("allocatePop node %s vendor %s strategy: keep pop %s despite ip change (%s -> %s)", req.NodeId, req.Vendor, popID, string(nodeIP), ip)
+					logx.Infof("allocatePop node %s vendor %s strategy: keep pop %s despite ip change (%s -> %s)", req.NodeId, req.Vendor, popID, nodeIP, ip)
 					return pop, nil
 				}
 				logx.Errorf("allocatePop node %s vendor strategy: sticky pop %s not found", req.NodeId, popID)
 			} else {
 				// Case C: IP changed and no Vendor Strategy, need to re-allocate
-				logx.Debugf("allocatePop node %s ip changed (%s -> %s), will re-allocate from pop %s", req.NodeId, string(nodeIP), ip, popID)
+				logx.Debugf("allocatePop node %s ip changed (%s -> %s), will re-allocate from pop %s", req.NodeId, nodeIP, ip, popID)
 			}
 		}
 	} else {
@@ -177,7 +177,29 @@ func (l *GetNodePopLogic) matchAndAllocatePop(popIds []string, strategyName, nod
 func (l *GetNodePopLogic) saveNodePop(nodeID, popID, ip string) {
 	if err := model.SetNodePopIP(l.svcCtx.Redis, nodeID, popID, ip); err != nil {
 		logx.Errorf("allocatePop SetNodePop error %v", err)
+		return
 	}
+	l.svcCtx.NodePopCache.Store(nodeID, &svc.NodeCacheItem{PopID: popID, IP: ip})
+}
+
+func (l *GetNodePopLogic) getNodePopIP(nodeID string) (string, string, error) {
+	if val, ok := l.svcCtx.NodePopCache.Load(nodeID); ok {
+		if item, ok := val.(*svc.NodeCacheItem); ok {
+			return item.PopID, item.IP, nil
+		}
+	}
+
+	pID, nIP, err := model.GetNodePopIP(l.svcCtx.Redis, nodeID)
+	if err != nil {
+		return "", "", err
+	}
+
+	popID := string(pID)
+	nodeIP := string(nIP)
+	if len(popID) > 0 {
+		l.svcCtx.NodePopCache.Store(nodeID, &svc.NodeCacheItem{PopID: popID, IP: nodeIP})
+	}
+	return popID, nodeIP, nil
 }
 
 func (l *GetNodePopLogic) selectPopFromList(ctx context.Context, strategyName string, popIds []string) (*svc.Pop, error) {
