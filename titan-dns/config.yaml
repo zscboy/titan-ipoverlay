@@ -1,0 +1,13 @@
+server:
+  listen: ":53"
+  domain_suffix: ".abc.aa.com"
+  ttl_seconds: 43200 # 12 hours
+
+# Back-end POP servers
+pops:
+  - ip: "117.55.199.201"
+    id: "pop-01"
+    weight: 10
+  - ip: "117.55.199.202"
+    id: "pop-02"
+    weight: 10
