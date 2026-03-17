@@ -125,7 +125,7 @@ func (p *HttpProxy) handleHTTP(w http.ResponseWriter, r *http.Request, user *Use
 		return
 	}
 
-	p.tunMgr.HandleSocks5TCP(tcpConn, &socks5.SocksTargetInfo{
+	err = p.tunMgr.HandleSocks5TCP(tcpConn, &socks5.SocksTargetInfo{
 		DomainName:     host,
 		Port:           port,
 		Username:       user.username,
@@ -134,6 +134,9 @@ func (p *HttpProxy) handleHTTP(w http.ResponseWriter, r *http.Request, user *Use
 		ExtraBytes:     buf.Bytes(),
 		ConnCreateTime: time.Now(),
 	})
+	if err != nil {
+		logx.Errorf("handleHTTP tcp error:%s", err.Error())
+	}
 }
 
 func (p *HttpProxy) parseHostPort(hostPort string, defaultPort int) (string, int, error) {
