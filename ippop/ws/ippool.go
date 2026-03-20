@@ -558,45 +558,87 @@ type FreeIPInfo struct {
 	NodeIDs []string `json:"node_ids"`
 }
 
+// GetFreeIPsFromTail retrieves free IPs using round-robin across all active lines, from the tail.
 func (p *IPPool) GetFreeIPsFromTail(count int) []FreeIPInfo {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	if count <= 0 || len(p.activeLines) == 0 {
+		return nil
+	}
+
 	res := make([]FreeIPInfo, 0, count)
-	for _, lineID := range p.activeLines {
-		fl := p.freeLists[lineID]
-		for e := fl.Back(); e != nil && len(res) < count; e = e.Prev() {
-			entry := e.Value.(*ipEntry)
-			nodeIDs := make([]string, 0, len(entry.tunnels))
-			for nodeID := range entry.tunnels {
-				nodeIDs = append(nodeIDs, nodeID)
+	// Track current element for each line
+	iters := make([]*list.Element, len(p.activeLines))
+	for i, lineID := range p.activeLines {
+		iters[i] = p.freeLists[lineID].Back()
+	}
+
+	for len(res) < count {
+		anyAdded := false
+		for i := range iters {
+			if len(res) >= count {
+				break
 			}
-			res = append(res, FreeIPInfo{
-				IP:      entry.ip,
-				NodeIDs: nodeIDs,
-			})
+			if iters[i] != nil {
+				entry := iters[i].Value.(*ipEntry)
+				nodeIDs := make([]string, 0, len(entry.tunnels))
+				for nodeID := range entry.tunnels {
+					nodeIDs = append(nodeIDs, nodeID)
+				}
+				res = append(res, FreeIPInfo{
+					IP:      entry.ip,
+					NodeIDs: nodeIDs,
+				})
+				iters[i] = iters[i].Prev()
+				anyAdded = true
+			}
+		}
+		if !anyAdded {
+			break
 		}
 	}
 	return res
 }
 
+// GetFreeIPsFromHead retrieves free IPs using round-robin across all active lines, from the head.
 func (p *IPPool) GetFreeIPsFromHead(count int) []FreeIPInfo {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	if count <= 0 || len(p.activeLines) == 0 {
+		return nil
+	}
+
 	res := make([]FreeIPInfo, 0, count)
-	for _, lineID := range p.activeLines {
-		fl := p.freeLists[lineID]
-		for e := fl.Front(); e != nil && len(res) < count; e = e.Next() {
-			entry := e.Value.(*ipEntry)
-			nodeIDs := make([]string, 0, len(entry.tunnels))
-			for nodeID := range entry.tunnels {
-				nodeIDs = append(nodeIDs, nodeID)
+	// Track current element for each line
+	iters := make([]*list.Element, len(p.activeLines))
+	for i, lineID := range p.activeLines {
+		iters[i] = p.freeLists[lineID].Front()
+	}
+
+	for len(res) < count {
+		anyAdded := false
+		for i := range iters {
+			if len(res) >= count {
+				break
 			}
-			res = append(res, FreeIPInfo{
-				IP:      entry.ip,
-				NodeIDs: nodeIDs,
-			})
+			if iters[i] != nil {
+				entry := iters[i].Value.(*ipEntry)
+				nodeIDs := make([]string, 0, len(entry.tunnels))
+				for nodeID := range entry.tunnels {
+					nodeIDs = append(nodeIDs, nodeID)
+				}
+				res = append(res, FreeIPInfo{
+					IP:      entry.ip,
+					NodeIDs: nodeIDs,
+				})
+				iters[i] = iters[i].Next()
+				anyAdded = true
+			}
+		}
+		if !anyAdded {
+			break
 		}
 	}
 	return res
