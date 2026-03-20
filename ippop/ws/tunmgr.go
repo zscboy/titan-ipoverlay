@@ -237,6 +237,13 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, n
 	node.Online = true
 	node.LoginAt = time.Now().Format(model.TimeLayout)
 
+	localIP := ""
+	if addr, _, err := net.SplitHostPort(conn.LocalAddr().String()); err == nil {
+		localIP = addr
+	} else {
+		localIP = conn.LocalAddr().String()
+	}
+
 	config := tm.config
 
 	localIP := ""
@@ -250,6 +257,7 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, n
 		Id:                node.Id,
 		OS:                node.OS,
 		IP:                node.IP,
+		LocalIP:           localIP,
 		Version:           node.Version,
 		UDPTimeout:        int(config.Socks5.UDPTimeout),
 		TCPTimeout:        int(config.Socks5.TCPTimeout),
