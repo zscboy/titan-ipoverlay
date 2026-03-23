@@ -3,3 +3,4 @@
 *.exe~
 bin/
 test*
+script_test/
