@@ -42,6 +42,7 @@ type IPPool struct {
 	allIPs         map[string]*ipEntry   // ip -> entry
 	freeLists      map[string]*list.List // lineID (LocalIP) -> free list
 	activeLines    []string              // Sorted list of active lines for round-robin
+	lineStats      map[string]int        // Real-time: LocalIP -> tunnel count
 	nextLineIdx    uint32                // Atomic index for round-robin
 	blacklistCount int                   // count of IPs currently blacklisted
 	assignedCount  int                   // count of IPs currently assigned
@@ -55,8 +56,12 @@ type PoolStats struct {
 	BlacklistIPCount int
 	AssignedIPCount  int
 	TunnelCount      int
+<<<<<<< HEAD
 	LineNodes        map[string]int // LineID (LocalIP) -> NodeCount in free list
 	RegionNodes      map[string]int // Region -> NodeCount in free list
+=======
+	LineStats        map[string]int // LocalIP -> tunnel count
+>>>>>>> 4683969 (Refactor LineStats in IPPool to  by maintaining real-time counters during tunnel add/remove operations.)
 }
 
 func NewIPPool() *IPPool {
@@ -111,7 +116,11 @@ func (p *IPPool) removeFromFreePool(entry *ipEntry) {
 =======
 		allIPs:    make(map[string]*ipEntry),
 		freeLists: make(map[string]*list.List),
+<<<<<<< HEAD
 >>>>>>> 9e3fb41 (feat(ippop): implement dynamic multi-line bandwidth balancing in IPPool)
+=======
+		lineStats: make(map[string]int),
+>>>>>>> 4683969 (Refactor LineStats in IPPool to  by maintaining real-time counters during tunnel add/remove operations.)
 	}
 }
 
@@ -173,7 +182,6 @@ func (p *IPPool) AddTunnel(t *Tunnel, isBlacklisted bool) {
 			}
 =======
 	} else {
-		// If entry exists, we keep its original lineID to avoid moving it between lists frequently
 		if !entry.isBlacklisted && isBlacklisted {
 			entry.isBlacklisted = true
 			p.blacklistCount++
@@ -184,18 +192,24 @@ func (p *IPPool) AddTunnel(t *Tunnel, isBlacklisted bool) {
 		} else if entry.isBlacklisted && !isBlacklisted {
 			entry.isBlacklisted = false
 			p.blacklistCount--
+<<<<<<< HEAD
 			// No need to add here, the unified check below (line 98) will handle it
 >>>>>>> 9e3fb41 (feat(ippop): implement dynamic multi-line bandwidth balancing in IPPool)
+=======
+>>>>>>> 4683969 (Refactor LineStats in IPPool to  by maintaining real-time counters during tunnel add/remove operations.)
 		}
 	}
 
 	entry.tunnels[nodeID] = t
 	p.tunnelCount++
 <<<<<<< HEAD
+<<<<<<< HEAD
 	p.lineNodes[localIP]++
 =======
+=======
+	p.lineStats[lineID]++
+>>>>>>> 4683969 (Refactor LineStats in IPPool to  by maintaining real-time counters during tunnel add/remove operations.)
 
-	// Unified check: if IP is free, idle, and not blacklisted, ensure it's in a free list
 	if !entry.isBlacklisted && entry.assignedNodeID == "" && entry.element == nil {
 		p.addToFreeList(entry)
 	}
@@ -222,7 +236,11 @@ func (p *IPPool) RemoveTunnel(t *Tunnel) {
 
 	delete(entry.tunnels, t.opts.Id)
 	p.tunnelCount--
+<<<<<<< HEAD
 	p.lineNodes[t.opts.LocalIP]--
+=======
+	p.lineStats[t.opts.LocalIP]--
+>>>>>>> 4683969 (Refactor LineStats in IPPool to  by maintaining real-time counters during tunnel add/remove operations.)
 
 	if entry.assignedNodeID == t.opts.Id {
 		entry.assignedNodeID = ""
@@ -254,6 +272,7 @@ func (p *IPPool) RemoveTunnel(t *Tunnel) {
 	}
 }
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 // RemoveIP removes the entire IP entry from the pool, regardless of tunnels.
 // func (p *IPPool) RemoveIP(ip string) {
@@ -295,6 +314,8 @@ func (p *IPPool) RemoveIP(ip string) {
 }
 >>>>>>> 9e3fb41 (feat(ippop): implement dynamic multi-line bandwidth balancing in IPPool)
 
+=======
+>>>>>>> 4683969 (Refactor LineStats in IPPool to  by maintaining real-time counters during tunnel add/remove operations.)
 // ActivateIP marks an IP as not blacklisted.
 func (p *IPPool) ActivateIP(ip string) {
 	p.mu.Lock()
@@ -394,7 +415,7 @@ func (p *IPPool) AcquireIP() (string, *Tunnel) {
 	for i := 0; i < numLines; i++ {
 		lineIdx := (int(startIdx) + i) % numLines
 		lineID := p.activeLines[lineIdx]
-		
+
 		fl := p.freeLists[lineID]
 		element := fl.Front()
 		if element == nil {
@@ -541,14 +562,24 @@ func (p *IPPool) GetPoolStats() PoolStats {
 >>>>>>> 9e3fb41 (feat(ippop): implement dynamic multi-line bandwidth balancing in IPPool)
 	}
 
+	// O(1) Copy: Since number of lines is very small (usually <= 20)
+	stats := make(map[string]int)
+	for k, v := range p.lineStats {
+		stats[k] = v
+	}
+
 	return PoolStats{
 		TotalIPCount:     len(p.allIPs),
 		FreeIPCount:      totalFree,
 		BlacklistIPCount: p.blacklistCount,
 		AssignedIPCount:  p.assignedCount,
 		TunnelCount:      p.tunnelCount,
+<<<<<<< HEAD
 		LineNodes:        stats,
 		// RegionNodes:      regionNodes,
+=======
+		LineStats:        stats,
+>>>>>>> 4683969 (Refactor LineStats in IPPool to  by maintaining real-time counters during tunnel add/remove operations.)
 	}
 }
 
