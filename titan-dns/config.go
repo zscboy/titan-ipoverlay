@@ -8,7 +8,7 @@ import (
 
 type Config struct {
 	Server ServerConfig `yaml:"server"`
-	Pops   []PopConfig   `yaml:"pops"`
+	Pops   []PopConfig  `yaml:"pops"`
 }
 
 type ServerConfig struct {
@@ -18,9 +18,10 @@ type ServerConfig struct {
 }
 
 type PopConfig struct {
-	IP     string `yaml:"ip"`
-	ID     string `yaml:"id"`
-	Weight int    `yaml:"weight"`
+	ID     string   `yaml:"id"`
+	Name   string   `yaml:"name"` // Human-readable name for identified
+	IPs    []string `yaml:"ips"`
+	Weight int      `yaml:"weight"`
 }
 
 func LoadConfig(path string) (*Config, error) {

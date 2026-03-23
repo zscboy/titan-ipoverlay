@@ -1,33 +1,58 @@
 package main
 
 import (
+	"sync"
 	"sync/atomic"
 )
 
+type PopData struct {
+	IPs     []string
+	rrIndex uint64
+}
+
 type LoadBalancer struct {
-	pops     []PopConfig
-	rrIndex  uint64
+	pops map[string]*PopData
+	mu   sync.RWMutex
 }
 
 func NewLoadBalancer(pops []PopConfig) *LoadBalancer {
-	return &LoadBalancer{
-		pops: pops,
+	lb := &LoadBalancer{
+		pops: make(map[string]*PopData),
 	}
+	for _, p := range pops {
+		lb.pops[p.ID] = &PopData{
+			IPs: p.IPs,
+		}
+	}
+	return lb
 }
 
-// NextIP selects a POP IP using round-robin.
-// In a real load-balanced scenario, this would check POP scores or connection counts.
-func (lb *LoadBalancer) NextIP() string {
-	if len(lb.pops) == 0 {
+// BalanceBySession selects an IP for a POP using round-robin.
+// Stickiness is handled via external cache in the handler.
+func (lb *LoadBalancer) BalanceBySession(popID string, session string) string {
+	return lb.BalanceByRR(popID)
+}
+
+// BalanceByRR selects an IP for a POP using round-robin.
+func (lb *LoadBalancer) BalanceByRR(popID string) string {
+	lb.mu.RLock()
+	data, ok := lb.pops[popID]
+	lb.mu.RUnlock()
+	if !ok || len(data.IPs) == 0 {
 		return ""
 	}
 
-	index := atomic.AddUint64(&lb.rrIndex, 1) - 1
-	pop := lb.pops[index % uint64(len(lb.pops))]
-	return pop.IP
+	index := atomic.AddUint64(&data.rrIndex, 1) - 1
+	return data.IPs[index%uint64(len(data.IPs))]
 }
 
-// UpdateLoad can be used to dynamically adjust weights based on back-end reports.
-func (lb *LoadBalancer) UpdateLoad(popID string, load int) {
-	// Not implemented in this basic version, but provides a hook for future POP load feedback.
+// UpdatePopIPs allows dynamic updates of the IP pool for a specific POP.
+func (lb *LoadBalancer) UpdatePopIPs(popID string, ips []string) {
+	lb.mu.Lock()
+	defer lb.mu.Unlock()
+	if data, ok := lb.pops[popID]; ok {
+		data.IPs = ips
+	} else {
+		lb.pops[popID] = &PopData{IPs: ips}
+	}
 }

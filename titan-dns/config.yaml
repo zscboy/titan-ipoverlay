@@ -1,68 +1,28 @@
 server:
   listen: ":53"
-  domain_suffix: ".abc.aa.com"
-  ttl_seconds: 43200 # 12 hours
+  domain_suffix: ".pop.adqczcf.xyz"
+  ttl_seconds: 60
 
 # Back-end POP servers
 pops:
-  - ip: "43.106.56.136"
-    id: "vs-01"
+  - id: "pop.adqczcf.xyz"
+    name: "Singapore test pop"
+    ips: 
+      - "217.15.165.177"
+      - "217.15.165.138"
+      - "217.15.165.131"
+      - "217.15.164.100"
     weight: 10
-  - ip: "43.106.55.186"
-    id: "vs-02"
+  # Case A: Multi-NIC single host
+  - id: "pop1.pop.adqczcf.xyz"
+    name: "Vename test pop"
+    ips: 
+      - "14.236.0.98"
+      - "14.243.54.210"
+      - "14.236.1.42"
+      - "14.236.2.194"
+      - "14.236.3.55"
+      - "14.236.4.120"
+      - "14.236.5.33"
+      - "14.236.6.211"
     weight: 10
-  - ip: "43.106.51.242"
-    id: "vs-03"
-    weight: 10
-  - ip: "43.106.49.34"
-    id: "vs-04"
-    weight: 10
-  - ip: "43.106.51.205"
-    id: "vs-05"
-    weight: 10
-  - ip: "43.106.48.172"
-    id: "vs-06"
-    weight: 10
-  - ip: "43.106.51.92"
-    id: "vs-07"
-    weight: 10
-  - ip: "43.106.54.58"
-    id: "vs-08"
-    weight: 10
-  - ip: "43.106.4.69"
-    id: "vs-09"
-    weight: 10
-  - ip: "43.106.22.154"
-    id: "vs-10"
-    weight: 10
-  - ip: "43.106.6.98"
-    id: "vs-11"
-    weight: 10
-  - ip: "43.106.15.51"
-    id: "vs-12"
-    weight: 10
-  - ip: "43.106.52.60"
-    id: "vs-13"
-    weight: 10
-  - ip: "43.106.49.137"
-    id: "vs-14"
-    weight: 10
-  - ip: "8.219.206.196"
-    id: "vs-15"
-    weight: 10
-  - ip: "43.106.55.205"
-    id: "vs-16"
-    weight: 10
-  - ip: "43.106.51.67"
-    id: "vs-17"
-    weight: 10
-  - ip: "43.106.48.180"
-    id: "vs-18"
-    weight: 10
-  - ip: "8.222.217.100"
-    id: "vs-19"
-    weight: 10
-  - ip: "43.106.27.250"
-    id: "vs-20"
-    weight: 10
-
