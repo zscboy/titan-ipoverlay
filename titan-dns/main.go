@@ -89,6 +89,14 @@ func (h *DNSHandler) resolveSubdomain(name string) string {
 }
 
 func (h *DNSHandler) handleAPI(w http.ResponseWriter, r *http.Request) {
+	// 1. Authorization Check
+	token := r.Header.Get("Authorization")
+	if h.config.Server.APIToken != "" && token != h.config.Server.APIToken {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		log.Printf("Unauthorized access attempt from %s", r.RemoteAddr)
+		return
+	}
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -135,7 +143,10 @@ func (h *DNSHandler) handleAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Successfully updated and PERSISTED POP %s with new IPs: %v", req.PopID, req.IPs)
+	// 4. Invalidate Cache for this POP to ensure new IP list is used immediately
+	h.cache.RemoveByPop(req.PopID)
+
+	log.Printf("Successfully updated, PERSISTED and CACHE-CLEARED POP %s with new IPs: %v", req.PopID, req.IPs)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok", "message": "updated and persisted"})

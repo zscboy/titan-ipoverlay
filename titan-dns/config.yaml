@@ -1,28 +1,26 @@
 server:
-  listen: ":53"
-  domain_suffix: ".pop.adqczcf.xyz"
-  ttl_seconds: 60
-
-# Back-end POP servers
+    listen: :53
+    domain_suffix: .pop.adqczcf.xyz
+    ttl_seconds: 60
+    api_token: titan-dns-token-123456
 pops:
-  - id: "pop.adqczcf.xyz"
-    name: "Singapore test pop"
-    ips: 
-      - "217.15.165.177"
-      - "217.15.165.138"
-      - "217.15.165.131"
-      - "217.15.164.100"
-    weight: 10
-  # Case A: Multi-NIC single host
-  - id: "pop1.pop.adqczcf.xyz"
-    name: "Vename test pop"
-    ips: 
-      - "14.236.0.98"
-      - "14.243.54.210"
-      - "14.236.1.42"
-      - "14.236.2.194"
-      - "14.236.3.55"
-      - "14.236.4.120"
-      - "14.236.5.33"
-      - "14.236.6.211"
-    weight: 10
+    - id: pop.adqczcf.xyz
+      name: Singapore test pop
+      ips:
+        - 217.15.165.177
+        - 217.15.165.138
+        - 217.15.165.131
+        - 217.15.164.100
+      weight: 10
+    - id: pop1.pop.adqczcf.xyz
+      name: Vename test pop
+      ips:
+        - 14.236.0.98
+        - 14.243.54.210
+        - 14.236.1.42
+        - 14.236.2.194
+        - 14.236.3.55
+        - 14.236.4.120
+        - 14.236.5.33
+        - 14.236.6.211
+      weight: 10

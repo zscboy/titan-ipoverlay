@@ -56,6 +56,20 @@ func (c *StickyCache) Set(key, ip string) {
 	}
 }
 
+// RemoveByPop clears all cache entries belonging to a specific POP node.
+func (c *StickyCache) RemoveByPop(popID string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	importSuffix := "." + popID
+	for k := range c.items {
+		// If key is exactly the popID or ends with .popID, remove it
+		if k == popID || (len(k) > len(importSuffix) && k[len(k)-len(importSuffix):] == importSuffix) {
+			delete(c.items, k)
+		}
+	}
+}
+
 func (c *StickyCache) cleanupTask() {
 	ticker := time.NewTicker(1 * time.Hour)
 	for range ticker.C {

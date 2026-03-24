@@ -15,6 +15,7 @@ type ServerConfig struct {
 	Listen       string `yaml:"listen"`
 	DomainSuffix string `yaml:"domain_suffix"`
 	TTLSeconds   int    `yaml:"ttl_seconds"`
+	APIToken     string `yaml:"api_token"` // Added for authorization
 }
 
 type PopConfig struct {
