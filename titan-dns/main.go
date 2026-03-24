@@ -7,14 +7,17 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/miekg/dns"
 )
 
 type DNSHandler struct {
-	config   *Config
-	cache    *StickyCache
-	balancer *LoadBalancer
+	config     *Config
+	configPath string
+	mu         sync.Mutex
+	cache      *StickyCache
+	balancer   *LoadBalancer
 }
 
 func (h *DNSHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
@@ -101,11 +104,41 @@ func (h *DNSHandler) handleAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	// 1. Update In-Memory Balancer (Hot update)
 	h.balancer.UpdatePopIPs(req.PopID, req.IPs)
-	log.Printf("Updated POP %s with new IPs: %v", req.PopID, req.IPs)
+
+	// 2. Update In-Memory Config Structure
+	updated := false
+	for i, p := range h.config.Pops {
+		if p.ID == req.PopID {
+			h.config.Pops[i].IPs = req.IPs
+			updated = true
+			break
+		}
+	}
+	// If it's a new POPID not in config, add it as a new entry
+	if !updated {
+		h.config.Pops = append(h.config.Pops, PopConfig{
+			ID:   req.PopID,
+			Name: "Dynamic-Added-" + req.PopID,
+			IPs:  req.IPs,
+		})
+	}
+
+	// 3. Persist to Disk
+	if err := SaveConfig(h.configPath, h.config); err != nil {
+		log.Printf("ERROR saving config to %s: %v", h.configPath, err)
+		http.Error(w, "Failed to save config: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Successfully updated and PERSISTED POP %s with new IPs: %v", req.PopID, req.IPs)
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok", "message": "updated and persisted"})
 }
 
 func main() {
@@ -119,9 +152,10 @@ func main() {
 	}
 
 	handler := &DNSHandler{
-		config:   cfg,
-		cache:    NewStickyCache(cfg.Server.TTLSeconds),
-		balancer: NewLoadBalancer(cfg.Pops),
+		config:     cfg,
+		configPath: *configPath,
+		cache:      NewStickyCache(cfg.Server.TTLSeconds),
+		balancer:   NewLoadBalancer(cfg.Pops),
 	}
 
 	// Start HTTP API in background
