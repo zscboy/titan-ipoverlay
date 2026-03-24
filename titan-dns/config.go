@@ -15,7 +15,7 @@ type ServerConfig struct {
 	Listen       string `yaml:"listen"`
 	DomainSuffix string `yaml:"domain_suffix"`
 	TTLSeconds   int    `yaml:"ttl_seconds"`
-	APIToken     string `yaml:"api_token"` // Added for authorization
+	Secret       string `yaml:"secret"` // Production grade secret for HMAC
 }
 
 type PopConfig struct {

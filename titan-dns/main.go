@@ -1,13 +1,20 @@
 package main
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"flag"
+	"io"
 	"log"
+	"math"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/miekg/dns"
 )
@@ -88,17 +95,53 @@ func (h *DNSHandler) resolveSubdomain(name string) string {
 	return ip
 }
 
+func (h *DNSHandler) validateSignature(r *http.Request, body []byte) bool {
+	secret := h.config.Server.Secret
+	if secret == "" {
+		return true // Allow if no secret configured
+	}
+
+	timestamp := r.Header.Get("X-Titan-Timestamp")
+	signature := r.Header.Get("X-Titan-Signature")
+
+	if timestamp == "" || signature == "" {
+		return false
+	}
+
+	// 1. Check timestamp (5 mins window)
+	t, err := strconv.ParseInt(timestamp, 10, 64)
+	if err != nil {
+		return false
+	}
+	if math.Abs(float64(time.Now().Unix()-t)) > 300 {
+		return false
+	}
+
+	// 2. Calculate HMAC-SHA256
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(body)
+	mac.Write([]byte(timestamp))
+	expectedMac := hex.EncodeToString(mac.Sum(nil))
+
+	return hmac.Equal([]byte(signature), []byte(expectedMac))
+}
+
 func (h *DNSHandler) handleAPI(w http.ResponseWriter, r *http.Request) {
-	// 1. Authorization Check
-	token := r.Header.Get("Authorization")
-	if h.config.Server.APIToken != "" && token != h.config.Server.APIToken {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		log.Printf("Unauthorized access attempt from %s", r.RemoteAddr)
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	// Read body to verify signature
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Error reading request", http.StatusInternalServerError)
+		return
+	}
+
+	if !h.validateSignature(r, body) {
+		http.Error(w, "Forbidden: Invalid Signature", http.StatusForbidden)
+		log.Printf("Forbidden access attempt (invalid signature) from %s", r.RemoteAddr)
 		return
 	}
 
@@ -107,7 +150,7 @@ func (h *DNSHandler) handleAPI(w http.ResponseWriter, r *http.Request) {
 		IPs   []string `json:"ips"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.Unmarshal(body, &req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}

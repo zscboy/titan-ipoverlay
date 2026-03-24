@@ -2,7 +2,7 @@ server:
     listen: :53
     domain_suffix: .pop.adqczcf.xyz
     ttl_seconds: 60
-    api_token: titan-dns-token-123456
+    secret: titan-dns-secret-2026
 pops:
     - id: pop.adqczcf.xyz
       name: Singapore test pop
