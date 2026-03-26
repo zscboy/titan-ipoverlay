@@ -93,7 +93,9 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 
 	go tm.keepalive()
 	go tm.setNodeOnlineDataExpire()
-	go tm.startUserTrafficTimer()
+	if tm.config.TrafficStats.EnableUserTraffic {
+		go tm.startUserTrafficTimer()
+	}
 	go tm.perfCollector.Start()
 	go tm.syncBlacklistLoop()
 	return tm
@@ -673,5 +675,7 @@ func (tm *TunnelManager) startUserTrafficTimer() {
 }
 
 func (tm *TunnelManager) addUserTrafficStats(user string, downloadTraffic int64, uploadTraffic int64) {
-	tm.userTraffic.add(user, downloadTraffic+uploadTraffic)
+	if tm.config.TrafficStats.EnableUserTraffic {
+		tm.userTraffic.add(user, downloadTraffic+uploadTraffic)
+	}
 }
