@@ -34,21 +34,29 @@ func (h *DNSHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 
 	found := false
 	for _, q := range r.Question {
-		if q.Qtype == dns.TypeA {
-			ip := h.resolveSubdomain(q.Name)
-			if ip != "" {
+		// 无论查询类型是什么，先尝试解析该域名
+		// 如果域名在我们的管理范围内且有对应的 POP/Session，resolveSubdomain 会返回 IP
+		ip := h.resolveSubdomain(q.Name)
+
+		if ip != "" {
+			// 域名存在，标记 found=true，避免返回 NXDOMAIN
+			found = true
+			if q.Qtype == dns.TypeA {
 				ans := &dns.A{
 					Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: uint32(h.config.Server.TTLSeconds)},
 					A:   net.ParseIP(ip),
 				}
 				msg.Answer = append(msg.Answer, ans)
-				found = true
-				log.Printf("Resolved: %s -> %s", q.Name, ip)
+				log.Printf("Resolved A: %s -> %s", q.Name, ip)
+			} else {
+				// 对于 AAAA 等其他类型，我们目前不提供记录，但返回 NOERROR (Answer 为空)
+				log.Printf("Domain exists but type %d not handled: %s", q.Qtype, q.Name)
 			}
 		}
 	}
 
 	if !found {
+		// 只有完全不存在的域名才返回 NXDOMAIN
 		msg.SetRcode(r, dns.RcodeNameError) // NXDOMAIN
 	}
 
