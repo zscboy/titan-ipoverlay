@@ -110,6 +110,11 @@ type ClickHouse struct {
 	Password string `json:",optional"`
 }
 
+type TrafficStats struct {
+	//lint:ignore SA5008 go-zero allows "default" in struct tags
+	EnableUserTraffic bool `json:",default=false"`
+}
+
 type Config struct {
 	// APIServer api.APIServerConfig
 	WS        WS
@@ -131,6 +136,9 @@ type Config struct {
 
 	//lint:ignore SA5008 go-zero allows "optional" in struct tags
 	QoS QoSConf `json:",optional"`
+
+	//lint:ignore SA5008 go-zero allows "optional" in struct tags
+	TrafficStats TrafficStats `json:",optional"`
 
 	JwtAuth JwtAuth
 	Socks5  Socks5
