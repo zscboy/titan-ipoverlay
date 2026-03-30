@@ -22,6 +22,7 @@ type PopConfig struct {
 	ID     string   `yaml:"id"`
 	Name   string   `yaml:"name"` // Human-readable name for identified
 	IPs    []string `yaml:"ips"`
+	Follow []string `yaml:"follow"` // Track and aggregate IPs from these POP IDs
 	Weight int      `yaml:"weight"`
 }
 
