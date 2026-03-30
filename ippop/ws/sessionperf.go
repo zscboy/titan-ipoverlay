@@ -227,11 +227,6 @@ func (s *SessionPerfStats) Close() {
 
 	// 提交到收集器异步处理
 	if s.collector != nil {
-		// 【过滤保护】：只对真正有数据的会话进行 ClickHouse 写入和详细统计收集
-		if (t1Count == 0 && t4BytesReceived == 0) || s.TargetDomain == "" {
-			return
-		}
-
 		s.collector.Collect(&SessionPerfRecord{
 			SessionID:    s.SessionID,
 			UserName:     s.UserName,

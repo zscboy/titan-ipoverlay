@@ -150,7 +150,7 @@ func NewSessionPerfCollector(chConfig config.ClickHouse, nodeID string) *Session
 		logx.Infof("SessionPerfCollector: Initializing ClickHouse connection to %s (Version: 2026-03-04-C)", chConfig.Addr)
 		// 经过调试发现，直接使用 clickhouse.Open 可能导致协议识别错误 (packet [72])
 		// 使用标准库 database/sql.Open + DSN 是最稳健的 HTTP 连接方式
-		dsn := fmt.Sprintf("http://%s:%s@%s/%s?dial_timeout=10s&max_execution_time=60",
+		dsn := fmt.Sprintf("clickhouse://%s:%s@%s/%s?dial_timeout=10s&max_execution_time=60",
 			chConfig.Username, chConfig.Password, chConfig.Addr, chConfig.Database)
 
 		db, err := sql.Open("clickhouse", dsn)
@@ -445,6 +445,11 @@ func (c *SessionPerfCollector) Collect(record *SessionPerfRecord) {
 
 	// 2. 批量写入 ClickHouse（无锁发送到 channel）
 	if !c.chEnabled {
+		return
+	}
+
+	// 【过滤保护】：只对真正有数据的会话进行 ClickHouse 写入
+	if (record.T1Count == 0 && record.UploadBytes == 0) || record.TargetDomain == "" {
 		return
 	}
 
