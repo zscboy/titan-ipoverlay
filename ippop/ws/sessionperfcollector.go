@@ -76,6 +76,7 @@ type SessionPerfRecord struct {
 const (
 	evtStart = iota
 	evtEnd
+	evtEndManual
 	evtSocksError
 	evtAuthFailure
 )
@@ -218,7 +219,9 @@ func (c *SessionPerfCollector) Start() {
 				c.handleSessionStart(c.sanitizeUser(event.userName))
 			case evtEnd:
 				// record 中的 UserName 在创建时已经通过 sanitizeUser 预处理
-				c.handleSessionEnd(&event.record)
+				c.handlePerformanceRecord(&event.record)
+			case evtEndManual:
+				c.handleSessionEndManual(c.sanitizeUser(event.userName))
 			case evtSocksError:
 				metrics.SOCKS5Errors.WithLabelValues(event.tag, c.nodeID).Inc()
 			case evtAuthFailure:
@@ -270,23 +273,25 @@ func (c *SessionPerfCollector) handleSessionStart(userName string) {
 	c.userSessions[userName]++
 }
 
-// handleSessionEnd 处理会话结束指标
-func (c *SessionPerfCollector) handleSessionEnd(r *SessionPerfRecord) {
-	// 基础指标
-	sanitizedUser := c.sanitizeUser(r.UserName)
-	metrics.ActiveSessions.WithLabelValues(sanitizedUser, c.nodeID).Dec()
-	metrics.SessionDuration.WithLabelValues(sanitizedUser, c.nodeID).Observe(r.DurationSec)
+// handleSessionEndManual 处理手动的会话结束（用于精确同步计数）
+func (c *SessionPerfCollector) handleSessionEndManual(userName string) {
+	metrics.ActiveSessions.WithLabelValues(userName, c.nodeID).Dec()
 
 	// 更新活跃用户数
-	if count := c.userSessions[sanitizedUser]; count > 0 {
-		c.userSessions[sanitizedUser]--
-		if c.userSessions[sanitizedUser] == 0 {
-			metrics.ActiveUsers.WithLabelValues(sanitizedUser, c.nodeID).Dec()
-			delete(c.userSessions, sanitizedUser)
+	if count := c.userSessions[userName]; count > 0 {
+		c.userSessions[userName]--
+		if c.userSessions[userName] == 0 {
+			metrics.ActiveUsers.WithLabelValues(userName, c.nodeID).Dec()
+			delete(c.userSessions, userName)
 		}
 	}
+}
 
-	// 注意：T1Bytes, T3Bytes, BytesSent, BytesReceived 等累加型指标已通过 evtTrafficDelta 增量上报
+// handlePerformanceRecord 处理会话结束时的性能指标（只处理数据，Dec 逻辑由 handleSessionEndManual 负责）
+func (c *SessionPerfCollector) handlePerformanceRecord(r *SessionPerfRecord) {
+	sanitizedUser := c.sanitizeUser(r.UserName)
+	metrics.SessionDuration.WithLabelValues(sanitizedUser, c.nodeID).Observe(r.DurationSec)
+
 	// 这里主要处理直方图和需要全会话数据的汇总指标
 	if r.T1Count > 0 {
 		metrics.T1Throughput.WithLabelValues(sanitizedUser, c.nodeID).Observe(r.T1SpeedMBps)
@@ -295,12 +300,6 @@ func (c *SessionPerfCollector) handleSessionEnd(r *SessionPerfRecord) {
 	// T2 指标 (平均处理时间)
 	if r.T2Count > 0 {
 		metrics.T2ProcessingTime.WithLabelValues(r.UserName, c.nodeID).Observe(float64(r.T2AvgUs))
-	}
-
-	// T3 指标
-	// 这里主要处理直方图和需要全会话数据的汇总指标
-	if r.T1Count > 0 {
-		metrics.T1Throughput.WithLabelValues(sanitizedUser, c.nodeID).Observe(r.T1SpeedMBps)
 	}
 
 	if r.T3Count > 0 {
@@ -331,6 +330,15 @@ func (c *SessionPerfCollector) ReportSessionStart(userName string) {
 	case c.metricsChan <- &collectorEvent{typ: evtStart, userName: userName}:
 	default:
 		logx.WithContext(c.ctx).Error("SessionPerfCollector: metrics channel full, dropping start event")
+	}
+}
+
+// ReportSessionEnd 异步上报会话结束
+func (c *SessionPerfCollector) ReportSessionEnd(userName string) {
+	select {
+	case c.metricsChan <- &collectorEvent{typ: evtEndManual, userName: userName}:
+	default:
+		logx.WithContext(c.ctx).Error("SessionPerfCollector: metrics channel full, dropping end event")
 	}
 }
 

@@ -460,18 +460,10 @@ func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks
 	tm.socks5ConnCount.Add(1)
 	defer tm.socks5ConnCount.Add(-1)
 
-	// 异步上报会话开始
+	// 异步上报会话开始，周期与 socks5ConnCount 完全一致
 	if tm.perfCollector != nil {
 		tm.perfCollector.ReportSessionStart(targetInfo.Username)
-		// 如果之后发生错误，需确保上报结束以平衡 ActiveSessions/ActiveUsers 指标
-		defer func() {
-			if err != nil {
-				tm.perfCollector.Collect(&SessionPerfRecord{
-					UserName:  targetInfo.Username,
-					Timestamp: time.Now().Unix(),
-				})
-			}
-		}()
+		defer tm.perfCollector.ReportSessionEnd(targetInfo.Username)
 	}
 
 	if tm.filterRules.isDeny(targetInfo.DomainName, fmt.Sprintf("%d", targetInfo.Port)) {
