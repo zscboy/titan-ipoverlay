@@ -117,6 +117,11 @@ func (proxy *UDPProxy) stop() {
 				}
 			}
 			proxy.perfStats.Close()
+
+			// UDP 手动上报结束 (因为 Close 不再自动 Dec)
+			if proxy.tunnel.tunMgr.perfCollector != nil {
+				proxy.tunnel.tunMgr.perfCollector.ReportSessionEnd(proxy.udpInfo.UserName)
+			}
 		}
 	})
 }
