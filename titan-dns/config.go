@@ -14,8 +14,9 @@ type Config struct {
 type ServerConfig struct {
 	Listen       string `yaml:"listen"`
 	DomainSuffix string `yaml:"domain_suffix"`
-	TTLSeconds   int    `yaml:"ttl_seconds"`
-	Secret       string `yaml:"secret"` // Production grade secret for HMAC
+	RecordTTL    int    `yaml:"record_ttl"` // TTL sent in DNS responses
+	CacheTTL     int    `yaml:"cache_ttl"`  // TTL for internal session cache
+	Secret       string `yaml:"secret"`     // Production grade secret for HMAC
 }
 
 type PopConfig struct {

@@ -43,7 +43,7 @@ func (h *DNSHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 			found = true
 			if q.Qtype == dns.TypeA {
 				ans := &dns.A{
-					Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: uint32(h.config.Server.TTLSeconds)},
+					Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: uint32(h.config.Server.RecordTTL)},
 					A:   net.ParseIP(ip),
 				}
 				msg.Answer = append(msg.Answer, ans)
@@ -216,7 +216,7 @@ func main() {
 	handler := &DNSHandler{
 		config:     cfg,
 		configPath: *configPath,
-		cache:      NewStickyCache(cfg.Server.TTLSeconds),
+		cache:      NewStickyCache(cfg.Server.CacheTTL),
 		balancer:   NewLoadBalancer(cfg.Pops),
 	}
 
