@@ -273,22 +273,23 @@ func (c *SessionPerfCollector) handleSessionStart(userName string) {
 // handleSessionEnd 处理会话结束指标
 func (c *SessionPerfCollector) handleSessionEnd(r *SessionPerfRecord) {
 	// 基础指标
-	metrics.ActiveSessions.WithLabelValues(r.UserName, c.nodeID).Dec()
-	metrics.SessionDuration.WithLabelValues(r.UserName, c.nodeID).Observe(r.DurationSec)
+	sanitizedUser := c.sanitizeUser(r.UserName)
+	metrics.ActiveSessions.WithLabelValues(sanitizedUser, c.nodeID).Dec()
+	metrics.SessionDuration.WithLabelValues(sanitizedUser, c.nodeID).Observe(r.DurationSec)
 
 	// 更新活跃用户数
-	if count := c.userSessions[r.UserName]; count > 0 {
-		c.userSessions[r.UserName]--
-		if c.userSessions[r.UserName] == 0 {
-			metrics.ActiveUsers.WithLabelValues(r.UserName, c.nodeID).Dec()
-			delete(c.userSessions, r.UserName)
+	if count := c.userSessions[sanitizedUser]; count > 0 {
+		c.userSessions[sanitizedUser]--
+		if c.userSessions[sanitizedUser] == 0 {
+			metrics.ActiveUsers.WithLabelValues(sanitizedUser, c.nodeID).Dec()
+			delete(c.userSessions, sanitizedUser)
 		}
 	}
 
 	// 注意：T1Bytes, T3Bytes, BytesSent, BytesReceived 等累加型指标已通过 evtTrafficDelta 增量上报
 	// 这里主要处理直方图和需要全会话数据的汇总指标
 	if r.T1Count > 0 {
-		metrics.T1Throughput.WithLabelValues(r.UserName, c.nodeID).Observe(r.T1SpeedMBps)
+		metrics.T1Throughput.WithLabelValues(sanitizedUser, c.nodeID).Observe(r.T1SpeedMBps)
 	}
 
 	// T2 指标 (平均处理时间)
@@ -297,20 +298,25 @@ func (c *SessionPerfCollector) handleSessionEnd(r *SessionPerfRecord) {
 	}
 
 	// T3 指标
+	// 这里主要处理直方图和需要全会话数据的汇总指标
+	if r.T1Count > 0 {
+		metrics.T1Throughput.WithLabelValues(sanitizedUser, c.nodeID).Observe(r.T1SpeedMBps)
+	}
+
 	if r.T3Count > 0 {
-		metrics.T3Throughput.WithLabelValues(r.UserName, c.nodeID).Observe(r.T3SpeedMBps)
+		metrics.T3Throughput.WithLabelValues(sanitizedUser, c.nodeID).Observe(r.T3SpeedMBps)
 	}
 
 	// 瓶颈检测
-	metrics.BottleneckDetection.WithLabelValues(r.Bottleneck, r.UserName, c.nodeID).Inc()
+	metrics.BottleneckDetection.WithLabelValues(r.Bottleneck, sanitizedUser, c.nodeID).Inc()
 
 	// 多维度流量统计 (Task 4)
 	totalBytes := (r.T1BytesMB + r.T3BytesMB) * 1024 * 1024
 	if r.TargetDomain != "" {
-		metrics.DomainTraffic.WithLabelValues(r.UserName, r.TargetDomain, c.nodeID).Add(totalBytes)
+		metrics.DomainTraffic.WithLabelValues(sanitizedUser, r.TargetDomain, c.nodeID).Add(totalBytes)
 	}
 	if r.CountryCode != "" {
-		metrics.CountryTraffic.WithLabelValues(r.UserName, r.CountryCode, c.nodeID).Add(totalBytes)
+		metrics.CountryTraffic.WithLabelValues(sanitizedUser, r.CountryCode, c.nodeID).Add(totalBytes)
 	}
 }
 
