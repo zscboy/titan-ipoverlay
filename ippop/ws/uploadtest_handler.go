@@ -15,7 +15,7 @@ import (
 )
 
 type UploadTestReq struct {
-	NodeIDs  []string `json:"node_ids,optional"`
+	NodeIDs  []string `json:"node_ids,omitempty"`
 	Count    int      `json:"count"`    // take count IPs from pool
 	Duration int      `json:"duration"` // seconds
 }
