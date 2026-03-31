@@ -36,6 +36,7 @@ func (l *AddIPBlacklistLogic) AddIPBlacklist(req *types.IPBlacklistReq) (resp *t
 		return &types.UserOperationResp{ErrMsg: "pop_id is required"}, nil
 	}
 
+	logx.Infof("AddIPBlacklistLogic: AddIPBlacklist, pop_id: %s, ip_list len: %d", req.PopID, len(req.IPList))
 	// 2. Add to manager's global IP blacklist
 	if err := model.AddIPBlacklist(l.svcCtx.Redis, req.IPList); err != nil {
 		return &types.UserOperationResp{ErrMsg: err.Error()}, nil
