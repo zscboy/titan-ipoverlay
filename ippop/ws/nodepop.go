@@ -2,6 +2,7 @@ package ws
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"time"
 
@@ -28,9 +29,18 @@ type NodePop struct {
 func NewNodePop(cfg *config.Config) *NodePop {
 	return &NodePop{cfg: cfg}
 }
+func (h *NodePop) isLocalRequest(r *http.Request) bool {
+	host, _, _ := net.SplitHostPort(r.RemoteAddr)
+	return host == "127.0.0.1" || host == "::1" || host == "localhost"
+}
 
 func (pop *NodePop) ServeNodePop(w http.ResponseWriter, r *http.Request) {
 	logx.Infof("NodeWS.ServeNodePop %s %s", r.URL.Path, r.URL.RawQuery)
+
+	if !pop.isLocalRequest(r) {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
 
 	var req GetNodePopReq
 	if err := httpx.Parse(r, &req); err != nil {

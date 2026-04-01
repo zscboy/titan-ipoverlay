@@ -39,6 +39,7 @@ func newWS(config config.Config, tunMgr *ws.TunnelManager) *rest.Server {
 	statsQuery := ws.NewStatsQuery(tunMgr)
 	ippoolQuery := ws.NewIPPoolQuery(tunMgr)
 	uploadTest := ws.NewUploadTestHandler(tunMgr)
+	nodeList := ws.NewNodeListQuery(tunMgr)
 
 	// httpproxy := pophttp.NewHttProxy(tunMgr)
 
@@ -76,6 +77,11 @@ func newWS(config config.Config, tunMgr *ws.TunnelManager) *rest.Server {
 		Method:  "GET",
 		Path:    "/api/tunnel/upload-test-result",
 		Handler: uploadTest.ServeUploadTestResult,
+	})
+	server.AddRoute(rest.Route{
+		Method:  "GET",
+		Path:    "/node/online/csv",
+		Handler: nodeList.ServeNodeListCSV,
 	})
 	return server
 }
