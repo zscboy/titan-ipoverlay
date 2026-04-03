@@ -62,6 +62,14 @@ func (lb *LoadBalancer) BalanceByRR(popID string) string {
 	return data.IPs[index%uint64(len(data.IPs))]
 }
 
+// HasPop checks if a POP exists and has IPs without advancing the counter.
+func (lb *LoadBalancer) HasPop(popID string) bool {
+	lb.mu.RLock()
+	defer lb.mu.RUnlock()
+	data, ok := lb.pops[popID]
+	return ok && len(data.IPs) > 0
+}
+
 // UpdatePopIPs allows dynamic updates of the IP pool for a specific POP.
 func (lb *LoadBalancer) UpdatePopIPs(popID string, ips []string) {
 	lb.mu.Lock()

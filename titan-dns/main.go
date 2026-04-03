@@ -28,35 +28,38 @@ type DNSHandler struct {
 }
 
 func (h *DNSHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
+	log.Printf("resolve domain:%v", r.Question)
 	msg := dns.Msg{}
 	msg.SetReply(r)
 	msg.Authoritative = true
 
 	found := false
 	for _, q := range r.Question {
-		// 无论查询类型是什么，先尝试解析该域名
-		// 如果域名在我们的管理范围内且有对应的 POP/Session，resolveSubdomain 会返回 IP
-		ip := h.resolveSubdomain(q.Name)
-
-		if ip != "" {
-			// 域名存在，标记 found=true，避免返回 NXDOMAIN
-			found = true
-			if q.Qtype == dns.TypeA {
+		// Only TypeA queries trigger resolution and load balancing (RR increment)
+		if q.Qtype == dns.TypeA {
+			ip := h.resolveSubdomain(q.Name)
+			if ip != "" {
+				// Domain exists, mark found=true to avoid NXDOMAIN
+				found = true
 				ans := &dns.A{
 					Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: uint32(h.config.Server.RecordTTL)},
 					A:   net.ParseIP(ip),
 				}
 				msg.Answer = append(msg.Answer, ans)
 				log.Printf("Resolved A: %s -> %s", q.Name, ip)
-			} else {
-				// 对于 AAAA 等其他类型，我们目前不提供记录，但返回 NOERROR (Answer 为空)
+			}
+		} else {
+			// For non-A queries, check if the domain exists to decide between NOERROR and NXDOMAIN.
+			// Use a non-destructive check that doesn't trigger the load balancer counter.
+			if h.isDomainManaged(q.Name) {
+				found = true
 				log.Printf("Domain exists but type %d not handled: %s", q.Qtype, q.Name)
 			}
 		}
 	}
 
 	if !found {
-		// 只有完全不存在的域名才返回 NXDOMAIN
+		// Return NXDOMAIN only if the domain is not found at all
 		msg.SetRcode(r, dns.RcodeNameError) // NXDOMAIN
 	}
 
@@ -101,6 +104,31 @@ func (h *DNSHandler) resolveSubdomain(name string) string {
 		h.cache.Set(name, ip)
 	}
 	return ip
+}
+
+// isDomainManaged checks existence without affecting balancing (no RR increment)
+func (h *DNSHandler) isDomainManaged(name string) bool {
+	name = strings.ToLower(name)
+	name = strings.TrimSuffix(name, ".")
+
+	suffix := strings.ToLower(h.config.Server.DomainSuffix)
+	if !strings.HasSuffix(name, suffix) {
+		return false
+	}
+
+	// 1. Direct POP ID match?
+	if h.balancer.HasPop(name) {
+		return true
+	}
+
+	// 2. Session subdomain match?
+	parts := strings.SplitN(name, ".", 2)
+	if len(parts) < 2 {
+		return false
+	}
+
+	popID := parts[1]
+	return h.balancer.HasPop(popID)
 }
 
 func (h *DNSHandler) validateSignature(r *http.Request, body []byte) bool {
