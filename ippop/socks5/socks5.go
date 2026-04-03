@@ -12,6 +12,13 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
+const (
+	// acceptMinSleep is the initial duration to wait after an Accept error (e.g., EMFILE).
+	acceptMinSleep = 5 * time.Millisecond
+	// acceptMaxSleep is the maximum duration to wait between retries to avoid long-term blocking.
+	acceptMaxSleep = 1 * time.Second
+)
+
 type Socks5Handler interface {
 	HandleSocks5TCP(*net.TCPConn, *SocksTargetInfo) error
 	HandleSocks5UDP(udpConn UDPConn, udpInfo *Socks5UDPInfo, data []byte) error
@@ -122,16 +129,34 @@ func (socks5Server *Socks5Server) Stop() {
 }
 
 func (socks5Server *Socks5Server) serveSocks5() {
+	var tempDelay time.Duration // Current backoff delay
 	for {
 		conn, err := socks5Server.listener.Accept()
 		if err != nil {
+			// 1. If the listener is closed, stop the service loop normally.
+			// This typically happens when the server is shutting down.
 			if errors.Is(err, net.ErrClosed) {
 				return
 			}
-			logx.Errorf("localsocks5.Socks5Server serveSocks5 error:%s", err)
-			return
+			// 2. Handle temporary errors or resource exhaustion like "too many open files" (EMFILE).
+			// We use exponential backoff to prevent a high-CPU loop and log flooding.
+			logx.Errorf("Socks5Server Accept error: %v", err)
+			if tempDelay == 0 {
+				tempDelay = acceptMinSleep
+			} else {
+				tempDelay *= 2
+			}
+			if tempDelay > acceptMaxSleep {
+				tempDelay = acceptMaxSleep
+			}
+			time.Sleep(tempDelay)
+			continue
 		}
+		// 3. Reset backoff delay upon a successful connection.
+		// This ensures that the next error starts from the minimum delay again.
+		tempDelay = 0
 
+		// Handle the connection asynchronously to keep the main acceptor loop responsive.
 		go socks5Server.serveSocks5Conn(conn)
 	}
 }
