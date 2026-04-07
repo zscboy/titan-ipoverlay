@@ -28,7 +28,6 @@ type DNSHandler struct {
 }
 
 func (h *DNSHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
-	log.Printf("resolve domain:%v", r.Question)
 	msg := dns.Msg{}
 	msg.SetReply(r)
 	msg.Authoritative = true

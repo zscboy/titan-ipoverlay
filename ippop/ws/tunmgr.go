@@ -516,13 +516,13 @@ func (tm *TunnelManager) startUserTrafficTimer() {
 			logx.Errorf("AddUsersDayTraffic failed:%v", err)
 		}
 
-		if err := model.AddUsersTrafficOneHour(context.TODO(), tm.redis, trafficMap); err != nil {
-			logx.Errorf("AddUsersDayTraffic failed:%v", err)
-		}
+		// if err := model.AddUsersTrafficOneHour(context.TODO(), tm.redis, trafficMap); err != nil {
+		// 	logx.Errorf("AddUsersDayTraffic failed:%v", err)
+		// }
 
-		if err := model.AddUsersTraffic5Minutes(context.TODO(), tm.redis, trafficMap); err != nil {
-			logx.Errorf("AddUsersDayTraffic failed:%v", err)
-		}
+		// if err := model.AddUsersTraffic5Minutes(context.TODO(), tm.redis, trafficMap); err != nil {
+		// 	logx.Errorf("AddUsersDayTraffic failed:%v", err)
+		// }
 
 		if err := model.AddUsersTotalTraffic(context.TODO(), tm.redis, trafficMap); err != nil {
 			logx.Errorf("AddUsersTotalTraffic failed:%v", err)

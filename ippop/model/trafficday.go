@@ -13,7 +13,7 @@ import (
 
 const (
 	oneDayDataBit = 37      // 低 29 bit 存流量
-	keepThirtyDay = 24 * 30 // 保留7天
+	keepThirtyDay = 24 * 30 // 保留30天
 	oneDay        = 24 * 60 * 60
 )
 
@@ -26,7 +26,7 @@ func AddUsersTrafficOneDay(ctx context.Context, rdb *redis.Redis, users map[stri
 	now := time.Now()
 	ts := floorToDay(now)            // 5 分钟粒度时间戳
 	scoreBase := ts << oneDayDataBit // 高位存时间戳
-	minScore := (now.Add(-time.Hour*keepSevenDays).Unix() / oneDay) << oneDayDataBit
+	minScore := (now.Add(-time.Hour*keepThirtyDay).Unix() / oneDay) << oneDayDataBit
 
 	pipe, err := rdb.TxPipeline()
 	if err != nil {
