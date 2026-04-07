@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	// 1000 GB
-	defaultTotalTraffic = 1000 * 1024 * 1024 * 1024
+	// 1000 TB
+	defaultTotalTraffic = 1000 * 1024 * 1024 * 1024 * 1024
 )
 
 type CreateUserLogic struct {
@@ -138,7 +138,7 @@ func (l *CreateUserLogic) CreateUser(in *pb.CreateUserReq) (*pb.CreateUserResp, 
 func (l *CreateUserLogic) defaultTrafficLimit() *pb.TrafficLimit {
 	return &pb.TrafficLimit{
 		StartTime:    time.Now().Unix(),
-		EndTime:      time.Now().AddDate(0, 1, 0).Unix(),
+		EndTime:      time.Now().AddDate(1, 0, 0).Unix(),
 		TotalTraffic: defaultTotalTraffic,
 	}
 }
