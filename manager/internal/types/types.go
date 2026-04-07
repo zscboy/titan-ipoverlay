@@ -191,7 +191,7 @@ type SwitchUserRouteNodeReq struct {
 type TrafficLimit struct {
 	StartTime    int64 `json:"start_time"`
 	EndTime      int64 `json:"end_time"`
-	TotalTraffic int64 `json:"total_traffic,default=1073741824000"`
+	TotalTraffic int64 `json:"total_traffic,default=1073741824000000000"`
 }
 
 type User struct {

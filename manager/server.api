@@ -62,7 +62,7 @@ type (
 		EndTime int64 `json:"end_time"`
 		// Total traffic allowed to the user
 		// unit Bytes
-		TotalTraffic int64 `json:"total_traffic,default=1073741824000"`
+		TotalTraffic int64 `json:"total_traffic,default=1073741824000000000"`
 	}
 	CreateUserReq {
 		UserName string `json:"user_name"`
