@@ -41,6 +41,8 @@ type TunOptions struct {
 	DownloadRateLimti int64
 	UploadRateLimit   int64
 	IsBlacklisted     bool
+	LocalIP           string
+	Region            string
 }
 
 type TrafficStats struct {

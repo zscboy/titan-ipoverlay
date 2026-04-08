@@ -13,7 +13,7 @@ import (
 // AcquireExclusiveNode implements NodeSource interface
 func (tm *TunnelManager) AcquireExclusiveNode(ctx context.Context) (string, *Tunnel, error) {
 	if tm.config.WS.NodeAllocateStrategy == config.NodeAllocateIPPool {
-		ip, tun := tm.ipPool.AcquireIP()
+		ip, tun := tm.ipPool.AcquireIP("")
 		if tun == nil {
 			return "", nil, fmt.Errorf("no free ip found in pool")
 		}

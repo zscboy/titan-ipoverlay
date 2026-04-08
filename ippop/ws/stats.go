@@ -7,13 +7,15 @@ import (
 )
 
 type PopStats struct {
-	NodeCount        int `json:"node_count"`
-	TotalIPCount     int `json:"total_ip_count"`
-	FreeIPCount      int `json:"free_ip_count"`
-	BlacklistIPCount int `json:"blacklist_ip_count"`
-	AssignedIPCount  int `json:"assigned_ip_count"`
-	UserSessionCount int `json:"user_session_count"`
-	UserConnCount    int `json:"user_conn_count"`
+	NodeCount        int            `json:"node_count"`
+	TotalIPCount     int            `json:"total_ip_count"`
+	FreeIPCount      int            `json:"free_ip_count"`
+	BlacklistIPCount int            `json:"blacklist_ip_count"`
+	AssignedIPCount  int            `json:"assigned_ip_count"`
+	UserSessionCount int            `json:"user_session_count"`
+	UserConnCount    int            `json:"user_conn_count"`
+	LineNodes        map[string]int `json:"line_nodes"`
+	RegionNodes      map[string]int `json:"region_nodes"`
 }
 
 type StatsQuery struct {
@@ -36,6 +38,8 @@ func (s *StatsQuery) ServeStats(w http.ResponseWriter, r *http.Request) {
 		AssignedIPCount:  poolStats.AssignedIPCount,
 		UserSessionCount: sessionCount,
 		UserConnCount:    int(s.tm.socks5ConnCount.Load()),
+		LineNodes:        poolStats.LineNodes,
+		RegionNodes:      poolStats.RegionNodes,
 	}
 
 	httpx.OkJsonCtx(r.Context(), w, resp)

@@ -2,6 +2,7 @@ package ws
 
 import (
 	"container/list"
+	"sort"
 	"sync"
 )
 
@@ -10,6 +11,10 @@ type ipEntry struct {
 	ip             string
 	tunnels        map[string]*Tunnel // nodeID -> Tunnel
 	element        *list.Element      // Pointer to position in freeList
+	localIPElement *list.Element      // Pointer to position in localIPFreeList[localIP]
+	regionElement  *list.Element      // Pointer to position in regionFreeList[region]
+	localIP        string             // The local IP (NIC IP) this entry is associated with
+	region         string             // The region this IP belongs to
 	assignedNodeID string             // The nodeID currently given out by AcquireIP
 	isBlacklisted  bool               // New: tracks if this IP is in blacklist
 }
@@ -18,11 +23,15 @@ type ipEntry struct {
 type IPPool struct {
 	mu sync.Mutex
 
-	allIPs         map[string]*ipEntry // ip -> entry
-	freeList       *list.List          // List of *ipEntry (available IPs)
-	blacklistCount int                 // New: count of IPs currently blacklisted in the pool
-	assignedCount  int                 // New: count of IPs currently assigned
-	tunnelCount    int                 // New: total count of tunnels in the pool
+	allIPs          map[string]*ipEntry   // ip -> entry
+	freeList        *list.List            // List of *ipEntry (available IPs) (Global pool)
+	localIPFreeList map[string]*list.List // localIP -> List of *ipEntry (Line-specific pools)
+	regionFreeList  map[string]*list.List // region -> List of *ipEntry (Region-specific pools)
+	localIPRR       uint64                // Round-robin counter for lines
+	blacklistCount  int                   // New: count of IPs currently blacklisted in the pool
+	assignedCount   int                   // New: count of IPs currently assigned
+	tunnelCount     int                   // total count of tunnels in the pool
+	lineNodes       map[string]int        // Real-time: LocalIP -> tunnel count
 }
 
 type PoolStats struct {
@@ -31,12 +40,58 @@ type PoolStats struct {
 	BlacklistIPCount int
 	AssignedIPCount  int
 	TunnelCount      int
+	LineNodes        map[string]int // LineID (LocalIP) -> NodeCount in free list
+	RegionNodes      map[string]int // Region -> NodeCount in free list
 }
 
 func NewIPPool() *IPPool {
 	return &IPPool{
-		allIPs:   make(map[string]*ipEntry),
-		freeList: list.New(),
+		allIPs:          make(map[string]*ipEntry),
+		freeList:        list.New(),
+		localIPFreeList: make(map[string]*list.List),
+		regionFreeList:  make(map[string]*list.List),
+		lineNodes:       make(map[string]int),
+	}
+}
+
+func (p *IPPool) addToFreePool(entry *ipEntry) {
+	if entry.element == nil {
+		entry.element = p.freeList.PushBack(entry)
+	}
+	if entry.localIPElement == nil {
+		l, ok := p.localIPFreeList[entry.localIP]
+		if !ok {
+			l = list.New()
+			p.localIPFreeList[entry.localIP] = l
+		}
+		entry.localIPElement = l.PushBack(entry)
+	}
+	if entry.region != "" && entry.regionElement == nil {
+		l, ok := p.regionFreeList[entry.region]
+		if !ok {
+			l = list.New()
+			p.regionFreeList[entry.region] = l
+		}
+		entry.regionElement = l.PushBack(entry)
+	}
+}
+
+func (p *IPPool) removeFromFreePool(entry *ipEntry) {
+	if entry.element != nil {
+		p.freeList.Remove(entry.element)
+		entry.element = nil
+	}
+	if entry.localIPElement != nil {
+		if l, ok := p.localIPFreeList[entry.localIP]; ok {
+			l.Remove(entry.localIPElement)
+		}
+		entry.localIPElement = nil
+	}
+	if entry.regionElement != nil {
+		if l, ok := p.regionFreeList[entry.region]; ok {
+			l.Remove(entry.regionElement)
+		}
+		entry.regionElement = nil
 	}
 }
 
@@ -47,6 +102,8 @@ func (p *IPPool) AddTunnel(t *Tunnel, isBlacklisted bool) {
 
 	ip := t.opts.IP
 	nodeID := t.opts.Id
+	localIP := t.opts.LocalIP
+	region := t.opts.Region
 
 	entry, ok := p.allIPs[ip]
 	if !ok {
@@ -54,6 +111,8 @@ func (p *IPPool) AddTunnel(t *Tunnel, isBlacklisted bool) {
 			ip:            ip,
 			tunnels:       make(map[string]*Tunnel),
 			isBlacklisted: isBlacklisted,
+			localIP:       localIP,
+			region:        region,
 		}
 		p.allIPs[ip] = entry
 		if isBlacklisted {
@@ -62,29 +121,26 @@ func (p *IPPool) AddTunnel(t *Tunnel, isBlacklisted bool) {
 
 		// New IP starts as free if not blacklisted
 		if !isBlacklisted {
-			entry.element = p.freeList.PushBack(entry)
+			p.addToFreePool(entry)
 		}
 	} else {
 		// If entry already exists, update blacklist status if it changed
-		// (e.g., node reconnected and we have new info, though usually managed by Activate/Deactivate)
 		if !entry.isBlacklisted && isBlacklisted {
 			entry.isBlacklisted = true
 			p.blacklistCount++
-			if entry.element != nil {
-				p.freeList.Remove(entry.element)
-				entry.element = nil
-			}
+			p.removeFromFreePool(entry)
 		} else if entry.isBlacklisted && !isBlacklisted {
 			entry.isBlacklisted = false
 			p.blacklistCount--
 			if entry.element == nil && entry.assignedNodeID == "" {
-				entry.element = p.freeList.PushBack(entry)
+				p.addToFreePool(entry)
 			}
 		}
 	}
 
 	entry.tunnels[nodeID] = t
 	p.tunnelCount++
+	p.lineNodes[localIP]++
 }
 
 // RemoveTunnel removes a tunnel. If it was the last tunnel for an IP, the IP is removed.
@@ -99,23 +155,22 @@ func (p *IPPool) RemoveTunnel(t *Tunnel) {
 
 	delete(entry.tunnels, t.opts.Id)
 	p.tunnelCount--
+	p.lineNodes[t.opts.LocalIP]--
 
 	// If the tunnel being removed was the one assigned to a session
 	if entry.assignedNodeID == t.opts.Id {
 		entry.assignedNodeID = ""
 		p.assignedCount--
-		// If the IP was Busy (element == nil) but still has other tunnels,
-		// return it to freeList so it can be re-acquired (avoid leak)
+		// If the IP was Busy but still has other tunnels,
+		// return it to free lists so it can be re-acquired (avoid leak)
 		if entry.element == nil && len(entry.tunnels) > 0 {
-			entry.element = p.freeList.PushBack(entry)
+			p.addToFreePool(entry)
 		}
 	}
 
 	// If no more tunnels for this IP, remove the IP from the pool
 	if len(entry.tunnels) == 0 {
-		if entry.element != nil {
-			p.freeList.Remove(entry.element)
-		}
+		p.removeFromFreePool(entry)
 		if entry.isBlacklisted {
 			p.blacklistCount--
 		}
@@ -124,26 +179,24 @@ func (p *IPPool) RemoveTunnel(t *Tunnel) {
 }
 
 // RemoveIP removes the entire IP entry from the pool, regardless of tunnels.
-func (p *IPPool) RemoveIP(ip string) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+// func (p *IPPool) RemoveIP(ip string) {
+// 	p.mu.Lock()
+// 	defer p.mu.Unlock()
 
-	entry, ok := p.allIPs[ip]
-	if !ok {
-		return
-	}
+// 	entry, ok := p.allIPs[ip]
+// 	if !ok {
+// 		return
+// 	}
 
-	if entry.element != nil {
-		p.freeList.Remove(entry.element)
-	}
-	if entry.isBlacklisted {
-		p.blacklistCount--
-	}
-	if entry.assignedNodeID != "" {
-		p.assignedCount--
-	}
-	delete(p.allIPs, ip)
-}
+// 	p.removeFromFreePool(entry)
+// 	if entry.isBlacklisted {
+// 		p.blacklistCount--
+// 	}
+// 	if entry.assignedNodeID != "" {
+// 		p.assignedCount--
+// 	}
+// 	delete(p.allIPs, ip)
+// }
 
 // ActivateIP marks an IP as not blacklisted and returns it to the free list if possible.
 func (p *IPPool) ActivateIP(ip string) {
@@ -158,9 +211,9 @@ func (p *IPPool) ActivateIP(ip string) {
 	entry.isBlacklisted = false
 	p.blacklistCount--
 
-	// If it has tunnels and is not assigned, it should be in freeList
+	// If it has tunnels and is not assigned, it should be in free lists
 	if len(entry.tunnels) > 0 && entry.element == nil && entry.assignedNodeID == "" {
-		entry.element = p.freeList.PushBack(entry)
+		p.addToFreePool(entry)
 	}
 }
 
@@ -179,35 +232,83 @@ func (p *IPPool) DeactivateIP(ip string) {
 	entry.isBlacklisted = true
 	p.blacklistCount++
 
-	if entry.element != nil {
-		p.freeList.Remove(entry.element)
-		entry.element = nil
-	}
+	p.removeFromFreePool(entry)
 }
 
-// AcquireIP picks a free IP and one of its nodes.
-// It marks the IP as busy so no other session can take it.
-func (p *IPPool) AcquireIP() (string, *Tunnel) {
+// AcquireIP is the unified entry point for IP allocation.
+// It prioritizes region-based allocation if a region is specified,
+// otherwise balances across PPPoE lines if multiple are available.
+// If none of the above apply, it falls back to standard FIFO allocation.
+func (p *IPPool) AcquireIP(region string) (string, *Tunnel) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	element := p.freeList.Front()
+	// 1. If region is specified, try region list
+	if region != "" {
+		if l, ok := p.regionFreeList[region]; ok && l.Len() > 0 {
+			return p.acquireFromListLocked(l)
+		}
+	}
+
+	// 2. If multiple local IPs detected, use Line strategy (balanced)
+	if len(p.localIPFreeList) > 1 {
+		return p.acquireByLineLocked()
+	}
+
+	// 3. Fallback to standard Acquire (FIFO)
+	return p.acquireFromListLocked(p.freeList)
+}
+
+func (p *IPPool) acquireFromListLocked(l *list.List) (string, *Tunnel) {
+	element := l.Front()
 	if element == nil {
 		return "", nil
 	}
-
 	entry := element.Value.(*ipEntry)
-	p.freeList.Remove(element)
-	entry.element = nil
+	p.removeFromFreePool(entry)
 
-	// Pick a tunnel and record its ID
 	for id, t := range entry.tunnels {
 		entry.assignedNodeID = id
 		p.assignedCount++
 		return entry.ip, t
 	}
+	return "", nil
+}
 
-	return "", nil // Should not happen if Add/Remove is correct
+func (p *IPPool) acquireByLineLocked() (string, *Tunnel) {
+	if len(p.localIPFreeList) == 0 {
+		return "", nil
+	}
+
+	localIPs := make([]string, 0, len(p.localIPFreeList))
+	for ip := range p.localIPFreeList {
+		localIPs = append(localIPs, ip)
+	}
+	sort.Strings(localIPs)
+
+	startIdx := int(p.localIPRR % uint64(len(localIPs)))
+	p.localIPRR++
+
+	for i := 0; i < len(localIPs); i++ {
+		idx := (startIdx + i) % len(localIPs)
+		localIP := localIPs[idx]
+		l := p.localIPFreeList[localIP]
+
+		if l.Len() > 0 {
+			element := l.Front()
+			entry := element.Value.(*ipEntry)
+
+			p.removeFromFreePool(entry)
+
+			for id, t := range entry.tunnels {
+				entry.assignedNodeID = id
+				p.assignedCount++
+				return entry.ip, t
+			}
+		}
+	}
+
+	return "", nil
 }
 
 // ReleaseIP returns an IP to the free list if it still has active nodes and is not blacklisted.
@@ -226,9 +327,9 @@ func (p *IPPool) ReleaseIP(ip string) {
 		p.assignedCount--
 	}
 
-	// return to free list only if not blacklisted and has active tunnels
+	// return to free lists only if not blacklisted and has active tunnels
 	if entry.element == nil && len(entry.tunnels) > 0 && !entry.isBlacklisted {
-		entry.element = p.freeList.PushBack(entry)
+		p.addToFreePool(entry)
 	}
 }
 
@@ -271,12 +372,20 @@ func (p *IPPool) IsIPDeactivated(ip string) bool {
 func (p *IPPool) GetPoolStats() PoolStats {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+
+	stats := make(map[string]int)
+	for k, v := range p.lineNodes {
+		stats[k] = v
+	}
+
 	return PoolStats{
 		TotalIPCount:     len(p.allIPs),
 		FreeIPCount:      p.freeList.Len(),
 		BlacklistIPCount: p.blacklistCount,
 		AssignedIPCount:  p.assignedCount,
 		TunnelCount:      p.tunnelCount,
+		LineNodes:        stats,
+		// RegionNodes:      regionNodes,
 	}
 }
 

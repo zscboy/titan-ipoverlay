@@ -237,6 +237,14 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, n
 	node.LoginAt = time.Now().Format(model.TimeLayout)
 
 	config := tm.config
+
+	localIP := ""
+	if addr, _, err := net.SplitHostPort(conn.LocalAddr().String()); err == nil {
+		localIP = addr
+	} else {
+		localIP = conn.LocalAddr().String()
+	}
+
 	opts := &TunOptions{
 		Id:                node.Id,
 		OS:                node.OS,
@@ -247,6 +255,7 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, n
 		DownloadRateLimti: config.WS.DownloadRateLimit,
 		UploadRateLimit:   config.WS.UploadRateLimit,
 		IsBlacklisted:     node.IsBlacklisted,
+		LocalIP:           localIP,
 	}
 
 	tun := newTunnel(conn, tm, opts, ctx)
