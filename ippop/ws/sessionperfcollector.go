@@ -310,13 +310,13 @@ func (c *SessionPerfCollector) handlePerformanceRecord(r *SessionPerfRecord) {
 	metrics.BottleneckDetection.WithLabelValues(r.Bottleneck, sanitizedUser, c.nodeID).Inc()
 
 	// 多维度流量统计 (Task 4)
-	totalBytes := (r.T1BytesMB + r.T3BytesMB) * 1024 * 1024
-	if r.TargetDomain != "" {
-		metrics.DomainTraffic.WithLabelValues(sanitizedUser, r.TargetDomain, c.nodeID).Add(totalBytes)
-	}
-	if r.CountryCode != "" {
-		metrics.CountryTraffic.WithLabelValues(sanitizedUser, r.CountryCode, c.nodeID).Add(totalBytes)
-	}
+	// totalBytes := (r.T1BytesMB + r.T3BytesMB) * 1024 * 1024
+	// if r.TargetDomain != "" {
+	// 	metrics.DomainTraffic.WithLabelValues(sanitizedUser, r.TargetDomain, c.nodeID).Add(totalBytes)
+	// }
+	// if r.CountryCode != "" {
+	// 	metrics.CountryTraffic.WithLabelValues(sanitizedUser, r.CountryCode, c.nodeID).Add(totalBytes)
+	// }
 }
 
 // Stop 停止收集器
