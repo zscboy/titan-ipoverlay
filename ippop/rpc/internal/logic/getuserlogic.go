@@ -47,11 +47,9 @@ func (l *GetUserLogic) GetUser(in *pb.GetUserReq) (*pb.User, error) {
 	trafficLimit := &pb.TrafficLimit{StartTime: user.StartTime, EndTime: user.EndTime, TotalTraffic: user.TotalTraffic}
 	route := &pb.Route{Mode: int32(user.RouteMode), NodeId: user.RouteNodeID, IntervalMinutes: int32(user.UpdateRouteIntervalMinutes), UtcMinuteOfDay: int32(user.UpdateRouteUtcMinuteOfDay)}
 	u := &pb.User{
-		UserName:     in.UserName,
-		TrafficLimit: trafficLimit,
-		Route:        route,
-		// NodeIp:              node.IP,
-		// NodeOnline:          node.Online,
+		UserName:            in.UserName,
+		TrafficLimit:        trafficLimit,
+		Route:               route,
 		CurrentTraffic:      user.CurrentTraffic,
 		Off:                 user.Off,
 		UploadRateLimite:    user.UploadRateLimit,
@@ -61,7 +59,7 @@ func (l *GetUserLogic) GetUser(in *pb.GetUserReq) (*pb.User, error) {
 
 	if node != nil {
 		u.NodeIp = node.IP
-		u.NodeOnline = node.Online
+		u.NodeOnline = l.svcCtx.IsOnline(user.RouteNodeID)
 	}
 
 	return u, nil

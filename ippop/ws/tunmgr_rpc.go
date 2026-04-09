@@ -8,6 +8,11 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
+func (tm *TunnelManager) IsOnline(nodeID string) bool {
+	_, ok := tm.tunnels.Load(nodeID)
+	return ok
+}
+
 // Kick implements svc.NodeManager interface
 func (tm *TunnelManager) Kick(nodeID string) error {
 	return tm.KickNode(nodeID)

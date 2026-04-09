@@ -7,6 +7,7 @@ import (
 )
 
 type NodeManager interface {
+	IsOnline(nodeID string) bool
 	Kick(nodeID string) error
 	KickByIPs(ips []string) error
 }

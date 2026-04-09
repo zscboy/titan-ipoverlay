@@ -57,7 +57,7 @@ func (l *ListNodeLogic) listNodeWithAll(req *pb.ListNodeReq) (resp *pb.ListNodeR
 
 	ns := make([]*pb.Node, 0, len(nodes))
 	for _, node := range nodes {
-		n := &pb.Node{Id: node.Id, Ip: node.IP, NetDelay: int32(node.NetDelay), BindUser: node.BindUser, Online: node.Online}
+		n := &pb.Node{Id: node.Id, Ip: node.IP, NetDelay: int32(node.NetDelay), BindUser: node.BindUser, Online: l.svcCtx.IsOnline(node.Id)}
 		ns = append(ns, n)
 	}
 
@@ -77,7 +77,7 @@ func (l *ListNodeLogic) listNodeWithFree(req *pb.ListNodeReq) (resp *pb.ListNode
 
 	ns := make([]*pb.Node, 0, len(nodes))
 	for _, node := range nodes {
-		n := &pb.Node{Id: node.Id, Ip: node.IP, NetDelay: int32(node.NetDelay), BindUser: node.BindUser, Online: node.Online}
+		n := &pb.Node{Id: node.Id, Ip: node.IP, NetDelay: int32(node.NetDelay), BindUser: node.BindUser, Online: l.svcCtx.IsOnline(node.Id)}
 		ns = append(ns, n)
 	}
 
@@ -97,7 +97,7 @@ func (l *ListNodeLogic) listNodeWithBind(req *pb.ListNodeReq) (resp *pb.ListNode
 
 	ns := make([]*pb.Node, 0, len(nodes))
 	for _, node := range nodes {
-		n := &pb.Node{Id: node.Id, Ip: node.IP, NetDelay: int32(node.NetDelay), BindUser: node.BindUser, Online: node.Online}
+		n := &pb.Node{Id: node.Id, Ip: node.IP, NetDelay: int32(node.NetDelay), BindUser: node.BindUser, Online: l.svcCtx.IsOnline(node.Id)}
 		ns = append(ns, n)
 	}
 

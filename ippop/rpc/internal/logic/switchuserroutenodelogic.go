@@ -75,7 +75,7 @@ func (l *SwitchUserRouteNodeLogic) checkNode(nodeID string) error {
 		return fmt.Errorf("node %s alreay used by user %s", nodeID, node.BindUser)
 	}
 
-	if !node.Online {
+	if !l.svcCtx.IsOnline(nodeID) {
 		return fmt.Errorf("node %s offline", nodeID)
 	}
 

@@ -72,7 +72,7 @@ func (l *ListUserLogic) ListUser(in *pb.ListUserReq) (*pb.ListUserResp, error) {
 		}
 
 		user.NodeIp = node.IP
-		user.NodeOnline = node.Online
+		user.NodeOnline = l.svcCtx.IsOnline(user.Route.NodeId)
 	}
 
 	total, err := model.GetUserLen(l.svcCtx.Redis)
