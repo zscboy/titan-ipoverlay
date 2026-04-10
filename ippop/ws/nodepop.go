@@ -31,7 +31,14 @@ func NewNodePop(cfg *config.Config) *NodePop {
 }
 func (h *NodePop) isLocalRequest(r *http.Request) bool {
 	host, _, _ := net.SplitHostPort(r.RemoteAddr)
-	return host == "127.0.0.1" || host == "::1" || host == "localhost"
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	return ip.IsLoopback() || ip.IsPrivate()
 }
 
 func (pop *NodePop) ServeNodePop(w http.ResponseWriter, r *http.Request) {

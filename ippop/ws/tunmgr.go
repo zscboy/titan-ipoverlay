@@ -388,11 +388,7 @@ func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks
 		return fmt.Errorf("can not allocate tunnel, user %s", targetInfo.Username)
 	}
 
-	if targetInfo.Session != "" {
-		logx.Infof("HandleSocks5TCP: user %s session %s allocated on node %s, target %s:%d", targetInfo.Username, targetInfo.Session, tun.opts.Id, targetInfo.DomainName, targetInfo.Port)
-	} else {
-		logx.Debugf("HandleSocks5TCP: user %s allocated on node %s, target %s:%s", targetInfo.Username, tun.opts.Id, targetInfo.DomainName, targetInfo.Port)
-	}
+	logx.Infof("HandleSocks5TCP: user %s session [%s] allocated on node %s, target %s:%d", targetInfo.Username, targetInfo.Session, tun.opts.Id, targetInfo.DomainName, targetInfo.Port)
 
 	if userSession != nil {
 		defer tm.sessionManager.Decrement(userSession)
@@ -498,7 +494,14 @@ func (tm *TunnelManager) keepalive() {
 		tickCount++
 		if tickCount > 10 {
 			stats := tm.ipPool.GetPoolStats()
-			logx.Infof("TunnelManager.keepalive tunnel count:%d/%d, cost:%v, ipCount:%d, freeCount:%d, blackCount:%d, assignedCount:%d, session len:%d", count, stats.TunnelCount, time.Since(now), stats.TotalIPCount, stats.FreeIPCount, stats.BlacklistIPCount, stats.AssignedIPCount, tm.sessionManager.SessionLen())
+
+			lineInfo := ""
+			for line, nodes := range stats.LineNodes {
+				lineInfo += fmt.Sprintf("%s:%d ", line, nodes)
+			}
+
+			logx.Infof("TunnelManager.keepalive lines:[ %s], tunnel count:%d/%d, cost:%v, ipCount:%d, freeCount:%d, blackCount:%d, assignedCount:%d, session len:%d",
+				lineInfo, count, stats.TunnelCount, time.Since(now), stats.TotalIPCount, stats.FreeIPCount, stats.BlacklistIPCount, stats.AssignedIPCount, tm.sessionManager.SessionLen())
 			tickCount = 0
 		}
 	}
