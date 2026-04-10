@@ -102,6 +102,10 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 }
 
 func (tm *TunnelManager) syncBlacklistLoop() {
+	if !tm.config.QoS.EnableBandwidthBlacklist {
+		return
+	}
+
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
@@ -195,11 +199,6 @@ func (tm *TunnelManager) BlacklistNode(ip string, nodeID string, reason string) 
 
 	// 异步更新 Redis 黑名单
 	go func() {
-		// 如果开关关闭，直接跳过自动拉黑逻辑
-		if !tm.config.QoS.EnableBandwidthBlacklist {
-			logx.Infof("QoS: Bandwidth blacklist is disabled in config. Skipping automatic blacklist for IP %s", ip)
-			return
-		}
 
 		if err := model.AddBlacklist(tm.redis, []string{ip}); err != nil {
 			logx.Errorf("QoS: Failed to add IP %s to Redis blacklist: %v", ip, err)
@@ -352,8 +351,10 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, n
 
 	tun := newTunnel(conn, tm, opts, ctx)
 	// QoS: 从 Redis 加载节点的 Strike 历史计数，实现状态继承
-	if strike, err := model.GetNodeStrike(tm.redis, req.NodeId); err == nil {
-		tun.strikeCount.Store(uint32(strike))
+	if tm.config.QoS.EnableBandwidthBlacklist {
+		if strike, err := model.GetNodeStrike(tm.redis, req.NodeId); err == nil {
+			tun.strikeCount.Store(uint32(strike))
+		}
 	}
 	tm.addTunnel(tun)
 

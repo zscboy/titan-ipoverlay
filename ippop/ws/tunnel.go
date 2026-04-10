@@ -202,6 +202,10 @@ type QoSProxy interface {
 }
 
 func (t *Tunnel) qosMonitor() {
+	if !t.tunMgr.config.QoS.EnableBandwidthBlacklist {
+		return
+	}
+
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
@@ -244,11 +248,8 @@ func (t *Tunnel) qosMonitor() {
 								stats.SessionID, t.opts.Id, speedMBps*1024, t.tunMgr.config.QoS.CircuitBreakerKbps)
 
 							// 极端熔断：如果开启了自动黑名单，则拉黑
-							if t.tunMgr.config.QoS.EnableBandwidthBlacklist {
-								t.tunMgr.BlacklistNode(t.opts.IP, t.opts.Id, fmt.Sprintf("Hard Circuit Breaker: Speed %.2fKBps < %dKBps for 30s", speedMBps*1024, t.tunMgr.config.QoS.CircuitBreakerKbps))
-							} else {
-								logx.Infof("QoS: node %s (IP: %s) triggered hard circuit breaker, but automatic blacklist is disabled", t.opts.Id, t.opts.IP)
-							}
+							t.tunMgr.BlacklistNode(t.opts.IP, t.opts.Id, fmt.Sprintf("Hard Circuit Breaker: Speed %.2fKBps < %dKBps for 30s", speedMBps*1024, t.tunMgr.config.QoS.CircuitBreakerKbps))
+
 							return false // 停止遍历
 						}
 					}

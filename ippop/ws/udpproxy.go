@@ -99,20 +99,22 @@ func (proxy *UDPProxy) stop() {
 	proxy.once.Do(func() {
 		close(proxy.done)
 		if proxy.perfStats != nil {
-			// QoS 结算：三振出局制 (柔性降级)
-			t3Bytes := proxy.perfStats.T3BytesSent.Load()
-			t3Dur := time.Duration(proxy.perfStats.T3Duration.Load()).Seconds()
-			if t3Dur > 0 {
-				speedMBps := (float64(t3Bytes) / t3Dur) / 1024 / 1024
-				redlineMBps := float64(proxy.tunnel.tunMgr.config.QoS.RedlineSpeedKbps) / 1024.0
+			// QoS 结算：三振出局制（仅在开启带宽黑名单时执行）
+			if proxy.tunnel.tunMgr.config.QoS.EnableBandwidthBlacklist {
+				t3Bytes := proxy.perfStats.T3BytesSent.Load()
+				t3Dur := time.Duration(proxy.perfStats.T3Duration.Load()).Seconds()
+				if t3Dur > 0 {
+					speedMBps := (float64(t3Bytes) / t3Dur) / 1024 / 1024
+					redlineMBps := float64(proxy.tunnel.tunMgr.config.QoS.RedlineSpeedKbps) / 1024.0
 
-				// 仅对有一定流量的 UDP 会话进行打分
-				if t3Bytes > 2*1024 {
-					if speedMBps < redlineMBps {
-						proxy.tunnel.tunMgr.AddStrike(proxy.tunnel.opts.Id, proxy.tunnel.opts.IP,
-							fmt.Sprintf("UDP Session slow: %.2fKBps < %vKBps", speedMBps*1024, proxy.tunnel.tunMgr.config.QoS.RedlineSpeedKbps))
-					} else {
-						proxy.tunnel.tunMgr.ClearStrike(proxy.tunnel.opts.Id)
+					// 仅对有一定流量的 UDP 会话进行打分
+					if t3Bytes > 2*1024 {
+						if speedMBps < redlineMBps {
+							proxy.tunnel.tunMgr.AddStrike(proxy.tunnel.opts.Id, proxy.tunnel.opts.IP,
+								fmt.Sprintf("UDP Session slow: %.2fKBps < %vKBps", speedMBps*1024, proxy.tunnel.tunMgr.config.QoS.RedlineSpeedKbps))
+						} else {
+							proxy.tunnel.tunMgr.ClearStrike(proxy.tunnel.opts.Id)
+						}
 					}
 				}
 			}
