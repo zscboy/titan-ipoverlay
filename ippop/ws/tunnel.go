@@ -35,7 +35,6 @@ type TunOptions struct {
 	OS          string
 	VMAPI       string
 	IP          string
-	LocalIP     string // The server's local IP assigned to this connection
 	Version     string
 	CountryCode string // 国家码，如 "US"
 	// seconds
