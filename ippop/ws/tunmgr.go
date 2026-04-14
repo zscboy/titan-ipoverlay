@@ -90,6 +90,7 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 	tm.allocatorRegistry.Register(model.RouteModeManual, NewStaticAllocator(tm))
 	tm.allocatorRegistry.Register(model.RouteModeTimed, NewStaticAllocator(tm))
 	tm.allocatorRegistry.Register(model.RouteModeCustom, NewSessionAllocator(tm.sessionManager, tm))
+	tm.allocatorRegistry.Register(model.RouteModePolling, NewPollingAllocator(tm))
 
 	tm.loadBlacklist()
 

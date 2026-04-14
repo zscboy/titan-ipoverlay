@@ -16,6 +16,7 @@ type NodeSource interface {
 	ReleaseExclusiveNodes(nodeIDs []string, ips []string)
 	GetLocalTunnel(nodeID string) *Tunnel
 	SwitchNodeForUser(user *model.User) error
+	AcquirePollingNode() (string, *Tunnel, error)
 }
 
 // UserSession tracks the binding between a user session and a node.

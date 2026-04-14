@@ -17,6 +17,7 @@ const (
 	RouteModeManual
 	RouteModeTimed
 	RouteModeCustom
+	RouteModePolling
 )
 
 func (m RouteMode) String() string {
@@ -29,6 +30,8 @@ func (m RouteMode) String() string {
 		return "timed"
 	case RouteModeCustom:
 		return "custom"
+	case RouteModePolling:
+		return "polling"
 	default:
 		return fmt.Sprintf("unknown(%d)", int(m))
 	}

@@ -79,3 +79,11 @@ func (tm *TunnelManager) GetLocalTunnel(nodeID string) *Tunnel {
 	}
 	return v.(*Tunnel)
 }
+// AcquirePollingNode implements NodeSource interface
+func (tm *TunnelManager) AcquirePollingNode() (string, *Tunnel, error) {
+	exitIP, tun := tm.ipPool.AcquirePollingIP()
+	if tun == nil {
+		return "", nil, fmt.Errorf("no available IPs in pool for polling")
+	}
+	return exitIP, tun, nil
+}

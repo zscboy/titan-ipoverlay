@@ -442,3 +442,34 @@ func (p *IPPool) GetFreeIPsFromHead(count int) []FreeIPInfo {
 	}
 	return res
 }
+// AcquirePollingIP picks an IP for polling mode in O(1) and rotates it to the back.
+func (p *IPPool) AcquirePollingIP() (string, *Tunnel) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	element := p.freeList.Front()
+	if element == nil {
+		return "", nil
+	}
+
+	entry := element.Value.(*ipEntry)
+
+	// Rotate: move to the back of all free lists to maintain LRU/Round-robin order.
+	p.freeList.MoveToBack(element)
+	if entry.localIPElement != nil {
+		if l, ok := p.localIPFreeList[entry.localIP]; ok {
+			l.MoveToBack(entry.localIPElement)
+		}
+	}
+	if entry.regionElement != nil {
+		if l, ok := p.regionFreeList[entry.region]; ok {
+			l.MoveToBack(entry.regionElement)
+		}
+	}
+
+	for _, t := range entry.tunnels {
+		return entry.ip, t
+	}
+
+	return "", nil
+}
