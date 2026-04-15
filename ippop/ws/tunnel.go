@@ -115,7 +115,7 @@ type Tunnel struct {
 	// QoS: 该节点当前的 Strike 计数 (0-3)
 	strikeCount atomic.Uint32
 
-	downloadBuckets DownloadBucketStats
+	downloadBuckets sync.Map
 }
 
 func newTunnel(conn *websocket.Conn, tunMgr *TunnelManager, opts *TunOptions, ctx context.Context) *Tunnel {
@@ -805,30 +805,6 @@ func (t *Tunnel) getTrafficStats() *TrafficStats {
 	return t.trafficStats
 }
 
-func (t *Tunnel) ReportDownloadBucket(size int64) {
-	const MB = 1024 * 1024
-	switch {
-	case size <= 1*MB:
-		t.downloadBuckets.Count1M++
-	case size <= 5*MB:
-		t.downloadBuckets.Count5M++
-	case size <= 10*MB:
-		t.downloadBuckets.Count10M++
-	case size <= 50*MB:
-		t.downloadBuckets.Count50M++
-	case size <= 100*MB:
-		t.downloadBuckets.Count100M++
-	case size <= 250*MB:
-		t.downloadBuckets.Count250M++
-	case size <= 500*MB:
-		t.downloadBuckets.Count500M++
-	case size <= 1000*MB:
-		t.downloadBuckets.Count1000M++
-	default:
-		t.downloadBuckets.CountMore++
-	}
-}
-
 func (t *Tunnel) addTrafficStats(writeBytes int, writeDuration time.Duration) {
 	t.trafficStats.WriteBytes.Add(int64(writeBytes))
 	t.trafficStats.WriteDuration.Add(int64(writeDuration))
@@ -942,4 +918,17 @@ func (t *Tunnel) isNodeVersionGreatThanV100() bool {
 
 func (t *Tunnel) addUserTrafficStats(username string, downloadTraffic int64, uploadTraffic int64) {
 	t.tunMgr.addUserTrafficStats(username, downloadTraffic, uploadTraffic)
+}
+
+func (t *Tunnel) getOrCreateUserBuckets(userName string) *DownloadBucketStats {
+	v, _ := t.downloadBuckets.LoadOrStore(userName, &DownloadBucketStats{})
+	return v.(*DownloadBucketStats)
+}
+
+func (t *Tunnel) getUserBuckets(userName string) *DownloadBucketStats {
+	v, ok := t.downloadBuckets.Load(userName)
+	if !ok {
+		return nil
+	}
+	return v.(*DownloadBucketStats)
 }

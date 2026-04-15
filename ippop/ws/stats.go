@@ -42,6 +42,7 @@ func (s *StatsQuery) ServeStats(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *StatsQuery) ServeDownloadBuckets(w http.ResponseWriter, r *http.Request) {
-	buckets := s.tm.GetDownloadBuckets()
+	userName := r.URL.Query().Get("username")
+	buckets := s.tm.GetUserDownloadBuckets(userName)
 	httpx.OkJsonCtx(r.Context(), w, &buckets)
 }

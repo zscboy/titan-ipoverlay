@@ -623,23 +623,35 @@ func (tm *TunnelManager) keepalive() {
 	}
 }
 
-func (tm *TunnelManager) accumulateDownloadBuckets(total *DownloadBucketStats, t *Tunnel) {
-	total.Count1M += t.downloadBuckets.Count1M
-	total.Count5M += t.downloadBuckets.Count5M
-	total.Count10M += t.downloadBuckets.Count10M
-	total.Count50M += t.downloadBuckets.Count50M
-	total.Count100M += t.downloadBuckets.Count100M
-	total.Count250M += t.downloadBuckets.Count250M
-	total.Count500M += t.downloadBuckets.Count500M
-	total.Count1000M += t.downloadBuckets.Count1000M
-	total.CountMore += t.downloadBuckets.CountMore
+func (tm *TunnelManager) accumulateDownloadBuckets(total *DownloadBucketStats, buckets *DownloadBucketStats) {
+	total.Count1M += atomic.LoadInt64(&buckets.Count1M)
+	total.Count5M += atomic.LoadInt64(&buckets.Count5M)
+	total.Count10M += atomic.LoadInt64(&buckets.Count10M)
+	total.Count50M += atomic.LoadInt64(&buckets.Count50M)
+	total.Count100M += atomic.LoadInt64(&buckets.Count100M)
+	total.Count250M += atomic.LoadInt64(&buckets.Count250M)
+	total.Count500M += atomic.LoadInt64(&buckets.Count500M)
+	total.Count1000M += atomic.LoadInt64(&buckets.Count1000M)
+	total.CountMore += atomic.LoadInt64(&buckets.CountMore)
 }
 
-func (tm *TunnelManager) GetDownloadBuckets() DownloadBucketStats {
+func (tm *TunnelManager) GetUserDownloadBuckets(userName string) DownloadBucketStats {
 	var total DownloadBucketStats
 	tm.tunnels.Range(func(key, value any) bool {
 		t := value.(*Tunnel)
-		tm.accumulateDownloadBuckets(&total, t)
+		if userName != "" {
+			// 查询特定用户
+			if b := t.getUserBuckets(userName); b != nil {
+				tm.accumulateDownloadBuckets(&total, b)
+			}
+		} else {
+			// 汇总该隧道下所有用户
+			t.downloadBuckets.Range(func(key, value any) bool {
+				b := value.(*DownloadBucketStats)
+				tm.accumulateDownloadBuckets(&total, b)
+				return true
+			})
+		}
 		return true
 	})
 	return total
