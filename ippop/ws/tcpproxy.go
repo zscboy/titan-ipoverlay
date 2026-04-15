@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/zeromicro/go-zero/core/logx"
@@ -23,6 +24,7 @@ type TCPProxy struct {
 	perfStats       *SessionPerfStats // 性能统计
 	downloadTraffic int64
 	uploadTraffic   int64
+	userBuckets     *DownloadBucketStats
 }
 
 func newTCPProxy(id string, conn net.Conn, t *Tunnel, userName, targetDomain, countryCode string) *TCPProxy {
@@ -34,7 +36,8 @@ func newTCPProxy(id string, conn net.Conn, t *Tunnel, userName, targetDomain, co
 		targetDomain: targetDomain,
 		activeTime:   time.Now(),
 		done:         make(chan struct{}),
-		perfStats:    NewSessionPerfStats(id, userName, targetDomain, countryCode, t.tunMgr.perfCollector.nodeID, t.opts.Id, &t.tunMgr.config.PerfMonitoring, &t.tunMgr.config.QoS, t.tunMgr.perfCollector),
+		perfStats:    NewSessionPerfStats(id, userName, targetDomain, countryCode, t.tunMgr.config.GetNodeID(), t.opts.Id, &t.tunMgr.config.PerfMonitoring, &t.tunMgr.config.QoS, t.tunMgr.perfCollector),
+		userBuckets:  t.getOrCreateUserBuckets(userName),
 	}
 }
 
@@ -70,7 +73,7 @@ func (proxy *TCPProxy) close() {
 		}
 
 		proxy.tunnel.addUserTrafficStats(proxy.userName, proxy.downloadTraffic, proxy.uploadTraffic)
-		proxy.tunnel.ReportDownloadBucket(proxy.uploadTraffic)
+		proxy.reportDownloadBucket(proxy.uploadTraffic)
 		close(proxy.done)
 	})
 }
@@ -192,4 +195,32 @@ func (proxy *TCPProxy) proxyConn() error {
 
 func (proxy *TCPProxy) GetPerfStats() *SessionPerfStats {
 	return proxy.perfStats
+}
+
+func (proxy *TCPProxy) reportDownloadBucket(size int64) {
+	if proxy.userBuckets == nil {
+		return
+	}
+
+	const MB = 1024 * 1024
+	switch {
+	case size <= 1*MB:
+		atomic.AddInt64(&proxy.userBuckets.Count1M, 1)
+	case size <= 5*MB:
+		atomic.AddInt64(&proxy.userBuckets.Count5M, 1)
+	case size <= 10*MB:
+		atomic.AddInt64(&proxy.userBuckets.Count10M, 1)
+	case size <= 50*MB:
+		atomic.AddInt64(&proxy.userBuckets.Count50M, 1)
+	case size <= 100*MB:
+		atomic.AddInt64(&proxy.userBuckets.Count100M, 1)
+	case size <= 250*MB:
+		atomic.AddInt64(&proxy.userBuckets.Count250M, 1)
+	case size <= 500*MB:
+		atomic.AddInt64(&proxy.userBuckets.Count500M, 1)
+	case size <= 1000*MB:
+		atomic.AddInt64(&proxy.userBuckets.Count1000M, 1)
+	default:
+		atomic.AddInt64(&proxy.userBuckets.CountMore, 1)
+	}
 }
