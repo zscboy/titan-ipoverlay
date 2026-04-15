@@ -70,6 +70,7 @@ func (proxy *TCPProxy) close() {
 		}
 
 		proxy.tunnel.addUserTrafficStats(proxy.userName, proxy.downloadTraffic, proxy.uploadTraffic)
+		proxy.tunnel.ReportDownloadBucket(proxy.uploadTraffic)
 		close(proxy.done)
 	})
 }

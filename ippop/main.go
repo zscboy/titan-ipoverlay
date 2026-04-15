@@ -56,6 +56,11 @@ func newWS(config config.Config, tunMgr *ws.TunnelManager) *rest.Server {
 	})
 	server.AddRoute(rest.Route{
 		Method:  "GET",
+		Path:    "/pop/download/buckets",
+		Handler: statsQuery.ServeDownloadBuckets,
+	})
+	server.AddRoute(rest.Route{
+		Method:  "GET",
 		Path:    "/ippool/free",
 		Handler: ippoolQuery.ServeFreeIPs,
 	})
