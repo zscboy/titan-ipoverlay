@@ -59,6 +59,18 @@ type TrafficStats struct {
 	WriteBytes    atomic.Int64
 }
 
+type DownloadBucketStats struct {
+	Count1M    int64 `json:"count_1m"`
+	Count5M    int64 `json:"count_5m"`
+	Count10M   int64 `json:"count_10m"`
+	Count50M   int64 `json:"count_50m"`
+	Count100M  int64 `json:"count_100m"`
+	Count250M  int64 `json:"count_250m"`
+	Count500M  int64 `json:"count_500m"`
+	Count1000M int64 `json:"count_1000m"`
+	CountMore  int64 `json:"count_more"`
+}
+
 // UploadTester handles upload bandwidth test state
 type UploadTester struct {
 	IsTesting  atomic.Bool
@@ -102,6 +114,8 @@ type Tunnel struct {
 
 	// QoS: 该节点当前的 Strike 计数 (0-3)
 	strikeCount atomic.Uint32
+
+	downloadBuckets DownloadBucketStats
 }
 
 func newTunnel(conn *websocket.Conn, tunMgr *TunnelManager, opts *TunOptions, ctx context.Context) *Tunnel {
@@ -789,6 +803,30 @@ func (t *Tunnel) clearProxys() {
 
 func (t *Tunnel) getTrafficStats() *TrafficStats {
 	return t.trafficStats
+}
+
+func (t *Tunnel) ReportDownloadBucket(size int64) {
+	const MB = 1024 * 1024
+	switch {
+	case size <= 1*MB:
+		t.downloadBuckets.Count1M++
+	case size <= 5*MB:
+		t.downloadBuckets.Count5M++
+	case size <= 10*MB:
+		t.downloadBuckets.Count10M++
+	case size <= 50*MB:
+		t.downloadBuckets.Count50M++
+	case size <= 100*MB:
+		t.downloadBuckets.Count100M++
+	case size <= 250*MB:
+		t.downloadBuckets.Count250M++
+	case size <= 500*MB:
+		t.downloadBuckets.Count500M++
+	case size <= 1000*MB:
+		t.downloadBuckets.Count1000M++
+	default:
+		t.downloadBuckets.CountMore++
+	}
 }
 
 func (t *Tunnel) addTrafficStats(writeBytes int, writeDuration time.Duration) {

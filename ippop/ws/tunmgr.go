@@ -623,6 +623,28 @@ func (tm *TunnelManager) keepalive() {
 	}
 }
 
+func (tm *TunnelManager) accumulateDownloadBuckets(total *DownloadBucketStats, t *Tunnel) {
+	total.Count1M += t.downloadBuckets.Count1M
+	total.Count5M += t.downloadBuckets.Count5M
+	total.Count10M += t.downloadBuckets.Count10M
+	total.Count50M += t.downloadBuckets.Count50M
+	total.Count100M += t.downloadBuckets.Count100M
+	total.Count250M += t.downloadBuckets.Count250M
+	total.Count500M += t.downloadBuckets.Count500M
+	total.Count1000M += t.downloadBuckets.Count1000M
+	total.CountMore += t.downloadBuckets.CountMore
+}
+
+func (tm *TunnelManager) GetDownloadBuckets() DownloadBucketStats {
+	var total DownloadBucketStats
+	tm.tunnels.Range(func(key, value any) bool {
+		t := value.(*Tunnel)
+		tm.accumulateDownloadBuckets(&total, t)
+		return true
+	})
+	return total
+}
+
 func (tm *TunnelManager) setNodeOnlineDataExpire() {
 	ticker := time.NewTicker(setOnlineTableExpireTick * time.Second)
 	defer ticker.Stop()
