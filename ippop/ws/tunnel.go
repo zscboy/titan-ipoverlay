@@ -546,7 +546,7 @@ func (t *Tunnel) acceptSocks5TCPConn(conn net.Conn, targetInfo *socks5.SocksTarg
 	err := t.createClientWithDest(&pb.DestAddr{Addr: addr}, sessionID)
 	if err != nil {
 		t.proxys.Delete(sessionID)
-		return fmt.Errorf("Tunnel.acceptSocks5TCPConn client create by Domain failed, cost:%dms, addr:%s, err:%v, tun:%s ip:%s session:%s", time.Since(now).Milliseconds(), addr, err, t.opts.Id, t.opts.IP, sessionID)
+		return fmt.Errorf("Tunnel.acceptSocks5TCPConn client create by Domain failed, user:%s, socks5-session:%s, cost:%dms, addr:%s, err:%v, tun:%s ip:%s tunnel-session:%s", targetInfo.Username, targetInfo.Session, time.Since(now).Milliseconds(), addr, err, t.opts.Id, t.opts.IP, sessionID)
 	}
 
 	if len(targetInfo.ExtraBytes) > 0 {
