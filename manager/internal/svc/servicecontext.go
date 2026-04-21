@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"titan-ipoverlay/ippop/businesspack"
 	"titan-ipoverlay/ippop/rpc/serverapi"
 	"titan-ipoverlay/manager/internal/config"
 	"titan-ipoverlay/manager/model"
@@ -38,6 +39,7 @@ type ServiceContext struct {
 	BlacklistMap   sync.Map
 	StrategyRR     sync.Map // map[string]*uint64
 	NodePopCache   sync.Map // map[string]*NodeCacheItem
+	PackClassifier *businesspack.Classifier
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
@@ -60,10 +62,23 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		IPGroup:        &singleflight.Group{},
 		RegionStrategy: regionStrategy,
 		VendorStrategy: vendorStrategy,
+		PackClassifier: newPackClassifier(c.BusinessPack),
 	}
 
 	sc.loadBlacklist()
 	return sc
+}
+
+func newPackClassifier(cfg config.BusinessPack) *businesspack.Classifier {
+	rules := make([]businesspack.Rule, 0, len(cfg.Rules))
+	for _, rule := range cfg.Rules {
+		rules = append(rules, businesspack.Rule{
+			MatchType: rule.MatchType,
+			Pattern:   rule.Pattern,
+			Pack:      rule.Pack,
+		})
+	}
+	return businesspack.NewClassifier(rules, cfg.DefaultPack)
 }
 
 func (sc *ServiceContext) loadBlacklist() {

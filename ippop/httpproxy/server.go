@@ -130,7 +130,7 @@ func (s *Server) Stop() {
 
 	log.Println("Shutting down server...")
 	if err := s.server.Shutdown(context.TODO()); err != nil {
-		logx.Error("server shutdown failed: %v", err)
+		logx.Errorf("server shutdown failed: %v", err)
 	}
 
 }

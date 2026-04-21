@@ -12,11 +12,11 @@ import (
 
 // NodeSource defines the capabilities required from the tunnel provider.
 type NodeSource interface {
-	AcquireExclusiveNode(ctx context.Context) (string, *Tunnel, error)
+	AcquireExclusiveNode(ctx context.Context, criteria AllocationCriteria) (string, *Tunnel, error)
 	ReleaseExclusiveNodes(nodeIDs []string, ips []string)
 	GetLocalTunnel(nodeID string) *Tunnel
 	SwitchNodeForUser(user *model.User) error
-	AcquirePollingNode() (string, *Tunnel, error)
+	AcquirePollingNode(criteria AllocationCriteria) (string, *Tunnel, error)
 }
 
 // UserSession tracks the binding between a user session and a node.
@@ -47,6 +47,21 @@ func (s *UserSession) GetErrorCount() int32 {
 // NodeAllocator is the interface for different node assignment strategies.
 type NodeAllocator interface {
 	Allocate(user *model.User, target *socks5.SocksTargetInfo) (*Tunnel, *UserSession, error)
+}
+
+type AllocationCriteria struct {
+	Region       string
+	BusinessPack string
+}
+
+func criteriaFromTarget(target *socks5.SocksTargetInfo) AllocationCriteria {
+	if target == nil {
+		return AllocationCriteria{}
+	}
+	return AllocationCriteria{
+		Region:       target.Region,
+		BusinessPack: target.Pack,
+	}
 }
 
 // AllocatorRegistry manages different allocation strategies based on RouteMode.

@@ -17,6 +17,8 @@ type SessionPerfStats struct {
 	SessionID    string
 	UserName     string
 	TargetDomain string // 目标域名
+	BusinessPack string
+	ExitIP       string
 	CountryCode  string // 国家码 (新增)
 	PopNodeID    string // POP 节点 ID
 	ClientNodeID string // 边缘节点 ID
@@ -108,11 +110,13 @@ func (s *SessionPerfStats) IsInPatienceWindow() bool {
 }
 
 // NewSessionPerfStats 创建新的会话性能统计
-func NewSessionPerfStats(sessionID, userName, targetDomain, countryCode, popNodeID, clientNodeID string, perfConfig *config.PerfMonitoring, qosConfig *config.QoSConf, collector *SessionPerfCollector) *SessionPerfStats {
+func NewSessionPerfStats(sessionID, userName, targetDomain, businessPack, exitIP, countryCode, popNodeID, clientNodeID string, perfConfig *config.PerfMonitoring, qosConfig *config.QoSConf, collector *SessionPerfCollector) *SessionPerfStats {
 	s := &SessionPerfStats{
 		SessionID:    sessionID,
 		UserName:     userName,
 		TargetDomain: targetDomain,
+		BusinessPack: businessPack,
+		ExitIP:       exitIP,
 		CountryCode:  countryCode,
 		PopNodeID:    popNodeID,
 		ClientNodeID: clientNodeID,
@@ -231,6 +235,8 @@ func (s *SessionPerfStats) Close() {
 			SessionID:    s.SessionID,
 			UserName:     s.UserName,
 			TargetDomain: s.TargetDomain,
+			BusinessPack: s.BusinessPack,
+			ExitIP:       s.ExitIP,
 			CountryCode:  s.CountryCode,
 			PopNodeID:    s.PopNodeID,
 			ClientNodeID: s.ClientNodeID,

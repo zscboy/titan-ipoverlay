@@ -6,4 +6,5 @@ const (
 	redisKeyPopNodes    = "titan:manager:pop:%s"
 	redisKeyIPLocation  = "titan:manager:iplocation"
 	redisKeyIPBlacklist = "titan:manager:ip:blacklist"
+	redisKeyNodePackStatus = "titan:node:packstatus:%s"
 )

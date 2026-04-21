@@ -125,7 +125,7 @@ func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*svc.Pop, error
 	// 3. Region Strategy (P2)
 	location, err := l.getLocalInfo(ip)
 	if err != nil {
-		logx.Errorf("GetIPLocation error: %v, node %s, ip %s", err, req.NodeId)
+		logx.Errorf("GetIPLocation error: %v, node %s, ip %s", err, req.NodeId, ip)
 		return nil, err
 	}
 

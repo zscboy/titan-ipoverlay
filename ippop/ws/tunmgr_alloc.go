@@ -10,8 +10,8 @@ import (
 )
 
 // AcquireExclusiveNode implements NodeSource interface
-func (tm *TunnelManager) AcquireExclusiveNode(ctx context.Context) (string, *Tunnel, error) {
-	ip, tun := tm.ipPool.AcquireIP("")
+func (tm *TunnelManager) AcquireExclusiveNode(ctx context.Context, criteria AllocationCriteria) (string, *Tunnel, error) {
+	ip, tun := tm.ipPool.AcquireIP(criteria, tm.packStatus.GetDecision)
 	if tun == nil {
 		return "", nil, fmt.Errorf("no free ip found in pool")
 	}
@@ -64,8 +64,8 @@ func (tm *TunnelManager) GetLocalTunnel(nodeID string) *Tunnel {
 }
 
 // AcquirePollingNode implements NodeSource interface
-func (tm *TunnelManager) AcquirePollingNode() (string, *Tunnel, error) {
-	exitIP, tun := tm.ipPool.AcquirePollingIP()
+func (tm *TunnelManager) AcquirePollingNode(criteria AllocationCriteria) (string, *Tunnel, error) {
+	exitIP, tun := tm.ipPool.AcquirePollingIP(criteria, tm.packStatus.GetDecision)
 	if tun == nil {
 		return "", nil, fmt.Errorf("no available IPs in pool for polling")
 	}

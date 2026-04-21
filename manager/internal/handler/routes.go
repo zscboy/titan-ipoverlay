@@ -36,6 +36,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 			},
 			{
 				Method:  http.MethodGet,
+				Path:    "/ip/pack/status",
+				Handler: getIPPackStatusHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodGet,
 				Path:    "/ip/blacklist/get",
 				Handler: getIPBlacklistHandler(serverCtx),
 			},
@@ -68,6 +73,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Method:  http.MethodGet,
 				Path:    "/node/list",
 				Handler: listNodeHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/business-pack/classify",
+				Handler: classifyBusinessPackHandler(serverCtx),
 			},
 			{
 				Method:  http.MethodGet,

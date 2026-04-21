@@ -11,6 +11,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"titan-ipoverlay/ippop/businesspack"
 	"titan-ipoverlay/ippop/config"
 	"titan-ipoverlay/ippop/metrics"
 	"titan-ipoverlay/ippop/model"
@@ -61,7 +62,9 @@ type TunnelManager struct {
 
 	acceptLocks []sync.Mutex
 	// 会话性能数据收集器
-	perfCollector *SessionPerfCollector
+	perfCollector  *SessionPerfCollector
+	packClassifier *businesspack.Classifier
+	packStatus     *PackStatusMatrix
 }
 
 func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
@@ -76,9 +79,11 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 		userCache:   gcache.New(userCacheSize).LRU().Build(),
 		filterRules: &Rules{rules: RulesToMap(config.FilterRules.Rules), defaultAction: config.FilterRules.DefaultAction},
 
-		ipPool:        NewIPPool(),
-		acceptLocks:   make([]sync.Mutex, acceptLockShards),
-		perfCollector: NewSessionPerfCollector(config.ClickHouse, config.GetNodeID()),
+		ipPool:         NewIPPool(),
+		acceptLocks:    make([]sync.Mutex, acceptLockShards),
+		perfCollector:  NewSessionPerfCollector(config.ClickHouse, config.GetNodeID()),
+		packClassifier: newPackClassifier(config.BusinessPack),
+		packStatus:     NewPackStatusMatrix(redis),
 	}
 
 	tm.sessionManager = NewSessionManager(tm, userSessionExpireDuration)
@@ -447,6 +452,8 @@ func (tm *TunnelManager) getTunnelByUser(user *model.User) (*Tunnel, error) {
 // have been moved to tunmgr_alloc.go and tunmgr_rpc.go respectively.
 
 func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks5.SocksTargetInfo) (err error) {
+	targetInfo.Pack = tm.resolveBusinessPack(targetInfo)
+
 	logx.Debugf("HandleSocks5TCP, user %s, DomainName %s, port %d, remote:%s, connCount:%d, connTime:%d",
 		targetInfo.Username, targetInfo.DomainName, targetInfo.Port, tcpConn.RemoteAddr().String(), tm.socks5ConnCount.Load(), time.Since(targetInfo.ConnCreateTime).Milliseconds())
 
@@ -488,7 +495,7 @@ func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks
 		return fmt.Errorf("can not allocate tunnel, user %s", targetInfo.Username)
 	}
 
-	logx.Infof("HandleSocks5TCP: user %s session [%s] allocated on node %s, target %s:%d, remote %s", targetInfo.Username, targetInfo.Session, tun.opts.Id, targetInfo.DomainName, targetInfo.Port, tcpConn.RemoteAddr().String())
+	logx.Infof("HandleSocks5TCP: user %s session [%s] allocated on node %s, target %s:%d, pack %s, region %s, remote %s", targetInfo.Username, targetInfo.Session, tun.opts.Id, targetInfo.DomainName, targetInfo.Port, targetInfo.Pack, targetInfo.Region, tcpConn.RemoteAddr().String())
 
 	if userSession != nil {
 		defer tm.sessionManager.Decrement(userSession)
@@ -502,7 +509,35 @@ func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks
 	} else if userSession != nil {
 		userSession.ResetError()
 	}
+	tm.reportBusinessPackResult(tun.opts.IP, targetInfo.Pack, err == nil)
 	return err
+}
+
+func newPackClassifier(cfg config.BusinessPack) *businesspack.Classifier {
+	rules := make([]businesspack.Rule, 0, len(cfg.Rules))
+	for _, rule := range cfg.Rules {
+		rules = append(rules, businesspack.Rule{
+			MatchType: rule.MatchType,
+			Pattern:   rule.Pattern,
+			Pack:      rule.Pack,
+		})
+	}
+	return businesspack.NewClassifier(rules, cfg.DefaultPack)
+}
+
+func (tm *TunnelManager) resolveBusinessPack(targetInfo *socks5.SocksTargetInfo) string {
+	if targetInfo == nil {
+		return businesspack.PackGeneralWeb
+	}
+	return tm.packClassifier.Classify(targetInfo.DomainName, targetInfo.Pack)
+}
+
+func (tm *TunnelManager) reportBusinessPackResult(exitIP, pack string, success bool) {
+	pack = businesspack.NormalizePack(pack)
+	if exitIP == "" || pack == "" {
+		return
+	}
+	tm.packStatus.ReportResult(exitIP, pack, success)
 }
 
 func (tm *TunnelManager) HandleSocks5UDP(udpConn socks5.UDPConn, udpInfo *socks5.Socks5UDPInfo, data []byte) error {

@@ -23,6 +23,16 @@ type AllStatsPerHourReq struct {
 	Hours int32  `form:"hours"`
 }
 
+type ClassifyBusinessPackReq struct {
+	Host          string `form:"host"`
+	RequestedPack string `form:"requested_pack,optional"`
+}
+
+type ClassifyBusinessPackResp struct {
+	Host string `json:"host"`
+	Pack string `json:"pack"`
+}
+
 type CreateUserReq struct {
 	UserName          string        `json:"user_name"`
 	Password          string        `json:"password"`
@@ -69,6 +79,24 @@ type GetIPBlacklistResp struct {
 	IPList     []string `json:"ip_list"`
 	NextCursor uint64   `json:"next_cursor"`
 	Total      int      `json:"total"`
+}
+
+type GetIPPackStatusReq struct {
+	IP   string `form:"ip"`
+	Pack string `form:"pack,optional"`
+}
+
+type IPPackStatusItem struct {
+	Pack         string `json:"pack"`
+	Label        string `json:"label"`
+	SuccessCount int64  `json:"success_count"`
+	FailureCount int64  `json:"failure_count"`
+	LastUpdated  int64  `json:"last_updated"`
+}
+
+type GetIPPackStatusResp struct {
+	IP       string              `json:"ip"`
+	Statuses []*IPPackStatusItem `json:"statuses"`
 }
 
 type GetNodePopReq struct {
