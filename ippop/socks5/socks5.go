@@ -43,6 +43,8 @@ type SocksTargetInfo struct {
 
 	ExtraBytes []byte
 	Username   string
+	Region     string
+	Pack       string
 	Session    string
 	SessTime   int64
 
@@ -359,6 +361,8 @@ func (socks5Server *Socks5Server) handleSocks5Connect(req *request) error {
 		DomainName:     req.destAddr.fqdn,
 		ExtraBytes:     extraBytes,
 		Username:       req.user.username,
+		Region:         req.user.region,
+		Pack:           req.user.pack,
 		Session:        req.user.session,
 		SessTime:       int64(req.user.sessTime),
 		ConnCreateTime: req.connCreateTime,

@@ -538,7 +538,7 @@ func (t *Tunnel) acceptSocks5TCPConn(conn net.Conn, targetInfo *socks5.SocksTarg
 	}
 
 	sessionID := uuid.NewString()
-	proxyTCP := newTCPProxy(sessionID, conn, t, targetInfo.Username, targetIdentifier, t.opts.CountryCode)
+	proxyTCP := newTCPProxy(sessionID, conn, t, targetInfo.Username, targetIdentifier, targetInfo.Pack, t.opts.IP, t.opts.CountryCode)
 
 	t.proxys.Store(sessionID, proxyTCP)
 

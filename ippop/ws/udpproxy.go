@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"time"
+	"titan-ipoverlay/ippop/businesspack"
 	"titan-ipoverlay/ippop/socks5"
 	"titan-ipoverlay/ippop/ws/pb"
 
@@ -36,7 +37,7 @@ func newProxyUDP(id string, conn socks5.UDPConn, udpInfo *socks5.Socks5UDPInfo, 
 		activeTime: time.Now(),
 		timeout:    timeout,
 		done:       make(chan struct{}),
-		perfStats:  NewSessionPerfStats(id, udpInfo.UserName, udpInfo.Dest, t.opts.CountryCode, t.tunMgr.perfCollector.nodeID, t.opts.Id, &t.tunMgr.config.PerfMonitoring, &t.tunMgr.config.QoS, t.tunMgr.perfCollector),
+		perfStats:  NewSessionPerfStats(id, udpInfo.UserName, udpInfo.Dest, businesspack.PackGeneralWeb, t.opts.IP, t.opts.CountryCode, t.tunMgr.perfCollector.nodeID, t.opts.Id, &t.tunMgr.config.PerfMonitoring, &t.tunMgr.config.QoS, t.tunMgr.perfCollector),
 	}
 }
 

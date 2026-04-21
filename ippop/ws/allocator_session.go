@@ -216,8 +216,10 @@ func NewSessionAllocator(sm *SessionManager, source NodeSource) *SessionAllocato
 	return &SessionAllocator{sm: sm, source: source}
 }
 func (a *SessionAllocator) Allocate(user *model.User, target *socks5.SocksTargetInfo) (*Tunnel, *UserSession, error) {
+	criteria := criteriaFromTarget(target)
+
 	if target.Session == "" {
-		exitIP, tun, err := a.source.AcquireExclusiveNode(context.Background())
+		exitIP, tun, err := a.source.AcquireExclusiveNode(context.Background(), criteria)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -258,7 +260,7 @@ func (a *SessionAllocator) Allocate(user *model.User, target *socks5.SocksTarget
 
 	// If we reach here, either sess is nil OR tun is dead (nil) OR it reached error threshold.
 	// Allocate new exclusive node
-	exitIP, tun, err := a.source.AcquireExclusiveNode(context.Background())
+	exitIP, tun, err := a.source.AcquireExclusiveNode(context.Background(), criteria)
 	if err != nil {
 		// If we had an active reference from GetAndActivate, we must release it
 		if hasActiveRef {

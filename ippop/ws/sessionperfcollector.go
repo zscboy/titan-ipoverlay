@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS session_perf (
     session_id     String,
     user_name      String,
     target_domain  String,
+    business_pack  String,
+    exit_ip        String,
     country_code   String,
     pop_node_id    String,
     client_node_id String,
@@ -55,6 +57,8 @@ type SessionPerfRecord struct {
 	SessionID    string  `json:"sid"`
 	UserName     string  `json:"user"`
 	TargetDomain string  `json:"domain"`
+	BusinessPack string  `json:"pack"`
+	ExitIP       string  `json:"exit_ip"`
 	CountryCode  string  `json:"country"`
 	PopNodeID    string  `json:"pop_id"`
 	ClientNodeID string  `json:"client_id"`
@@ -170,6 +174,7 @@ func NewSessionPerfCollector(chConfig config.ClickHouse, nodeID string) *Session
 				if _, err := db.Exec(createTableSQL); err != nil {
 					logx.Errorf("SessionPerfCollector: Create table error: %v", err)
 				} else {
+					c.ensureSchema()
 					logx.Info("SessionPerfCollector: ClickHouse connected and table ready")
 				}
 			}
@@ -177,6 +182,23 @@ func NewSessionPerfCollector(chConfig config.ClickHouse, nodeID string) *Session
 	}
 
 	return c
+}
+
+func (c *SessionPerfCollector) ensureSchema() {
+	if c.db == nil {
+		return
+	}
+
+	alterSQLs := []string{
+		"ALTER TABLE session_perf ADD COLUMN IF NOT EXISTS business_pack String AFTER target_domain",
+		"ALTER TABLE session_perf ADD COLUMN IF NOT EXISTS exit_ip String AFTER business_pack",
+	}
+
+	for _, sqlText := range alterSQLs {
+		if _, err := c.db.Exec(sqlText); err != nil {
+			logx.Errorf("SessionPerfCollector: ensure schema failed: %v", err)
+		}
+	}
 }
 
 // sanitizeUser 清洗用户名标签，防止 Session ID 或非法输入导致基数爆炸
@@ -511,12 +533,12 @@ flush:
 	defer tx.Rollback()
 
 	const insertSQL = `INSERT INTO session_perf (
-		session_id, user_name, target_domain, country_code, 
+		session_id, user_name, target_domain, business_pack, exit_ip, country_code, 
 		pop_node_id, client_node_id,
 		duration_sec, t1_bytes_mb, t1_speed_mbps, t1_count,
 		t2_avg_us, t2_total_ms, t2_count,
 		t3_bytes_mb, t3_speed_mbps, t3_count, bottleneck, created_at
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 	stmt, err := tx.Prepare(insertSQL)
 	if err != nil {
@@ -528,7 +550,7 @@ flush:
 	for _, r := range toFlush {
 		createdAt := time.Unix(r.Timestamp, 0)
 		_, err := stmt.Exec(
-			r.SessionID, r.UserName, r.TargetDomain, r.CountryCode,
+			r.SessionID, r.UserName, r.TargetDomain, r.BusinessPack, r.ExitIP, r.CountryCode,
 			r.PopNodeID, r.ClientNodeID,
 			r.DurationSec, r.T1BytesMB, r.T1SpeedMBps, r.T1Count,
 			r.T2AvgUs, r.T2TotalMs, r.T2Count,
@@ -560,7 +582,7 @@ func (c *SessionPerfCollector) QueryByUser(userName string, limit int) ([]Sessio
 	}
 
 	rows, err := c.db.Query(`
-		SELECT session_id, user_name, target_domain, duration_sec, 
+		SELECT session_id, user_name, target_domain, business_pack, exit_ip, duration_sec, 
 		       t1_bytes_mb, t1_speed_mbps, t1_count,
 		       t2_avg_us, t2_total_ms, t2_count,
 		       t3_bytes_mb, t3_speed_mbps, t3_count,
@@ -579,7 +601,7 @@ func (c *SessionPerfCollector) QueryByUser(userName string, limit int) ([]Sessio
 	for rows.Next() {
 		var r SessionPerfRecord
 		if err := rows.Scan(
-			&r.SessionID, &r.UserName, &r.TargetDomain, &r.DurationSec,
+			&r.SessionID, &r.UserName, &r.TargetDomain, &r.BusinessPack, &r.ExitIP, &r.DurationSec,
 			&r.T1BytesMB, &r.T1SpeedMBps, &r.T1Count,
 			&r.T2AvgUs, &r.T2TotalMs, &r.T2Count,
 			&r.T3BytesMB, &r.T3SpeedMBps, &r.T3Count,

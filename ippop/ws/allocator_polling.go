@@ -15,7 +15,7 @@ func NewPollingAllocator(source NodeSource) *PollingAllocator {
 }
 
 func (a *PollingAllocator) Allocate(user *model.User, target *socks5.SocksTargetInfo) (*Tunnel, *UserSession, error) {
-	_, tun, err := a.source.AcquirePollingNode()
+	_, tun, err := a.source.AcquirePollingNode(criteriaFromTarget(target))
 	if err != nil {
 		return nil, nil, err
 	}

@@ -215,27 +215,37 @@ func (p *IPPool) DeactivateIP(ip string) {
 	p.removeFromFreePool(entry)
 }
 
-// AcquireIP is the unified entry point for IP allocation.
-// It prioritizes region-based allocation if a region is specified,
-// otherwise balances across PPPoE lines if multiple are available.
-// If none of the above apply, it falls back to standard FIFO allocation.
-func (p *IPPool) AcquireIP(region string) (string, *Tunnel) {
+// AcquireIP allocates an IP with optional region and business-pack preference.
+func (p *IPPool) AcquireIP(criteria AllocationCriteria, evaluator func(ip, pack string) PackDecision) (string, *Tunnel) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	// 1. If region is specified, try region list
+	if criteria.BusinessPack == "" {
+		return p.acquireIPUnlocked(criteria.Region)
+	}
+
+	if criteria.Region != "" {
+		if l, ok := p.regionFreeList[criteria.Region]; ok && l.Len() > 0 {
+			if ip, tun := p.acquireBestFromListLocked(l, criteria.BusinessPack, evaluator, false); tun != nil {
+				return ip, tun
+			}
+		}
+	}
+
+	return p.acquireBestFromListLocked(p.freeList, criteria.BusinessPack, evaluator, false)
+}
+
+func (p *IPPool) acquireIPUnlocked(region string) (string, *Tunnel) {
 	if region != "" {
 		if l, ok := p.regionFreeList[region]; ok && l.Len() > 0 {
 			return p.acquireFromListLocked(l)
 		}
 	}
 
-	// 2. If multiple local IPs detected, use Line strategy (balanced)
 	if len(p.localIPFreeList) > 1 {
 		return p.acquireByLineLocked()
 	}
 
-	// 3. Fallback to standard Acquire (FIFO)
 	return p.acquireFromListLocked(p.freeList)
 }
 
@@ -423,12 +433,33 @@ func (p *IPPool) GetFreeIPsFromHead(count int) []FreeIPInfo {
 	return res
 }
 
-// AcquirePollingIP picks an IP for polling mode in O(1) and rotates it to the back.
-func (p *IPPool) AcquirePollingIP() (string, *Tunnel) {
+// AcquirePollingIP picks an IP for polling mode with optional region and business-pack preference.
+func (p *IPPool) AcquirePollingIP(criteria AllocationCriteria, evaluator func(ip, pack string) PackDecision) (string, *Tunnel) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	element := p.freeList.Front()
+	if criteria.BusinessPack != "" {
+		if criteria.Region != "" {
+			if l, ok := p.regionFreeList[criteria.Region]; ok && l.Len() > 0 {
+				if ip, tun := p.acquireBestFromListLocked(l, criteria.BusinessPack, evaluator, true); tun != nil {
+					return ip, tun
+				}
+			}
+		}
+		return p.acquireBestFromListLocked(p.freeList, criteria.BusinessPack, evaluator, true)
+	}
+
+	if criteria.Region != "" {
+		if l, ok := p.regionFreeList[criteria.Region]; ok && l.Len() > 0 {
+			return p.acquirePollingFromListLocked(l)
+		}
+	}
+
+	return p.acquirePollingFromListLocked(p.freeList)
+}
+
+func (p *IPPool) acquirePollingFromListLocked(l *list.List) (string, *Tunnel) {
+	element := l.Front()
 	if element == nil {
 		return "", nil
 	}
@@ -436,19 +467,82 @@ func (p *IPPool) AcquirePollingIP() (string, *Tunnel) {
 	entry := element.Value.(*ipEntry)
 
 	// Rotate: move to the back of all free lists to maintain LRU/Round-robin order.
-	p.freeList.MoveToBack(element)
+	if entry.element != nil {
+		p.freeList.MoveToBack(entry.element)
+	}
+	if l != p.freeList {
+		l.MoveToBack(element)
+	}
 	if entry.localIPElement != nil {
-		if l, ok := p.localIPFreeList[entry.localIP]; ok {
-			l.MoveToBack(entry.localIPElement)
+		if ll, ok := p.localIPFreeList[entry.localIP]; ok {
+			ll.MoveToBack(entry.localIPElement)
 		}
 	}
 	if entry.regionElement != nil {
-		if l, ok := p.regionFreeList[entry.region]; ok {
-			l.MoveToBack(entry.regionElement)
+		if ll, ok := p.regionFreeList[entry.region]; ok {
+			ll.MoveToBack(entry.regionElement)
 		}
 	}
 
 	for _, t := range entry.tunnels {
+		return entry.ip, t
+	}
+
+	return "", nil
+}
+
+func (p *IPPool) acquireBestFromListLocked(l *list.List, pack string, evaluator func(ip, pack string) PackDecision, rotate bool) (string, *Tunnel) {
+	if l == nil || l.Len() == 0 {
+		return "", nil
+	}
+
+	var bestElement *list.Element
+	bestDecision := PackDecisionDeny
+
+	for element := l.Front(); element != nil; element = element.Next() {
+		entry := element.Value.(*ipEntry)
+		decision := PackDecisionUnknown
+		if evaluator != nil {
+			decision = evaluator(entry.ip, pack)
+		}
+		if decision == PackDecisionDeny {
+			continue
+		}
+		if bestElement == nil || decision > bestDecision {
+			bestElement = element
+			bestDecision = decision
+			if decision == PackDecisionAllow {
+				break
+			}
+		}
+	}
+
+	if bestElement == nil {
+		return "", nil
+	}
+
+	entry := bestElement.Value.(*ipEntry)
+	if rotate {
+		p.freeList.MoveToBack(entry.element)
+		if entry.localIPElement != nil {
+			if ll, ok := p.localIPFreeList[entry.localIP]; ok {
+				ll.MoveToBack(entry.localIPElement)
+			}
+		}
+		if entry.regionElement != nil {
+			if ll, ok := p.regionFreeList[entry.region]; ok {
+				ll.MoveToBack(entry.regionElement)
+			}
+		}
+	} else {
+		p.removeFromFreePool(entry)
+	}
+
+	for id, t := range entry.tunnels {
+		if !rotate {
+			entry.assignedNodeID = id
+			p.assignedCount++
+		}
 		return entry.ip, t
 	}
 

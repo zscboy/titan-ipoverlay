@@ -38,13 +38,25 @@ type StrategyConfig struct {
 	DefaultPopId   string
 }
 
+type BusinessPackRule struct {
+	MatchType string `json:"match_type,optional"`
+	Pattern   string `json:"pattern"`
+	Pack      string `json:"pack"`
+}
+
+type BusinessPack struct {
+	DefaultPack string             `json:"default_pack,optional"`
+	Rules       []BusinessPackRule `json:"rules,optional"`
+}
+
 type Config struct {
 	rest.RestConf
 	Redis   redis.RedisConf
 	JwtAuth JwtAuth
 	// todo: will move to center server
-	Pops      []Pop
-	Strategy  StrategyConfig
-	GeoAPI    GeoAPI
-	Whitelist []string `json:",optional"`
+	Pops         []Pop
+	Strategy     StrategyConfig
+	BusinessPack BusinessPack `json:",optional"`
+	GeoAPI       GeoAPI
+	Whitelist    []string `json:",optional"`
 }

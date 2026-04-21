@@ -141,7 +141,7 @@ func (t *Tunnel) getPop() (*Pop, error) {
 		pop := &Pop{}
 		err = json.Unmarshal(bytes, pop)
 		if err != nil {
-			logx.Errorf("Tunnel", fmt.Sprintf("Tunnel.getPop Unmarshal error:%v", err))
+			logx.Errorf("Tunnel.getPop Unmarshal error:%v", err)
 			continue
 		}
 

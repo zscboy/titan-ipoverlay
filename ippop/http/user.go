@@ -13,6 +13,7 @@ type User struct {
 	username string
 	zone     string
 	region   string
+	pack     string
 	session  string
 	// duration
 	sessTime time.Duration
@@ -28,6 +29,7 @@ func paserUsername(username string) (*User, error) {
 	keys := map[string]bool{
 		"zone":     true,
 		"region":   true,
+		"pack":     true,
 		"session":  true,
 		"sessTime": true,
 	}
@@ -56,6 +58,8 @@ func paserUsername(username string) (*User, error) {
 			user.zone = value
 		case "region":
 			user.region = value
+		case "pack":
+			user.pack = value
 		case "session":
 			user.session = value
 		case "sessTime":

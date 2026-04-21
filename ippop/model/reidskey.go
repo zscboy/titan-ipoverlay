@@ -29,4 +29,6 @@ const (
 	redisKeyNodeStrike = "titan:node:strike:%s"
 	// QoS: 黑名单记录审计列表 (List)
 	redisKeyNodeBlacklistAudit = "titan:node:blacklist:audit"
+	// 业务包状态矩阵 (Hash: field=pack, value=json)
+	redisKeyNodePackStatus = "titan:node:packstatus:%s"
 )

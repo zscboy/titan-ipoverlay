@@ -115,6 +115,20 @@ type TrafficStats struct {
 	EnableUserTraffic bool `json:",default=false"`
 }
 
+type BusinessPackRule struct {
+	//lint:ignore SA5008 go-zero allows "options" in struct tags
+	MatchType string `json:"match_type,options=exact|suffix"`
+	Pattern   string `json:"pattern"`
+	Pack      string `json:"pack"`
+}
+
+type BusinessPack struct {
+	//lint:ignore SA5008 go-zero allows "default" in struct tags
+	DefaultPack string `json:",default=general_web"`
+	//lint:ignore SA5008 go-zero allows "optional" in struct tags
+	Rules []BusinessPackRule `json:",optional"`
+}
+
 type Config struct {
 	// APIServer api.APIServerConfig
 	WS        WS
@@ -139,6 +153,9 @@ type Config struct {
 
 	//lint:ignore SA5008 go-zero allows "optional" in struct tags
 	TrafficStats TrafficStats `json:",optional"`
+
+	//lint:ignore SA5008 go-zero allows "optional" in struct tags
+	BusinessPack BusinessPack `json:",optional"`
 
 	JwtAuth JwtAuth
 	Socks5  Socks5

@@ -228,6 +228,29 @@ type (
 		NextCursor uint64   `json:"next_cursor"`
 		Total      int      `json:"total"`
 	}
+	ClassifyBusinessPackReq {
+		Host          string `form:"host"`
+		RequestedPack string `form:"requested_pack,optional"`
+	}
+	ClassifyBusinessPackResp {
+		Host string `json:"host"`
+		Pack string `json:"pack"`
+	}
+	GetIPPackStatusReq {
+		IP   string `form:"ip"`
+		Pack string `form:"pack,optional"`
+	}
+	IPPackStatusItem {
+		Pack         string `json:"pack"`
+		Label        string `json:"label"`
+		SuccessCount int64  `json:"success_count"`
+		FailureCount int64  `json:"failure_count"`
+		LastUpdated  int64  `json:"last_updated"`
+	}
+	GetIPPackStatusResp {
+		IP       string              `json:"ip"`
+		Statuses []*IPPackStatusItem `json:"statuses"`
+	}
 )
 
 service server-api {
@@ -248,6 +271,9 @@ service server-api {
 
 	@handler listNode
 	get /node/list (ListNodeReq) returns (ListNodeResp)
+
+	@handler classifyBusinessPack
+	get /business-pack/classify (ClassifyBusinessPackReq) returns (ClassifyBusinessPackResp)
 
 	@handler createUser
 	post /user/create (CreateUserReq) returns (CreateUserResp)
@@ -299,5 +325,7 @@ service server-api {
 
 	@handler getIPBlacklist
 	get /ip/blacklist/get (GetIPBlacklistReq) returns (GetIPBlacklistResp)
-}
 
+	@handler getIPPackStatus
+	get /ip/pack/status (GetIPPackStatusReq) returns (GetIPPackStatusResp)
+}

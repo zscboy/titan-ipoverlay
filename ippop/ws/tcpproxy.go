@@ -17,6 +17,8 @@ type TCPProxy struct {
 	tunnel          *Tunnel
 	userName        string
 	targetDomain    string // 目标域名
+	businessPack    string
+	exitIP          string
 	isCloseByClient bool
 	activeTime      time.Time
 	done            chan struct{}
@@ -27,16 +29,18 @@ type TCPProxy struct {
 	userBuckets     *DownloadBucketStats
 }
 
-func newTCPProxy(id string, conn net.Conn, t *Tunnel, userName, targetDomain, countryCode string) *TCPProxy {
+func newTCPProxy(id string, conn net.Conn, t *Tunnel, userName, targetDomain, businessPack, exitIP, countryCode string) *TCPProxy {
 	return &TCPProxy{
 		id:           id,
 		conn:         conn,
 		tunnel:       t,
 		userName:     userName,
 		targetDomain: targetDomain,
+		businessPack: businessPack,
+		exitIP:       exitIP,
 		activeTime:   time.Now(),
 		done:         make(chan struct{}),
-		perfStats:    NewSessionPerfStats(id, userName, targetDomain, countryCode, t.tunMgr.config.GetNodeID(), t.opts.Id, &t.tunMgr.config.PerfMonitoring, &t.tunMgr.config.QoS, t.tunMgr.perfCollector),
+		perfStats:    NewSessionPerfStats(id, userName, targetDomain, businessPack, exitIP, countryCode, t.tunMgr.config.GetNodeID(), t.opts.Id, &t.tunMgr.config.PerfMonitoring, &t.tunMgr.config.QoS, t.tunMgr.perfCollector),
 		userBuckets:  t.getOrCreateUserBuckets(userName),
 	}
 }
