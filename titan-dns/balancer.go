@@ -94,18 +94,44 @@ func (lb *LoadBalancer) UpdatePopIPs(popID string, ips []string) {
 
 // recalculateFollower updates a follower's IP list based on its parents.
 // Assumes lock is already held by the caller for update, or during initialization.
+func (lb *LoadBalancer) UpdatePopFollows(popID string, follows []string) {
+	lb.mu.Lock()
+	defer lb.mu.Unlock()
+
+	// 1. Clean up old reverse mapping
+	if oldFollows, ok := lb.relations[popID]; ok {
+		for _, oldTarget := range oldFollows {
+			if targets, ok := lb.reverse[oldTarget]; ok {
+				newTargets := make([]string, 0)
+				for _, t := range targets {
+					if t != popID {
+						newTargets = append(newTargets, t)
+					}
+				}
+				lb.reverse[oldTarget] = newTargets
+			}
+		}
+	}
+
+	// 2. Update relations
+	lb.relations[popID] = follows
+
+	// 3. Update new reverse mapping
+	for _, targetID := range follows {
+		lb.reverse[targetID] = append(lb.reverse[targetID], popID)
+	}
+
+	// 4. Recalculate
+	lb.recalculateFollower(popID, follows)
+}
+
+// recalculateFollower updates a follower's IP list based on its parents.
+// Assumes lock is already held by the caller for update, or during initialization.
 func (lb *LoadBalancer) recalculateFollower(followerID string, follows []string) {
 	var combinedIPs []string
-	// seen := make(map[string]struct{})
-
 	for _, parentID := range follows {
 		if data, ok := lb.pops[parentID]; ok {
-			// for _, ip := range data.IPs {
-			// if _, ok := seen[ip]; !ok {
 			combinedIPs = append(combinedIPs, data.IPs...)
-			// seen[ip] = struct{}{}
-			// }
-			// }
 		}
 	}
 
