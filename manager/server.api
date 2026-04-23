@@ -299,5 +299,9 @@ service server-api {
 
 	@handler getIPBlacklist
 	get /ip/blacklist/get (GetIPBlacklistReq) returns (GetIPBlacklistResp)
+
+	@doc "Export all POP node IDs as CSV download"
+	@handler exportPopNodes
+	get /pop/nodes/export
 }
 
