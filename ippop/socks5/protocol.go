@@ -435,7 +435,7 @@ func paserUsername(username string) (*User, error) {
 			user.session = value
 		case "sessTime":
 			if n, err := strconv.Atoi(value); err == nil {
-				user.sessTime = time.Duration(n) * time.Minute
+				user.sessTime = time.Duration(n) * time.Second
 			}
 		}
 

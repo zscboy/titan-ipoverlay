@@ -44,7 +44,7 @@ type SocksTargetInfo struct {
 	ExtraBytes []byte
 	Username   string
 	Session    string
-	SessTime   int64
+	SessTime   time.Duration
 
 	ConnCreateTime time.Time
 }
@@ -360,7 +360,7 @@ func (socks5Server *Socks5Server) handleSocks5Connect(req *request) error {
 		ExtraBytes:     extraBytes,
 		Username:       req.user.username,
 		Session:        req.user.session,
-		SessTime:       int64(req.user.sessTime),
+		SessTime:       req.user.sessTime,
 		ConnCreateTime: req.connCreateTime,
 	}
 

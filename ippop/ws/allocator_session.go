@@ -86,14 +86,20 @@ func (sm *SessionManager) UpdateAllocation(sess *UserSession, deviceID, exitIP s
 	sess.exitIP = exitIP
 }
 
-func (sm *SessionManager) Create(username, sessionID, deviceID, exitIP string) *UserSession {
+func (sm *SessionManager) Create(username, sessionID, deviceID, exitIP string, sessionExpireDuration time.Duration) *UserSession {
+	if sessionExpireDuration == 0 {
+		sessionExpireDuration = sm.expireDuration
+	}
+
 	key := sessionKey{username, sessionID}
 	sess := &UserSession{
 		username:  username,
 		sessionID: sessionID,
 		deviceID:  deviceID,
 		exitIP:    exitIP,
+		duration:  sessionExpireDuration,
 	}
+
 	sm.lock.Lock()
 	sm.sessions[key] = sess
 	sm.lock.Unlock()
@@ -174,8 +180,8 @@ func (sm *SessionManager) checkAndClean() {
 		}
 
 		sess := element.Value.(*UserSession)
-		// Check if expired
-		if now.Sub(sess.disconnectAt) < sm.expireDuration {
+		// Use per-session duration for expiry
+		if now.Sub(sess.disconnectAt) < sess.duration {
 			// Since it's ordered by time, if head is not expired, none is.
 			break
 		}
@@ -268,7 +274,7 @@ func (a *SessionAllocator) Allocate(user *model.User, target *socks5.SocksTarget
 	}
 
 	if sess == nil {
-		sess = a.sm.Create(user.UserName, target.Session, tun.opts.Id, exitIP)
+		sess = a.sm.Create(user.UserName, target.Session, tun.opts.Id, exitIP, target.SessTime)
 		a.sm.Activate(sess) // Set count to 1
 	} else {
 		// Update existing session with new device node and IP

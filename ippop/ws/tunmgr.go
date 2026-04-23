@@ -488,7 +488,7 @@ func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks
 		return fmt.Errorf("can not allocate tunnel, user %s", targetInfo.Username)
 	}
 
-	logx.Infof("HandleSocks5TCP: user %s session [%s] allocated on node %s, target %s:%d, remote %s", targetInfo.Username, targetInfo.Session, tun.opts.Id, targetInfo.DomainName, targetInfo.Port, tcpConn.RemoteAddr().String())
+	logx.Infof("HandleSocks5TCP: user %s session [%s] sessionTime [%d] allocated on node %s, target %s:%d, remote %s", targetInfo.Username, targetInfo.Session, targetInfo.SessTime, tun.opts.Id, targetInfo.DomainName, targetInfo.Port, tcpConn.RemoteAddr().String())
 
 	if userSession != nil {
 		defer tm.sessionManager.Decrement(userSession)

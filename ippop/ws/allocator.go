@@ -27,6 +27,7 @@ type UserSession struct {
 	exitIP       string
 	connectCount int32         // Reference count of active connections
 	disconnectAt time.Time     // Time when connectCount became zero
+	duration     time.Duration // Session duration from socks5 client
 	idleElement  *list.Element // Pointer to the element in SessionManager's idleList
 	errorCount   int32         // Cumulative error count
 	isEphemeral  bool          // If true, release node immediately when count reaches zero
@@ -38,6 +39,10 @@ func (s *UserSession) ReportError() int32 {
 
 func (s *UserSession) ResetError() {
 	atomic.StoreInt32(&s.errorCount, 0)
+}
+
+func (s *UserSession) GetSessionTime() time.Duration {
+	return s.duration
 }
 
 func (s *UserSession) GetErrorCount() int32 {

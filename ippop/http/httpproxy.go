@@ -83,7 +83,7 @@ func (p *HttpProxy) handleHTTPS(w http.ResponseWriter, r *http.Request, user *Us
 		Port:           port,
 		Username:       user.username,
 		Session:        user.session,
-		SessTime:       int64(user.sessTime),
+		SessTime:       user.sessTime,
 		ConnCreateTime: time.Now(),
 	})
 }
@@ -130,7 +130,7 @@ func (p *HttpProxy) handleHTTP(w http.ResponseWriter, r *http.Request, user *Use
 		Port:           port,
 		Username:       user.username,
 		Session:        user.session,
-		SessTime:       int64(user.sessTime),
+		SessTime:       user.sessTime,
 		ExtraBytes:     buf.Bytes(),
 		ConnCreateTime: time.Now(),
 	})
