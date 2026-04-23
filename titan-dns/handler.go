@@ -43,7 +43,7 @@ func (h *DNSHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 			// Use a non-destructive check that doesn't trigger the load balancer counter.
 			if h.isDomainManaged(q.Name) {
 				found = true
-				log.Printf("Domain exists but type %d not handled: %s", q.Qtype, q.Name)
+				// log.Printf("Domain exists but type %d not handled: %s", q.Qtype, q.Name)
 			}
 		}
 	}
