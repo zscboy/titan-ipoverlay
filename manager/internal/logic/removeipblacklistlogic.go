@@ -33,6 +33,7 @@ func (l *RemoveIPBlacklistLogic) RemoveIPBlacklist(req *types.IPBlacklistReq) (r
 
 	// 1. Remove from manager's global IP blacklist
 	if err := model.RemoveIPBlacklist(l.svcCtx.Redis, req.IPList); err != nil {
+		logx.Errorf("RemoveIPBlacklist: failed to remove IPs from blacklist: %v", err)
 		return &types.UserOperationResp{ErrMsg: err.Error()}, nil
 	}
 
