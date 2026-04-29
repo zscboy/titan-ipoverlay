@@ -63,12 +63,25 @@ func (l *MigrateNodesLogic) MigrateNodes(req *types.MigrateNodesReq) (resp *type
 		return &types.UserOperationResp{Success: false, ErrMsg: "failed to migrate nodes in redis: " + err.Error()}, nil
 	}
 
-	// 3. Kick nodes in source POP
-	_, err = sourcePop.API.KickNodeByIP(l.ctx, &serverapi.KickNodeByIPReq{
-		IpList: ips,
-	})
-	if err != nil {
-		logx.Errorf("failed to kick nodes in source pop: %v", err)
+	// Clear local memory cache in manager to ensure nodes re-allocate to new POP
+	for nodeID := range nodeIDToIP {
+		l.svcCtx.NodePopCache.Delete(nodeID)
+	}
+
+	// 3. Kick nodes in source POP in batches of 100
+	const batchSize = 100
+	for i := 0; i < len(ips); i += batchSize {
+		end := i + batchSize
+		if end > len(ips) {
+			end = len(ips)
+		}
+
+		_, err = sourcePop.API.KickNodeByIP(l.ctx, &serverapi.KickNodeByIPReq{
+			IpList: ips[i:end],
+		})
+		if err != nil {
+			logx.Errorf("failed to kick nodes batch [%d:%d] in source pop: %v", i, end, err)
+		}
 	}
 
 	return &types.UserOperationResp{Success: true}, nil
