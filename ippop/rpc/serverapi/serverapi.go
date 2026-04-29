@@ -22,8 +22,11 @@ type (
 	CreateUserResp         = pb.CreateUserResp
 	DeleteUserReq          = pb.DeleteUserReq
 	Empty                  = pb.Empty
+	FreeIPInfoPb           = pb.FreeIPInfoPb
 	GetBlacklistReq        = pb.GetBlacklistReq
 	GetBlacklistResp       = pb.GetBlacklistResp
+	GetFreeIPsReq          = pb.GetFreeIPsReq
+	GetFreeIPsResp         = pb.GetFreeIPsResp
 	GetNodeAccessTokenReq  = pb.GetNodeAccessTokenReq
 	GetNodeAccessTokenResp = pb.GetNodeAccessTokenResp
 	GetServerInfoResp      = pb.GetServerInfoResp
@@ -73,6 +76,7 @@ type (
 		KickNodeByIP(ctx context.Context, in *KickNodeByIPReq, opts ...grpc.CallOption) (*UserOperationResp, error)
 		GetUserBaseStats(ctx context.Context, in *UserBaseStatsReq, opts ...grpc.CallOption) (*UserBaseStatsResp, error)
 		GetUserStatChart(ctx context.Context, in *UserStatChartReq, opts ...grpc.CallOption) (*UserStatChartResp, error)
+		GetFreeIPs(ctx context.Context, in *GetFreeIPsReq, opts ...grpc.CallOption) (*GetFreeIPsResp, error)
 	}
 
 	defaultServerAPI struct {
@@ -174,4 +178,9 @@ func (m *defaultServerAPI) GetUserBaseStats(ctx context.Context, in *UserBaseSta
 func (m *defaultServerAPI) GetUserStatChart(ctx context.Context, in *UserStatChartReq, opts ...grpc.CallOption) (*UserStatChartResp, error) {
 	client := pb.NewServerAPIClient(m.cli.Conn())
 	return client.GetUserStatChart(ctx, in, opts...)
+}
+
+func (m *defaultServerAPI) GetFreeIPs(ctx context.Context, in *GetFreeIPsReq, opts ...grpc.CallOption) (*GetFreeIPsResp, error) {
+	client := pb.NewServerAPIClient(m.cli.Conn())
+	return client.GetFreeIPs(ctx, in, opts...)
 }

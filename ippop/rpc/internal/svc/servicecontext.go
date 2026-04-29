@@ -2,6 +2,7 @@ package svc
 
 import (
 	"titan-ipoverlay/ippop/rpc/internal/config"
+	"titan-ipoverlay/ippop/types"
 
 	"github.com/zeromicro/go-zero/core/stores/redis"
 )
@@ -33,6 +34,7 @@ type TunnelManager interface {
 	UserManager
 	EndpointProvider
 	BlacklistManager
+	GetFreeIPs(count int, fromHead bool) []types.FreeIPInfo
 }
 
 type ServiceContext struct {

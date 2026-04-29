@@ -13,7 +13,7 @@ import (
 var (
 	upgrader = websocket.Upgrader{
 		ReadBufferSize:  64 * 1024, // 针对 10G 流量，建议 64KB
-		WriteBufferSize: 64 * 1024, // 减少回传/指令缓存以节省内存
+		WriteBufferSize: 16 * 1024, // 减少回传/指令缓存以节省内存
 	}
 )
 

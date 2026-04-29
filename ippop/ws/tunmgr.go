@@ -15,6 +15,7 @@ import (
 	"titan-ipoverlay/ippop/metrics"
 	"titan-ipoverlay/ippop/model"
 	"titan-ipoverlay/ippop/socks5"
+	"titan-ipoverlay/ippop/types"
 
 	"github.com/bluele/gcache"
 	"github.com/gorilla/websocket"
@@ -32,7 +33,7 @@ const (
 	setOnlineTableExpireTick  = 90
 	onlineTableExpireTime     = 2 * setOnlineTableExpireTick
 	userSessionExpireInterval = 120
-	userSessionExpireDuration = 3 * time.Minute
+	userSessionExpireDuration = 2 * time.Minute
 	acceptLockShards          = 16384
 )
 
@@ -427,6 +428,13 @@ func (tm *TunnelManager) KickNode(nodeID string) error {
 	}
 
 	return fmt.Errorf("node %s already offline", nodeID)
+}
+
+func (tm *TunnelManager) GetFreeIPs(count int, fromHead bool) []types.FreeIPInfo {
+	if fromHead {
+		return tm.ipPool.GetFreeIPsFromHead(count)
+	}
+	return tm.ipPool.GetFreeIPsFromTail(count)
 }
 
 // allocateTunnelByUserSession, randomTunnel, nextTunnel are now handled by NodeSource implementation or Allocators.

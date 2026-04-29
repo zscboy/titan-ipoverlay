@@ -107,3 +107,43 @@ func NodeCountOfPops(ctx context.Context, rds *redis.Redis, popIDs []string) (ma
 
 	return result, nil
 }
+
+func BatchMoveNodesToPop(rds *redis.Redis, nodeIDToIP map[string]string, sourcePop, targetPop string) error {
+	if len(nodeIDToIP) == 0 {
+		return nil
+	}
+
+	nodeIDs := make([]string, 0, len(nodeIDToIP))
+	for nodeID := range nodeIDToIP {
+		nodeIDs = append(nodeIDs, nodeID)
+	}
+
+	ctx := context.Background()
+	pipe, err := rds.TxPipeline()
+	if err != nil {
+		return err
+	}
+
+	if len(sourcePop) > 0 {
+		pipe.SRem(ctx, fmt.Sprintf(redisKeyPopNodes, sourcePop), sliceToInterface(nodeIDs)...)
+	}
+
+	pipe.SAdd(ctx, fmt.Sprintf(redisKeyPopNodes, targetPop), sliceToInterface(nodeIDs)...)
+
+	fields := make(map[string]interface{}, len(nodeIDToIP))
+	for nodeID, ip := range nodeIDToIP {
+		fields[nodeID] = fmt.Sprintf("%s:%s", targetPop, ip)
+	}
+	pipe.HMSet(ctx, redisKeyNodes, fields)
+
+	_, err = pipe.Exec(ctx)
+	return err
+}
+
+func sliceToInterface(ss []string) []interface{} {
+	is := make([]interface{}, len(ss))
+	for i, s := range ss {
+		is[i] = s
+	}
+	return is
+}

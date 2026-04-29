@@ -37,6 +37,7 @@ const (
 	ServerAPI_KickNodeByIP_FullMethodName        = "/server.ServerAPI/KickNodeByIP"
 	ServerAPI_GetUserBaseStats_FullMethodName    = "/server.ServerAPI/GetUserBaseStats"
 	ServerAPI_GetUserStatChart_FullMethodName    = "/server.ServerAPI/GetUserStatChart"
+	ServerAPI_GetFreeIPs_FullMethodName          = "/server.ServerAPI/GetFreeIPs"
 )
 
 // ServerAPIClient is the client API for ServerAPI service.
@@ -61,6 +62,7 @@ type ServerAPIClient interface {
 	KickNodeByIP(ctx context.Context, in *KickNodeByIPReq, opts ...grpc.CallOption) (*UserOperationResp, error)
 	GetUserBaseStats(ctx context.Context, in *UserBaseStatsReq, opts ...grpc.CallOption) (*UserBaseStatsResp, error)
 	GetUserStatChart(ctx context.Context, in *UserStatChartReq, opts ...grpc.CallOption) (*UserStatChartResp, error)
+	GetFreeIPs(ctx context.Context, in *GetFreeIPsReq, opts ...grpc.CallOption) (*GetFreeIPsResp, error)
 }
 
 type serverAPIClient struct {
@@ -251,6 +253,16 @@ func (c *serverAPIClient) GetUserStatChart(ctx context.Context, in *UserStatChar
 	return out, nil
 }
 
+func (c *serverAPIClient) GetFreeIPs(ctx context.Context, in *GetFreeIPsReq, opts ...grpc.CallOption) (*GetFreeIPsResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetFreeIPsResp)
+	err := c.cc.Invoke(ctx, ServerAPI_GetFreeIPs_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ServerAPIServer is the server API for ServerAPI service.
 // All implementations must embed UnimplementedServerAPIServer
 // for forward compatibility.
@@ -273,6 +285,7 @@ type ServerAPIServer interface {
 	KickNodeByIP(context.Context, *KickNodeByIPReq) (*UserOperationResp, error)
 	GetUserBaseStats(context.Context, *UserBaseStatsReq) (*UserBaseStatsResp, error)
 	GetUserStatChart(context.Context, *UserStatChartReq) (*UserStatChartResp, error)
+	GetFreeIPs(context.Context, *GetFreeIPsReq) (*GetFreeIPsResp, error)
 	mustEmbedUnimplementedServerAPIServer()
 }
 
@@ -336,6 +349,9 @@ func (UnimplementedServerAPIServer) GetUserBaseStats(context.Context, *UserBaseS
 }
 func (UnimplementedServerAPIServer) GetUserStatChart(context.Context, *UserStatChartReq) (*UserStatChartResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetUserStatChart not implemented")
+}
+func (UnimplementedServerAPIServer) GetFreeIPs(context.Context, *GetFreeIPsReq) (*GetFreeIPsResp, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetFreeIPs not implemented")
 }
 func (UnimplementedServerAPIServer) mustEmbedUnimplementedServerAPIServer() {}
 func (UnimplementedServerAPIServer) testEmbeddedByValue()                   {}
@@ -682,6 +698,24 @@ func _ServerAPI_GetUserStatChart_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ServerAPI_GetFreeIPs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetFreeIPsReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ServerAPIServer).GetFreeIPs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ServerAPI_GetFreeIPs_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerAPIServer).GetFreeIPs(ctx, req.(*GetFreeIPsReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ServerAPI_ServiceDesc is the grpc.ServiceDesc for ServerAPI service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -760,6 +794,10 @@ var ServerAPI_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetUserStatChart",
 			Handler:    _ServerAPI_GetUserStatChart_Handler,
+		},
+		{
+			MethodName: "GetFreeIPs",
+			Handler:    _ServerAPI_GetFreeIPs_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -245,5 +245,20 @@ service ServerAPI {
 
   rpc GetUserBaseStats (UserBaseStatsReq) returns (UserBaseStatsResp);
   rpc GetUserStatChart (UserStatChartReq) returns (UserStatChartResp);
-
+  rpc GetFreeIPs(GetFreeIPsReq) returns (GetFreeIPsResp);
 }
+
+message GetFreeIPsReq {
+  int32 count = 1;
+  bool from_head = 2;
+}
+
+message FreeIPInfoPb {
+  string ip = 1;
+  repeated string node_ids = 2;
+}
+
+message GetFreeIPsResp {
+  repeated FreeIPInfoPb ips = 1;
+}
+

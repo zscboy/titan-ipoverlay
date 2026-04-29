@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"sort"
 	"sync"
+	"titan-ipoverlay/ippop/types"
 )
 
 // ipEntry tracks an IP and its associated tunnels
@@ -369,14 +370,8 @@ func (p *IPPool) GetPoolStats() PoolStats {
 	}
 }
 
-// FreeIPInfo contains IP and its associated NodeIDs
-type FreeIPInfo struct {
-	IP      string   `json:"ip"`
-	NodeIDs []string `json:"node_ids"`
-}
-
 // GetFreeIPsFromTail retrieves free IPs from the tail of the free list.
-func (p *IPPool) GetFreeIPsFromTail(count int) []FreeIPInfo {
+func (p *IPPool) GetFreeIPsFromTail(count int) []types.FreeIPInfo {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -384,14 +379,14 @@ func (p *IPPool) GetFreeIPsFromTail(count int) []FreeIPInfo {
 		return nil
 	}
 
-	res := make([]FreeIPInfo, 0, count)
+	res := make([]types.FreeIPInfo, 0, count)
 	for e := p.freeList.Back(); e != nil && len(res) < count; e = e.Prev() {
 		entry := e.Value.(*ipEntry)
 		nodeIDs := make([]string, 0, len(entry.tunnels))
 		for nodeID := range entry.tunnels {
 			nodeIDs = append(nodeIDs, nodeID)
 		}
-		res = append(res, FreeIPInfo{
+		res = append(res, types.FreeIPInfo{
 			IP:      entry.ip,
 			NodeIDs: nodeIDs,
 		})
@@ -400,7 +395,7 @@ func (p *IPPool) GetFreeIPsFromTail(count int) []FreeIPInfo {
 }
 
 // GetFreeIPsFromHead retrieves free IPs from the head of the free list.
-func (p *IPPool) GetFreeIPsFromHead(count int) []FreeIPInfo {
+func (p *IPPool) GetFreeIPsFromHead(count int) []types.FreeIPInfo {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -408,14 +403,14 @@ func (p *IPPool) GetFreeIPsFromHead(count int) []FreeIPInfo {
 		return nil
 	}
 
-	res := make([]FreeIPInfo, 0, count)
+	res := make([]types.FreeIPInfo, 0, count)
 	for e := p.freeList.Front(); e != nil && len(res) < count; e = e.Next() {
 		entry := e.Value.(*ipEntry)
 		nodeIDs := make([]string, 0, len(entry.tunnels))
 		for nodeID := range entry.tunnels {
 			nodeIDs = append(nodeIDs, nodeID)
 		}
-		res = append(res, FreeIPInfo{
+		res = append(res, types.FreeIPInfo{
 			IP:      entry.ip,
 			NodeIDs: nodeIDs,
 		})

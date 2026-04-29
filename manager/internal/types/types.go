@@ -127,6 +127,13 @@ type ListUserResp struct {
 	Total int     `json:"total"`
 }
 
+type MigrateNodesReq struct {
+	SourcePop string `json:"source_pop"`
+	TargetPop string `json:"target_pop"`
+	Count     int    `json:"count"`
+	FromHead  bool   `json:"from_head"`
+}
+
 type ModifyUserPasswordReq struct {
 	UserName    string `json:"user_name"`
 	NewPassword string `json:"new_password"`

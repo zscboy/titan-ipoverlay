@@ -112,3 +112,8 @@ func (s *ServerAPIServer) GetUserStatChart(ctx context.Context, in *pb.UserStatC
 	l := logic.NewGetUserStatChartLogic(ctx, s.svcCtx)
 	return l.GetUserStatChart(in)
 }
+
+func (s *ServerAPIServer) GetFreeIPs(ctx context.Context, in *pb.GetFreeIPsReq) (*pb.GetFreeIPsResp, error) {
+	l := logic.NewGetFreeIPsLogic(ctx, s.svcCtx)
+	return l.GetFreeIPs(in)
+}

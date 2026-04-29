@@ -2177,6 +2177,154 @@ func (*Empty) Descriptor() ([]byte, []int) {
 	return file_server_proto_rawDescGZIP(), []int{38}
 }
 
+type GetFreeIPsReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Count         int32                  `protobuf:"varint,1,opt,name=count,proto3" json:"count,omitempty"`
+	FromHead      bool                   `protobuf:"varint,2,opt,name=from_head,json=fromHead,proto3" json:"from_head,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFreeIPsReq) Reset() {
+	*x = GetFreeIPsReq{}
+	mi := &file_server_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFreeIPsReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFreeIPsReq) ProtoMessage() {}
+
+func (x *GetFreeIPsReq) ProtoReflect() protoreflect.Message {
+	mi := &file_server_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFreeIPsReq.ProtoReflect.Descriptor instead.
+func (*GetFreeIPsReq) Descriptor() ([]byte, []int) {
+	return file_server_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *GetFreeIPsReq) GetCount() int32 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
+func (x *GetFreeIPsReq) GetFromHead() bool {
+	if x != nil {
+		return x.FromHead
+	}
+	return false
+}
+
+type FreeIPInfoPb struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Ip            string                 `protobuf:"bytes,1,opt,name=ip,proto3" json:"ip,omitempty"`
+	NodeIds       []string               `protobuf:"bytes,2,rep,name=node_ids,json=nodeIds,proto3" json:"node_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FreeIPInfoPb) Reset() {
+	*x = FreeIPInfoPb{}
+	mi := &file_server_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FreeIPInfoPb) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FreeIPInfoPb) ProtoMessage() {}
+
+func (x *FreeIPInfoPb) ProtoReflect() protoreflect.Message {
+	mi := &file_server_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FreeIPInfoPb.ProtoReflect.Descriptor instead.
+func (*FreeIPInfoPb) Descriptor() ([]byte, []int) {
+	return file_server_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *FreeIPInfoPb) GetIp() string {
+	if x != nil {
+		return x.Ip
+	}
+	return ""
+}
+
+func (x *FreeIPInfoPb) GetNodeIds() []string {
+	if x != nil {
+		return x.NodeIds
+	}
+	return nil
+}
+
+type GetFreeIPsResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Ips           []*FreeIPInfoPb        `protobuf:"bytes,1,rep,name=ips,proto3" json:"ips,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFreeIPsResp) Reset() {
+	*x = GetFreeIPsResp{}
+	mi := &file_server_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFreeIPsResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFreeIPsResp) ProtoMessage() {}
+
+func (x *GetFreeIPsResp) ProtoReflect() protoreflect.Message {
+	mi := &file_server_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFreeIPsResp.ProtoReflect.Descriptor instead.
+func (*GetFreeIPsResp) Descriptor() ([]byte, []int) {
+	return file_server_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *GetFreeIPsResp) GetIps() []*FreeIPInfoPb {
+	if x != nil {
+		return x.Ips
+	}
+	return nil
+}
+
 var File_server_proto protoreflect.FileDescriptor
 
 const file_server_proto_rawDesc = "" +
@@ -2320,7 +2468,15 @@ const file_server_proto_rawDesc = "" +
 	"\bend_time\x18\x04 \x01(\x03R\aendTime\"<\n" +
 	"\x11UserStatChartResp\x12'\n" +
 	"\x05stats\x18\x01 \x03(\v2\x11.server.StatPointR\x05stats\"\a\n" +
-	"\x05Empty2\xc2\t\n" +
+	"\x05Empty\"B\n" +
+	"\rGetFreeIPsReq\x12\x14\n" +
+	"\x05count\x18\x01 \x01(\x05R\x05count\x12\x1b\n" +
+	"\tfrom_head\x18\x02 \x01(\bR\bfromHead\"9\n" +
+	"\fFreeIPInfoPb\x12\x0e\n" +
+	"\x02ip\x18\x01 \x01(\tR\x02ip\x12\x19\n" +
+	"\bnode_ids\x18\x02 \x03(\tR\anodeIds\"8\n" +
+	"\x0eGetFreeIPsResp\x12&\n" +
+	"\x03ips\x18\x01 \x03(\v2\x14.server.FreeIPInfoPbR\x03ips2\xff\t\n" +
 	"\tServerAPI\x125\n" +
 	"\bListNode\x12\x13.server.ListNodeReq\x1a\x14.server.ListNodeResp\x12;\n" +
 	"\n" +
@@ -2342,7 +2498,9 @@ const file_server_proto_rawDesc = "" +
 	"\bKickNode\x12\x13.server.KickNodeReq\x1a\x19.server.UserOperationResp\x12B\n" +
 	"\fKickNodeByIP\x12\x17.server.KickNodeByIPReq\x1a\x19.server.UserOperationResp\x12G\n" +
 	"\x10GetUserBaseStats\x12\x18.server.UserBaseStatsReq\x1a\x19.server.UserBaseStatsResp\x12G\n" +
-	"\x10GetUserStatChart\x12\x18.server.UserStatChartReq\x1a\x19.server.UserStatChartRespB\x06Z\x04./pbb\x06proto3"
+	"\x10GetUserStatChart\x12\x18.server.UserStatChartReq\x1a\x19.server.UserStatChartResp\x12;\n" +
+	"\n" +
+	"GetFreeIPs\x12\x15.server.GetFreeIPsReq\x1a\x16.server.GetFreeIPsRespB\x06Z\x04./pbb\x06proto3"
 
 var (
 	file_server_proto_rawDescOnce sync.Once
@@ -2356,7 +2514,7 @@ func file_server_proto_rawDescGZIP() []byte {
 	return file_server_proto_rawDescData
 }
 
-var file_server_proto_msgTypes = make([]protoimpl.MessageInfo, 39)
+var file_server_proto_msgTypes = make([]protoimpl.MessageInfo, 42)
 var file_server_proto_goTypes = []any{
 	(*ListNodeReq)(nil),            // 0: server.ListNodeReq
 	(*Node)(nil),                   // 1: server.Node
@@ -2397,6 +2555,9 @@ var file_server_proto_goTypes = []any{
 	(*UserStatChartReq)(nil),       // 36: server.UserStatChartReq
 	(*UserStatChartResp)(nil),      // 37: server.UserStatChartResp
 	(*Empty)(nil),                  // 38: server.Empty
+	(*GetFreeIPsReq)(nil),          // 39: server.GetFreeIPsReq
+	(*FreeIPInfoPb)(nil),           // 40: server.FreeIPInfoPb
+	(*GetFreeIPsResp)(nil),         // 41: server.GetFreeIPsResp
 }
 var file_server_proto_depIdxs = []int32{
 	1,  // 0: server.ListNodeResp.nodes:type_name -> server.Node
@@ -2411,47 +2572,50 @@ var file_server_proto_depIdxs = []int32{
 	14, // 9: server.ListUserResp.users:type_name -> server.User
 	26, // 10: server.StatsResp.stats:type_name -> server.StatPoint
 	26, // 11: server.UserStatChartResp.stats:type_name -> server.StatPoint
-	0,  // 12: server.ServerAPI.ListNode:input_type -> server.ListNodeReq
-	5,  // 13: server.ServerAPI.CreateUser:input_type -> server.CreateUserReq
-	15, // 14: server.ServerAPI.ListUser:input_type -> server.ListUserReq
-	8,  // 15: server.ServerAPI.ModifyUserPassword:input_type -> server.ModifyUserPasswordReq
-	9,  // 16: server.ServerAPI.ModifyUser:input_type -> server.ModifyUserReq
-	10, // 17: server.ServerAPI.GetUser:input_type -> server.GetUserReq
-	12, // 18: server.ServerAPI.DeleteUser:input_type -> server.DeleteUserReq
-	11, // 19: server.ServerAPI.SwitchUserRouteNode:input_type -> server.SwitchUserRouteNodeReq
-	13, // 20: server.ServerAPI.StartOrStopUser:input_type -> server.StartOrStopUserReq
-	38, // 21: server.ServerAPI.GetServerInfo:input_type -> server.Empty
-	18, // 22: server.ServerAPI.GetNodeAccessToken:input_type -> server.GetNodeAccessTokenReq
-	20, // 23: server.ServerAPI.AddBlacklist:input_type -> server.AddBlacklistReq
-	21, // 24: server.ServerAPI.RemoveBlacklist:input_type -> server.RemoveBlacklistReq
-	22, // 25: server.ServerAPI.GetBlacklist:input_type -> server.GetBlacklistReq
-	24, // 26: server.ServerAPI.KickNode:input_type -> server.KickNodeReq
-	25, // 27: server.ServerAPI.KickNodeByIP:input_type -> server.KickNodeByIPReq
-	34, // 28: server.ServerAPI.GetUserBaseStats:input_type -> server.UserBaseStatsReq
-	36, // 29: server.ServerAPI.GetUserStatChart:input_type -> server.UserStatChartReq
-	2,  // 30: server.ServerAPI.ListNode:output_type -> server.ListNodeResp
-	6,  // 31: server.ServerAPI.CreateUser:output_type -> server.CreateUserResp
-	16, // 32: server.ServerAPI.ListUser:output_type -> server.ListUserResp
-	7,  // 33: server.ServerAPI.ModifyUserPassword:output_type -> server.UserOperationResp
-	7,  // 34: server.ServerAPI.ModifyUser:output_type -> server.UserOperationResp
-	14, // 35: server.ServerAPI.GetUser:output_type -> server.User
-	7,  // 36: server.ServerAPI.DeleteUser:output_type -> server.UserOperationResp
-	7,  // 37: server.ServerAPI.SwitchUserRouteNode:output_type -> server.UserOperationResp
-	7,  // 38: server.ServerAPI.StartOrStopUser:output_type -> server.UserOperationResp
-	17, // 39: server.ServerAPI.GetServerInfo:output_type -> server.GetServerInfoResp
-	19, // 40: server.ServerAPI.GetNodeAccessToken:output_type -> server.GetNodeAccessTokenResp
-	7,  // 41: server.ServerAPI.AddBlacklist:output_type -> server.UserOperationResp
-	7,  // 42: server.ServerAPI.RemoveBlacklist:output_type -> server.UserOperationResp
-	23, // 43: server.ServerAPI.GetBlacklist:output_type -> server.GetBlacklistResp
-	7,  // 44: server.ServerAPI.KickNode:output_type -> server.UserOperationResp
-	7,  // 45: server.ServerAPI.KickNodeByIP:output_type -> server.UserOperationResp
-	35, // 46: server.ServerAPI.GetUserBaseStats:output_type -> server.UserBaseStatsResp
-	37, // 47: server.ServerAPI.GetUserStatChart:output_type -> server.UserStatChartResp
-	30, // [30:48] is the sub-list for method output_type
-	12, // [12:30] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	40, // 12: server.GetFreeIPsResp.ips:type_name -> server.FreeIPInfoPb
+	0,  // 13: server.ServerAPI.ListNode:input_type -> server.ListNodeReq
+	5,  // 14: server.ServerAPI.CreateUser:input_type -> server.CreateUserReq
+	15, // 15: server.ServerAPI.ListUser:input_type -> server.ListUserReq
+	8,  // 16: server.ServerAPI.ModifyUserPassword:input_type -> server.ModifyUserPasswordReq
+	9,  // 17: server.ServerAPI.ModifyUser:input_type -> server.ModifyUserReq
+	10, // 18: server.ServerAPI.GetUser:input_type -> server.GetUserReq
+	12, // 19: server.ServerAPI.DeleteUser:input_type -> server.DeleteUserReq
+	11, // 20: server.ServerAPI.SwitchUserRouteNode:input_type -> server.SwitchUserRouteNodeReq
+	13, // 21: server.ServerAPI.StartOrStopUser:input_type -> server.StartOrStopUserReq
+	38, // 22: server.ServerAPI.GetServerInfo:input_type -> server.Empty
+	18, // 23: server.ServerAPI.GetNodeAccessToken:input_type -> server.GetNodeAccessTokenReq
+	20, // 24: server.ServerAPI.AddBlacklist:input_type -> server.AddBlacklistReq
+	21, // 25: server.ServerAPI.RemoveBlacklist:input_type -> server.RemoveBlacklistReq
+	22, // 26: server.ServerAPI.GetBlacklist:input_type -> server.GetBlacklistReq
+	24, // 27: server.ServerAPI.KickNode:input_type -> server.KickNodeReq
+	25, // 28: server.ServerAPI.KickNodeByIP:input_type -> server.KickNodeByIPReq
+	34, // 29: server.ServerAPI.GetUserBaseStats:input_type -> server.UserBaseStatsReq
+	36, // 30: server.ServerAPI.GetUserStatChart:input_type -> server.UserStatChartReq
+	39, // 31: server.ServerAPI.GetFreeIPs:input_type -> server.GetFreeIPsReq
+	2,  // 32: server.ServerAPI.ListNode:output_type -> server.ListNodeResp
+	6,  // 33: server.ServerAPI.CreateUser:output_type -> server.CreateUserResp
+	16, // 34: server.ServerAPI.ListUser:output_type -> server.ListUserResp
+	7,  // 35: server.ServerAPI.ModifyUserPassword:output_type -> server.UserOperationResp
+	7,  // 36: server.ServerAPI.ModifyUser:output_type -> server.UserOperationResp
+	14, // 37: server.ServerAPI.GetUser:output_type -> server.User
+	7,  // 38: server.ServerAPI.DeleteUser:output_type -> server.UserOperationResp
+	7,  // 39: server.ServerAPI.SwitchUserRouteNode:output_type -> server.UserOperationResp
+	7,  // 40: server.ServerAPI.StartOrStopUser:output_type -> server.UserOperationResp
+	17, // 41: server.ServerAPI.GetServerInfo:output_type -> server.GetServerInfoResp
+	19, // 42: server.ServerAPI.GetNodeAccessToken:output_type -> server.GetNodeAccessTokenResp
+	7,  // 43: server.ServerAPI.AddBlacklist:output_type -> server.UserOperationResp
+	7,  // 44: server.ServerAPI.RemoveBlacklist:output_type -> server.UserOperationResp
+	23, // 45: server.ServerAPI.GetBlacklist:output_type -> server.GetBlacklistResp
+	7,  // 46: server.ServerAPI.KickNode:output_type -> server.UserOperationResp
+	7,  // 47: server.ServerAPI.KickNodeByIP:output_type -> server.UserOperationResp
+	35, // 48: server.ServerAPI.GetUserBaseStats:output_type -> server.UserBaseStatsResp
+	37, // 49: server.ServerAPI.GetUserStatChart:output_type -> server.UserStatChartResp
+	41, // 50: server.ServerAPI.GetFreeIPs:output_type -> server.GetFreeIPsResp
+	32, // [32:51] is the sub-list for method output_type
+	13, // [13:32] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_server_proto_init() }
@@ -2465,7 +2629,7 @@ func file_server_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_server_proto_rawDesc), len(file_server_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   39,
+			NumMessages:   42,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

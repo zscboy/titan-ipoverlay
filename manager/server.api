@@ -303,5 +303,17 @@ service server-api {
 	@doc "Export all POP node IDs as CSV download"
 	@handler exportPopNodes
 	get /pop/nodes/export
+
+	@handler migrateNodes
+	post /node/migrate (MigrateNodesReq) returns (UserOperationResp)
 }
+
+type (
+	MigrateNodesReq {
+		SourcePop string `json:"source_pop"`
+		TargetPop string `json:"target_pop"`
+		Count     int    `json:"count"`
+		FromHead  bool   `json:"from_head"`
+	}
+)
 

@@ -70,6 +70,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Handler: listNodeHandler(serverCtx),
 			},
 			{
+				Method:  http.MethodPost,
+				Path:    "/node/migrate",
+				Handler: migrateNodesHandler(serverCtx),
+			},
+			{
 				// Export all POP node IDs as CSV download
 				Method:  http.MethodGet,
 				Path:    "/pop/nodes/export",

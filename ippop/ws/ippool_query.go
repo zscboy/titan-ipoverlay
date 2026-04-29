@@ -3,6 +3,8 @@ package ws
 import (
 	"net/http"
 
+	"titan-ipoverlay/ippop/types"
+
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
@@ -15,7 +17,7 @@ func NewIPPoolQuery(tunMgr *TunnelManager) *IPPoolQuery {
 }
 
 type GetFreeIPsResp struct {
-	IPs []FreeIPInfo `json:"ips"`
+	IPs []types.FreeIPInfo `json:"ips"`
 }
 
 func (q *IPPoolQuery) ServeFreeIPs(w http.ResponseWriter, r *http.Request) {
