@@ -17,26 +17,34 @@ import (
 )
 
 func handleCLI(cfg *Config, apiAddr, cmd, popID, dataList string) {
-	// 1. Build a lookup map for validation
-	popMap := make(map[string]struct{}, len(cfg.Pops))
-	for _, p := range cfg.Pops {
-		popMap[p.ID] = struct{}{}
-	}
-
-	// 2. Validate target POP ID
-	if _, exists := popMap[popID]; !exists {
-		log.Fatalf("Error: POP ID '%s' not found in config file.", popID)
-	}
-
-	// 3. Dispatch to specific handlers
+	// 1. Dispatch to specific handlers
 	switch cmd {
 	case "set-ips":
+		validatePopID(cfg, popID)
 		handleSetIPs(cfg, apiAddr, popID, dataList)
 	case "set-follow":
-		handleSetFollow(cfg, apiAddr, popID, dataList, popMap)
+		validatePopID(cfg, popID)
+		handleSetFollow(cfg, apiAddr, popID, dataList)
+	case "reload":
+		handleReload(cfg, apiAddr)
 	default:
-		log.Fatal("Unknown command. Supported: set-ips, set-follow")
+		log.Fatal("Unknown command. Supported: set-ips, set-follow, reload")
 	}
+}
+
+func validatePopID(cfg *Config, popID string) {
+	for _, p := range cfg.Pops {
+		if p.ID == popID {
+			return
+		}
+	}
+	log.Fatalf("Error: POP ID '%s' not found in config file.", popID)
+}
+
+func handleReload(cfg *Config, apiAddr string) {
+	sendSignedRequest(apiAddr, "/api/v1/reload", cfg.Server.Secret, map[string]string{
+		"action": "reload",
+	})
 }
 
 func handleSetIPs(cfg *Config, apiAddr, popID, ipList string) {
@@ -51,7 +59,13 @@ func handleSetIPs(cfg *Config, apiAddr, popID, ipList string) {
 	sendSignedRequest(apiAddr, "/api/v1/pop", cfg.Server.Secret, payload)
 }
 
-func handleSetFollow(cfg *Config, apiAddr, popID, followList string, popMap map[string]struct{}) {
+func handleSetFollow(cfg *Config, apiAddr, popID, followList string) {
+	// Build pop map for validation
+	popMap := make(map[string]struct{}, len(cfg.Pops))
+	for _, p := range cfg.Pops {
+		popMap[p.ID] = struct{}{}
+	}
+
 	var follows []string
 	if followList != "" {
 		follows = strings.Split(followList, ",")

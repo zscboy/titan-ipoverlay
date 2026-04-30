@@ -7,9 +7,9 @@ import (
 
 func main() {
 	configPath := flag.String("c", "config.yaml", "path to config file")
-	apiAddr := flag.String("api", ":8080", "address for HTTP API")
+	apiAddr := flag.String("api", ":8000", "address for HTTP API")
 	mode := flag.String("m", "server", "running mode: 'server' or 'cli'")
-	cmd := flag.String("cmd", "", "cli command: 'set-follow' or 'set-ips'. Example: ./titan-dns -m cli -cmd set-ips -pop pop1 -val 192.168.1.1,192.168.1.2")
+	cmd := flag.String("cmd", "", "cli command: 'set-follow','set-ips' or 'reload'. Example: ./titan-dns -m cli -cmd set-ips -pop pop1 -val 192.168.1.1,192.168.1.2")
 	popID := flag.String("pop", "", "target POP ID")
 	valList := flag.String("val", "", "comma separated list of values (IPs or POP IDs)")
 	flag.Parse()

@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/miekg/dns"
 )
@@ -13,12 +15,16 @@ import (
 type DNSHandler struct {
 	config     *Config
 	configPath string
-	mu         sync.Mutex
+	mu         sync.RWMutex // Changed to RWMutex for better concurrency
 	cache      *StickyCache
 	balancer   *LoadBalancer
+	stats      sync.Map // domain -> *int64
 }
 
 func (h *DNSHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
 	msg := dns.Msg{}
 	msg.SetReply(r)
 	msg.Authoritative = true
@@ -36,7 +42,8 @@ func (h *DNSHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 					A:   net.ParseIP(ip),
 				}
 				msg.Answer = append(msg.Answer, ans)
-				log.Printf("Resolved A: %s -> %s", q.Name, ip)
+				// Count query internally instead of printing every time
+				h.incStat(q.Name)
 			}
 		} else {
 			// For non-A queries, check if the domain exists to decide between NOERROR and NXDOMAIN.
@@ -135,6 +142,7 @@ func (h *DNSHandler) Start(apiAddr string) error {
 	go func() {
 		http.HandleFunc("/api/v1/pop", h.handlePopIPsAPI)
 		http.HandleFunc("/api/v1/follow", h.handleFollowAPI)
+		http.HandleFunc("/api/v1/reload", h.handleReloadAPI)
 		log.Printf("Starting Management API on %s", apiAddr)
 		if err := http.ListenAndServe(apiAddr, nil); err != nil {
 			log.Fatalf("HTTP API failed: %v", err)
@@ -150,5 +158,73 @@ func (h *DNSHandler) Start(apiAddr string) error {
 
 	log.Printf("Starting Titan DNS Server on %s", h.config.Server.Listen)
 	log.Printf("Handling domains ending in %s", h.config.Server.DomainSuffix)
+
+	// 3. Start statistics loop (prints every 10s and resets)
+	go h.printStatsLoop()
+
 	return server.ListenAndServe()
+}
+
+func (h *DNSHandler) ReloadConfig() error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	cfg, err := LoadConfig(h.configPath)
+	if err != nil {
+		return err
+	}
+
+	h.config = cfg
+	h.balancer = NewLoadBalancer(cfg.Pops)
+	// We keep the cache but it might contain old entries. 
+	// For a clean reload, we could h.cache.Clear() if needed.
+	
+	log.Printf("Configuration RELOADED from %s", h.configPath)
+	return nil
+}
+
+
+func (h *DNSHandler) incStat(name string) {
+	name = strings.ToLower(name)
+	suffix := strings.ToLower(h.config.Server.DomainSuffix)
+	if !strings.HasSuffix(suffix, ".") {
+		suffix += "."
+	}
+
+	// Calculate prefix relative to suffix
+	prefix := strings.TrimSuffix(name, suffix)
+	parts := strings.Split(strings.TrimSuffix(prefix, "."), ".")
+
+	// If prefix has more than 1 part (e.g., sessionID.popID), aggregate it
+	// session123.pop1.abc.com -> *.pop1.abc.com
+	if len(parts) > 1 {
+		// Use strings.TrimLeft to avoid double dots if suffix already starts with a dot
+		name = "*." + parts[len(parts)-1] + "." + strings.TrimLeft(suffix, ".")
+	}
+
+	val, _ := h.stats.LoadOrStore(name, new(int64))
+	atomic.AddInt64(val.(*int64), 1)
+}
+
+func (h *DNSHandler) printStatsLoop() {
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		hasData := false
+		h.stats.Range(func(key, value interface{}) bool {
+			if !hasData {
+				log.Println("=== DNS Stats (Last 10s) ===")
+				hasData = true
+			}
+			count := atomic.SwapInt64(value.(*int64), 0)
+			if count > 0 {
+				log.Printf("%s: %d", key, count)
+			}
+			return true
+		})
+		if hasData {
+			// Clear the map to keep memory usage low and remove old entries
+			h.stats = sync.Map{}
+		}
+	}
 }

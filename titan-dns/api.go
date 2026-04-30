@@ -15,7 +15,10 @@ import (
 )
 
 func (h *DNSHandler) validateSignature(r *http.Request, body []byte) bool {
+	h.mu.RLock()
 	secret := h.config.Server.Secret
+	h.mu.RUnlock()
+	
 	if secret == "" {
 		return true // Allow if no secret configured
 	}
@@ -177,4 +180,26 @@ func (h *DNSHandler) handleFollowAPI(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Successfully updated FOLLOW for POP %s: %v", req.PopID, req.Follow)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok", "message": "follow updated and persisted"})
+}
+
+func (h *DNSHandler) handleReloadAPI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Signature verification for security
+	body, _ := io.ReadAll(r.Body)
+	if !h.validateSignature(r, body) {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	if err := h.ReloadConfig(); err != nil {
+		http.Error(w, "Reload failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok", "message": "config reloaded successfully"})
 }
