@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -43,7 +44,7 @@ func (h *DNSHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 				}
 				msg.Answer = append(msg.Answer, ans)
 				// Count query internally instead of printing every time
-				h.incStat(q.Name)
+				h.incStat(q.Name, ip)
 			}
 		} else {
 			// For non-A queries, check if the domain exists to decide between NOERROR and NXDOMAIN.
@@ -176,15 +177,14 @@ func (h *DNSHandler) ReloadConfig() error {
 
 	h.config = cfg
 	h.balancer = NewLoadBalancer(cfg.Pops)
-	// We keep the cache but it might contain old entries. 
+	// We keep the cache but it might contain old entries.
 	// For a clean reload, we could h.cache.Clear() if needed.
-	
+
 	log.Printf("Configuration RELOADED from %s", h.configPath)
 	return nil
 }
 
-
-func (h *DNSHandler) incStat(name string) {
+func (h *DNSHandler) incStat(name, resolvedIP string) {
 	name = strings.ToLower(name)
 	suffix := strings.ToLower(h.config.Server.DomainSuffix)
 	if !strings.HasSuffix(suffix, ".") {
@@ -202,7 +202,8 @@ func (h *DNSHandler) incStat(name string) {
 		name = "*." + parts[len(parts)-1] + "." + strings.TrimLeft(suffix, ".")
 	}
 
-	val, _ := h.stats.LoadOrStore(name, new(int64))
+	statKey := fmt.Sprintf("%s->%s", name, resolvedIP)
+	val, _ := h.stats.LoadOrStore(statKey, new(int64))
 	atomic.AddInt64(val.(*int64), 1)
 }
 
