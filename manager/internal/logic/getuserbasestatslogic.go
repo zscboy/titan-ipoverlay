@@ -27,28 +27,34 @@ func NewGetUserBaseStatsLogic(ctx context.Context, svcCtx *svc.ServiceContext) *
 }
 
 func (l *GetUserBaseStatsLogic) GetUserBaseStats(req *types.UserBaseStatsReq) (resp *types.UserBaseStatsResp, err error) {
-	popID, err := model.GetUserPop(l.svcCtx.Redis, req.Username)
+	popIDs, err := model.GetUserPops(l.svcCtx.Redis, req.Username)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(popID) == 0 {
+	if len(popIDs) == 0 {
 		return nil, fmt.Errorf("user %s not exist", req.Username)
 	}
 
-	server := l.svcCtx.Pops[popID]
-	if server == nil {
-		return nil, fmt.Errorf("pop %s not found", popID)
+	var currentBandwidth, topBandwidth, totalTraffic int64
+	for _, popID := range popIDs {
+		server := l.svcCtx.Pops[popID]
+		if server == nil {
+			continue
+		}
+		baseStatsResp, err := server.API.GetUserBaseStats(l.ctx, &serverapi.UserBaseStatsReq{Username: req.Username})
+		if err != nil {
+			return nil, err
+		}
+		currentBandwidth += baseStatsResp.CurrentBandwidth
+		topBandwidth += baseStatsResp.TopBandwidth
+		totalTraffic += baseStatsResp.TotalTraffic
 	}
 
-	baseStatsResp, err := server.API.GetUserBaseStats(l.ctx, &serverapi.UserBaseStatsReq{Username: req.Username})
-	if err != nil {
-		return nil, err
-	}
 	return &types.UserBaseStatsResp{
-		CurrentBandwidth: baseStatsResp.CurrentBandwidth,
-		TopBandwidth:     baseStatsResp.TopBandwidth,
-		TotalTraffic:     baseStatsResp.TotalTraffic,
+		CurrentBandwidth: currentBandwidth,
+		TopBandwidth:     topBandwidth,
+		TotalTraffic:     totalTraffic,
 		CurrentConns:     0,
 	}, nil
 }

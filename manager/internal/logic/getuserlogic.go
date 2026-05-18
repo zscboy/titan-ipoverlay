@@ -3,6 +3,7 @@ package logic
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"titan-ipoverlay/ippop/rpc/serverapi"
 	"titan-ipoverlay/manager/internal/svc"
@@ -27,18 +28,18 @@ func NewGetUserLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetUserLo
 }
 
 func (l *GetUserLogic) GetUser(req *types.GetUserReq) (resp *types.GetUserResp, err error) {
-	popID, err := model.GetUserPop(l.svcCtx.Redis, req.UserName)
+	popIDs, err := model.GetUserPops(l.svcCtx.Redis, req.UserName)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(popID) == 0 {
+	if len(popIDs) == 0 {
 		return nil, fmt.Errorf("user %s not exist", req.UserName)
 	}
 
-	server := l.svcCtx.Pops[popID]
+	server := l.svcCtx.Pops[popIDs[0]]
 	if server == nil {
-		return nil, fmt.Errorf("pop %s not found", popID)
+		return nil, fmt.Errorf("pop %s not found", popIDs[0])
 	}
 
 	getUserResp, err := server.API.GetUser(l.ctx, &serverapi.GetUserReq{UserName: req.UserName})
@@ -62,7 +63,8 @@ func (l *GetUserLogic) GetUser(req *types.GetUserReq) (resp *types.GetUserResp, 
 		LastRouteSwitchTime: getUserResp.LastRouteSwitchTime,
 	}
 	return &types.GetUserResp{
-		PopId: popID,
-		User:  user,
+		PopId:  strings.Join(popIDs, ","),
+		PopIds: popIDs,
+		User:   user,
 	}, nil
 }

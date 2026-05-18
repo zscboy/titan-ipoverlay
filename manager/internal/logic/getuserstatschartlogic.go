@@ -3,6 +3,7 @@ package logic
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"titan-ipoverlay/ippop/rpc/serverapi"
 	"titan-ipoverlay/manager/internal/svc"
@@ -27,30 +28,49 @@ func NewGetUserStatsChartLogic(ctx context.Context, svcCtx *svc.ServiceContext) 
 }
 
 func (l *GetUserStatsChartLogic) GetUserStatsChart(req *types.UserStatsChartReq) (resp *types.UserStatsChartResp, err error) {
-	popID, err := model.GetUserPop(l.svcCtx.Redis, req.Username)
+	popIDs, err := model.GetUserPops(l.svcCtx.Redis, req.Username)
 	if err != nil {
 		return nil, fmt.Errorf("get user %s error %s", req.Username, err.Error())
 	}
 
-	if len(popID) == 0 {
+	if len(popIDs) == 0 {
 		return nil, fmt.Errorf("user %s not exist", req.Username)
 	}
 
-	server := l.svcCtx.Pops[popID]
-	if server == nil {
-		return nil, fmt.Errorf("pop %s not exist", popID)
+	aggStats := make(map[int64]*types.StatPoint)
+	for _, popID := range popIDs {
+		server := l.svcCtx.Pops[popID]
+		if server == nil {
+			continue
+		}
+		userStatChartReq := &serverapi.UserStatChartReq{Username: req.Username, Type: req.Type, StartTime: req.StartTime, EndTime: req.EndTime}
+		statsResp, err := server.API.GetUserStatChart(l.ctx, userStatChartReq)
+		if err != nil {
+			return nil, fmt.Errorf("get user stats chart failed:%v", err)
+		}
+		for _, statPoint := range statsResp.Stats {
+			if existing, ok := aggStats[statPoint.Timestamp]; ok {
+				existing.Bandwidth += statPoint.Bandwidth
+				existing.Traffic += statPoint.Traffic
+			} else {
+				aggStats[statPoint.Timestamp] = &types.StatPoint{
+					Timestamp: statPoint.Timestamp,
+					Bandwidth: statPoint.Bandwidth,
+					Traffic:   statPoint.Traffic,
+				}
+			}
+		}
 	}
 
-	userStatChartReq := &serverapi.UserStatChartReq{Username: req.Username, Type: req.Type, StartTime: req.StartTime, EndTime: req.EndTime}
-	statsResp, err := server.API.GetUserStatChart(l.ctx, userStatChartReq)
-	if err != nil {
-		return nil, fmt.Errorf("get all stats per 5min failed:%v", err)
+	keys := make([]int64, 0, len(aggStats))
+	for k := range aggStats {
+		keys = append(keys, k)
 	}
+	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
 
-	stats := make([]*types.StatPoint, 0, len(statsResp.Stats))
-	for _, statPonint := range statsResp.Stats {
-		stat := &types.StatPoint{Timestamp: statPonint.Timestamp, Bandwidth: statPonint.Bandwidth, Traffic: statPonint.Traffic}
-		stats = append(stats, stat)
+	stats := make([]*types.StatPoint, 0, len(keys))
+	for _, k := range keys {
+		stats = append(stats, aggStats[k])
 	}
 
 	return &types.UserStatsChartResp{Stats: stats}, nil

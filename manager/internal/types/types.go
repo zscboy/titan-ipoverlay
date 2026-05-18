@@ -26,7 +26,7 @@ type AllStatsPerHourReq struct {
 type CreateUserReq struct {
 	UserName          string        `json:"user_name"`
 	Password          string        `json:"password"`
-	PopId             string        `json:"pop_id"`
+	PopIds            []string      `json:"pop_ids"`
 	TrafficLimit      *TrafficLimit `json:"traffic_limit,optional"`
 	Route             *Route        `json:"route,optional"`
 	UploadRateLimit   int64         `json:"upload_rate_limit,default=655360"`
@@ -35,10 +35,11 @@ type CreateUserReq struct {
 
 type CreateUserResp struct {
 	UserName     string        `json:"user_name"`
-	PopId        string        `json:"pop_id"`
 	TrafficLimit *TrafficLimit `json:"traffic_limit"`
 	Route        *Route        `json:"route"`
 	NodeIP       string        `json:"node_ip"`
+	SuccessPops  []string      `json:"success_pops,optional"`
+	FailedPops   []string      `json:"failed_pops,optional"`
 }
 
 type DeleteUserReq struct {
@@ -92,7 +93,8 @@ type GetUserReq struct {
 
 type GetUserResp struct {
 	User
-	PopId string `json:"pop_id"`
+	PopId  string   `json:"pop_id"`
+	PopIds []string `json:"pop_ids"`
 }
 
 type IPBlacklistReq struct {

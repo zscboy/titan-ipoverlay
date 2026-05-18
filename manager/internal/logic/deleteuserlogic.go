@@ -27,28 +27,37 @@ func NewDeleteUserLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Delete
 }
 
 func (l *DeleteUserLogic) DeleteUser(req *types.DeleteUserReq) (resp *types.UserOperationResp, err error) {
-	popID, err := model.GetUserPop(l.svcCtx.Redis, req.UserName)
+	popIDs, err := model.GetUserPops(l.svcCtx.Redis, req.UserName)
 	if err != nil {
 		return &types.UserOperationResp{ErrMsg: err.Error()}, nil
 	}
 
-	if len(popID) == 0 {
+	if len(popIDs) == 0 {
 		return &types.UserOperationResp{ErrMsg: fmt.Sprintf("user %s not exist", req.UserName)}, nil
 	}
 
-	server := l.svcCtx.Pops[popID]
-	if server == nil {
-		return &types.UserOperationResp{ErrMsg: fmt.Sprintf("pop %s not found", popID)}, nil
-	}
+	var errMsg string
+	var success = true
+	for _, popID := range popIDs {
+		server := l.svcCtx.Pops[popID]
+		if server == nil {
+			logx.Errorf("pop %s not found for user %s", popID, req.UserName)
+			continue
+		}
 
-	deleteUserResp, err := server.API.DeleteUser(l.ctx, &serverapi.DeleteUserReq{UserName: req.UserName})
-	if err != nil {
-		return &types.UserOperationResp{ErrMsg: err.Error()}, nil
+		deleteUserResp, err := server.API.DeleteUser(l.ctx, &serverapi.DeleteUserReq{UserName: req.UserName})
+		if err != nil {
+			success = false
+			errMsg += fmt.Sprintf("pop %s: %s; ", popID, err.Error())
+		} else if !deleteUserResp.Success {
+			success = false
+			errMsg += fmt.Sprintf("pop %s: %s; ", popID, deleteUserResp.ErrMsg)
+		}
 	}
 
 	if err := model.DeleteUser(l.svcCtx.Redis, req.UserName); err != nil {
 		return &types.UserOperationResp{ErrMsg: err.Error()}, nil
 	}
 
-	return &types.UserOperationResp{Success: deleteUserResp.Success, ErrMsg: deleteUserResp.ErrMsg}, nil
+	return &types.UserOperationResp{Success: success, ErrMsg: errMsg}, nil
 }

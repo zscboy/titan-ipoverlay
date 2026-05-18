@@ -67,8 +67,8 @@ type (
 	CreateUserReq {
 		UserName string `json:"user_name"`
 		Password string `json:"password"`
-		// the id of pop(Point of Presence)
-		PopId string `json:"pop_id"`
+		// list of pop IDs
+		PopIds []string `json:"pop_ids"`
 		// if TrafficLimit is nil, will allocate 1 mouth and 1000GB traffic
 		TrafficLimit *TrafficLimit `json:"traffic_limit,optional"`
 		// if Route is nil, will use manual mode
@@ -80,13 +80,13 @@ type (
 	}
 	CreateUserResp {
 		UserName string `json:"user_name"`
-		// the id of pop(Point of Presence)
-		PopId string `json:"pop_id"`
 		// if TrafficLimit is nil, will allocate 1 mouth and 1000GB traffic
 		TrafficLimit *TrafficLimit `json:"traffic_limit"`
 		// if Route is nil, will use manual mode
 		Route  *Route `json:"route"`
 		NodeIP string `json:"node_ip"`
+		SuccessPops []string `json:"success_pops,optional"`
+		FailedPops  []string `json:"failed_pops,optional"`
 	}
 	UserOperationResp {
 		Success bool   `json:"success"`
@@ -107,6 +107,7 @@ type (
 	GetUserResp {
 		User
 		PopId string `json:"pop_id"`
+		PopIds []string `json:"pop_ids"`
 	}
 	SwitchUserRouteNodeReq {
 		UserName string `json:"user_name"`

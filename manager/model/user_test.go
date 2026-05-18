@@ -16,22 +16,41 @@ func TestSaveUser(t *testing.T) {
 
 	userName := "abc"
 	popID := "abc"
-	if err := SetUserPop(rd, userName, popID); err != nil {
+	if err := SetUserPop(rd, userName, []string{popID}); err != nil {
 		t.Errorf("save user %v", err)
 		return
 	}
 	t.Logf("save user success")
 }
-
-func TestGetUser(t *testing.T) {
+func TestUserMultiplePops(t *testing.T) {
 	conf := redis.RedisConf{Host: "127.0.0.1:6379", Type: "node"}
 	rd := redis.MustNewRedis(conf)
-	user := "abc"
-	pop, err := GetUserPop(rd, user)
+	user := "test_multi_pop_user"
+
+	// Clean up first
+	_ = DeleteUser(rd, user)
+
+	// Set first pop
+	err := SetUserPop(rd, user, []string{"pop1"})
 	if err != nil {
-		t.Errorf("get user %v", err)
-		return
+		t.Fatalf("set user pop1: %v", err)
 	}
 
-	t.Logf("user:%s pop:%s", user, pop)
+	// Set second pop
+	err = SetUserPop(rd, user, []string{"pop2"})
+	if err != nil {
+		t.Fatalf("set user pop2: %v", err)
+	}
+
+	// Get all pops
+	pops, err := GetUserPops(rd, user)
+	if err != nil {
+		t.Fatalf("get all user pops: %v", err)
+	}
+	if len(pops) != 2 || pops[0] != "pop1" || pops[1] != "pop2" {
+		t.Errorf("expected [pop1, pop2], got %v", pops)
+	}
+
+	// Clean up
+	_ = DeleteUser(rd, user)
 }

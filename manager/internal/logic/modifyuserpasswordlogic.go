@@ -27,25 +27,34 @@ func NewModifyUserPasswordLogic(ctx context.Context, svcCtx *svc.ServiceContext)
 }
 
 func (l *ModifyUserPasswordLogic) ModifyUserPassword(req *types.ModifyUserPasswordReq) (resp *types.UserOperationResp, err error) {
-	popID, err := model.GetUserPop(l.svcCtx.Redis, req.UserName)
+	popIDs, err := model.GetUserPops(l.svcCtx.Redis, req.UserName)
 	if err != nil {
 		return &types.UserOperationResp{ErrMsg: err.Error()}, nil
 	}
 
-	if len(popID) == 0 {
+	if len(popIDs) == 0 {
 		return &types.UserOperationResp{ErrMsg: fmt.Sprintf("user %s not exist", req.UserName)}, nil
 	}
 
-	server := l.svcCtx.Pops[popID]
-	if server == nil {
-		return &types.UserOperationResp{ErrMsg: fmt.Sprintf("pop %s not found", popID)}, nil
+	var errMsg string
+	var success = true
+	for _, popID := range popIDs {
+		server := l.svcCtx.Pops[popID]
+		if server == nil {
+			logx.Errorf("pop %s not found for user %s", popID, req.UserName)
+			continue
+		}
+
+		in := &serverapi.ModifyUserPasswordReq{UserName: req.UserName, NewPassword: req.NewPassword}
+		modifyUserPasswordResp, err := server.API.ModifyUserPassword(l.ctx, in)
+		if err != nil {
+			success = false
+			errMsg += fmt.Sprintf("pop %s: %s; ", popID, err.Error())
+		} else if !modifyUserPasswordResp.Success {
+			success = false
+			errMsg += fmt.Sprintf("pop %s: %s; ", popID, modifyUserPasswordResp.ErrMsg)
+		}
 	}
 
-	in := &serverapi.ModifyUserPasswordReq{UserName: req.UserName, NewPassword: req.NewPassword}
-	modifyUserPasswordResp, err := server.API.ModifyUserPassword(l.ctx, in)
-	if err != nil {
-		return &types.UserOperationResp{ErrMsg: err.Error()}, nil
-	}
-
-	return &types.UserOperationResp{Success: modifyUserPasswordResp.Success, ErrMsg: modifyUserPasswordResp.ErrMsg}, nil
+	return &types.UserOperationResp{Success: success, ErrMsg: errMsg}, nil
 }
