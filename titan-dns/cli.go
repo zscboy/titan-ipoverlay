@@ -27,8 +27,10 @@ func handleCLI(cfg *Config, apiAddr, cmd, popID, dataList string) {
 		handleSetFollow(cfg, apiAddr, popID, dataList)
 	case "reload":
 		handleReload(cfg, apiAddr)
+	case "set-log":
+		handleSetLog(cfg, apiAddr, dataList)
 	default:
-		log.Fatal("Unknown command. Supported: set-ips, set-follow, reload")
+		log.Fatal("Unknown command. Supported: set-ips, set-follow, reload, set-log")
 	}
 }
 
@@ -132,4 +134,15 @@ func sendSignedRequest(apiAddr, endpoint, secret string, payload interface{}) {
 		log.Fatalf("Error from server (%d): %s", resp.StatusCode, string(respBody))
 	}
 	fmt.Printf("Success: %s\n", string(respBody))
+}
+
+func handleSetLog(cfg *Config, apiAddr, value string) {
+	enable := false
+	if value == "true" || value == "1" || value == "on" {
+		enable = true
+	}
+	payload := map[string]interface{}{
+		"enable": enable,
+	}
+	sendSignedRequest(apiAddr, "/api/v1/log", cfg.Server.Secret, payload)
 }

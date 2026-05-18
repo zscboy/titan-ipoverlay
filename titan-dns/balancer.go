@@ -45,21 +45,21 @@ func NewLoadBalancer(pops []PopConfig) *LoadBalancer {
 
 // BalanceBySession selects an IP for a POP using round-robin.
 // Stickiness is handled via external cache in the handler.
-func (lb *LoadBalancer) BalanceBySession(popID string, session string) string {
+func (lb *LoadBalancer) BalanceBySession(popID string, session string) (string, uint64) {
 	return lb.BalanceByRR(popID)
 }
 
 // BalanceByRR selects an IP for a POP using round-robin.
-func (lb *LoadBalancer) BalanceByRR(popID string) string {
+func (lb *LoadBalancer) BalanceByRR(popID string) (string, uint64) {
 	lb.mu.RLock()
 	data, ok := lb.pops[popID]
 	lb.mu.RUnlock()
 	if !ok || len(data.IPs) == 0 {
-		return ""
+		return "", 0
 	}
 
 	index := atomic.AddUint64(&data.rrIndex, 1) - 1
-	return data.IPs[index%uint64(len(data.IPs))]
+	return data.IPs[index%uint64(len(data.IPs))], index
 }
 
 // HasPop checks if a POP exists and has IPs without advancing the counter.

@@ -6,11 +6,13 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"math"
 	"net/http"
 	"strconv"
+	"sync/atomic"
 	"time"
 )
 
@@ -202,4 +204,43 @@ func (h *DNSHandler) handleReloadAPI(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok", "message": "config reloaded successfully"})
+}
+
+func (h *DNSHandler) handleLogToggleAPI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Signature verification for security
+	body, _ := io.ReadAll(r.Body)
+	if !h.validateSignature(r, body) {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	var req struct {
+		Enable bool `json:"enable"`
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if req.Enable {
+		atomic.StoreInt32(&h.logQueries, 1)
+	} else {
+		atomic.StoreInt32(&h.logQueries, 0)
+	}
+
+	mode := "Stats"
+	if atomic.LoadInt32(&h.logQueries) == 1 {
+		mode = "Log"
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":  "ok",
+		"message": fmt.Sprintf("DNS query mode set to %s", mode),
+	})
 }

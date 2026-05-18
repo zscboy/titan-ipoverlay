@@ -20,6 +20,7 @@ type DNSHandler struct {
 	cache      *StickyCache
 	balancer   *LoadBalancer
 	stats      sync.Map // domain -> *int64
+	logQueries int32    // 0: Stats mode, 1: Log mode
 }
 
 func (h *DNSHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
@@ -34,7 +35,7 @@ func (h *DNSHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	for _, q := range r.Question {
 		// Only TypeA queries trigger resolution and load balancing (RR increment)
 		if q.Qtype == dns.TypeA {
-			ip := h.resolveSubdomain(q.Name)
+			ip, index := h.resolveSubdomain(q.Name)
 			if ip != "" {
 				// Domain exists, mark found=true to avoid NXDOMAIN
 				found = true
@@ -43,8 +44,12 @@ func (h *DNSHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 					A:   net.ParseIP(ip),
 				}
 				msg.Answer = append(msg.Answer, ans)
-				// Count query internally instead of printing every time
-				h.incStat(q.Name, ip)
+				// Switch between logging and statistics
+				if atomic.LoadInt32(&h.logQueries) == 1 {
+					log.Printf("QUERY [%d]: %s -> %s", index, q.Name, ip)
+				} else {
+					h.incStat(q.Name, ip)
+				}
 			}
 		} else {
 			// For non-A queries, check if the domain exists to decide between NOERROR and NXDOMAIN.
@@ -64,20 +69,20 @@ func (h *DNSHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	w.WriteMsg(&msg)
 }
 
-func (h *DNSHandler) resolveSubdomain(name string) string {
+func (h *DNSHandler) resolveSubdomain(name string) (string, uint64) {
 	name = strings.ToLower(name)
 	// Remove trailing dot if present
 	name = strings.TrimSuffix(name, ".")
 
 	suffix := strings.ToLower(h.config.Server.DomainSuffix)
 	if !strings.HasSuffix(name, suffix) {
-		return ""
+		return "", 0
 	}
 
 	// 1. First, check if the full name is exactly a configured POP ID (Direct Fixed Domain)
 	// Example: pop1.pop.abc.aa.com
-	if ip := h.balancer.BalanceByRR(name); ip != "" {
-		return ip
+	if ip, index := h.balancer.BalanceByRR(name); ip != "" {
+		return ip, index
 	}
 
 	// 2. If not a direct match, check if it's a session subdomain
@@ -85,7 +90,7 @@ func (h *DNSHandler) resolveSubdomain(name string) string {
 	// We extract popID (the part after the first dot)
 	parts := strings.SplitN(name, ".", 2)
 	if len(parts) < 2 {
-		return ""
+		return "", 0
 	}
 
 	sessionID := parts[0]
@@ -94,14 +99,14 @@ func (h *DNSHandler) resolveSubdomain(name string) string {
 	// Try Sticky Hash Balance for the Session
 	// Check cache first for performance
 	if ip, ok := h.cache.Get(name); ok {
-		return ip
+		return ip, 0 // Return 0 index for cache hits
 	}
 
-	ip := h.balancer.BalanceBySession(popID, sessionID)
+	ip, index := h.balancer.BalanceBySession(popID, sessionID)
 	if ip != "" {
 		h.cache.Set(name, ip)
 	}
-	return ip
+	return ip, index
 }
 
 // isDomainManaged checks existence without affecting balancing (no RR increment)
@@ -144,6 +149,7 @@ func (h *DNSHandler) Start(apiAddr string) error {
 		http.HandleFunc("/api/v1/pop", h.handlePopIPsAPI)
 		http.HandleFunc("/api/v1/follow", h.handleFollowAPI)
 		http.HandleFunc("/api/v1/reload", h.handleReloadAPI)
+		http.HandleFunc("/api/v1/log", h.handleLogToggleAPI)
 		log.Printf("Starting Management API on %s", apiAddr)
 		if err := http.ListenAndServe(apiAddr, nil); err != nil {
 			log.Fatalf("HTTP API failed: %v", err)
