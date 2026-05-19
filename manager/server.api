@@ -44,7 +44,7 @@ type (
 		Total int     `json:"total"`
 	}
 	Route {
-		// 1. auto mode, 2. manual mode, 3. Timed, 4.custom
+		// 1. auto mode, 2. manual mode, 3. Timed, 4.custom，5.share and pooling
 		Mode int `json:"mode"`
 		// if NodeID is empty, will auto allocate a node for user
 		NodeID string `json:"node_id,optional"`
@@ -83,8 +83,8 @@ type (
 		// if TrafficLimit is nil, will allocate 1 mouth and 1000GB traffic
 		TrafficLimit *TrafficLimit `json:"traffic_limit"`
 		// if Route is nil, will use manual mode
-		Route  *Route `json:"route"`
-		NodeIP string `json:"node_ip"`
+		Route       *Route   `json:"route"`
+		NodeIP      string   `json:"node_ip"`
 		SuccessPops []string `json:"success_pops,optional"`
 		FailedPops  []string `json:"failed_pops,optional"`
 	}
@@ -106,7 +106,7 @@ type (
 	}
 	GetUserResp {
 		User
-		PopId string `json:"pop_id"`
+		PopId  string   `json:"pop_id"`
 		PopIds []string `json:"pop_ids"`
 	}
 	SwitchUserRouteNodeReq {
@@ -229,6 +229,13 @@ type (
 		NextCursor uint64   `json:"next_cursor"`
 		Total      int      `json:"total"`
 	}
+	LoginReq {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	LoginResp {
+		Token string `json:"token"`
+	}
 )
 
 service server-api {
@@ -237,6 +244,9 @@ service server-api {
 
 	@handler getAuthToken
 	get /auth/token returns (GetAuthTokenResp)
+
+	@handler login
+	post /auth/login (LoginReq) returns (LoginResp)
 }
 
 @server (

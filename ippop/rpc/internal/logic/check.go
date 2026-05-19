@@ -15,7 +15,8 @@ const (
 	routeModeTypeAuto
 	routeModeTypeManual
 	routeModeTypeTimed
-	routeModeTypeCustom
+	routeModeTypePollingExclusive
+	routeModeTypePollingShare
 )
 
 func checkRoute(ctx context.Context, redis *redis.Redis, route *pb.Route) error {
@@ -46,7 +47,7 @@ func checkRoute(ctx context.Context, redis *redis.Redis, route *pb.Route) error 
 }
 
 func isInvalidRouteMode(mode int32) bool {
-	if mode != routeModeTypeManual && mode != routeModeTypeAuto && mode != routeModeTypeTimed && mode != routeModeTypeCustom {
+	if mode != routeModeTypeManual && mode != routeModeTypeAuto && mode != routeModeTypeTimed && mode != routeModeTypePollingExclusive && mode != routeModeTypePollingShare {
 		return true
 	}
 
