@@ -8,6 +8,11 @@ type AddBlacklistReq struct {
 	IPList []string `json:"ip_list"` // max length 100
 }
 
+type AddUserPopReq struct {
+	UserName string   `json:"user_name"`
+	PopIds   []string `json:"pop_ids"`
+}
+
 type AllStatsPer5MinReq struct {
 	PopID   string `form:"popid"`
 	Minutes int32  `form:"minutes"`
@@ -177,6 +182,11 @@ type Pop struct {
 type RemoveBlacklistReq struct {
 	PopID  string   `json:"pop_id"`
 	IPList []string `json:"ip_list"` // max length 100
+}
+
+type RemoveUserPopReq struct {
+	UserName string   `json:"user_name"`
+	PopIds   []string `json:"pop_ids"`
 }
 
 type Route struct {

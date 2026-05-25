@@ -54,3 +54,34 @@ func DeleteUser(redis *redis.Redis, user string) error {
 	_, err := redis.Hdel(redisKeyUsers, user)
 	return err
 }
+
+func RemoveUserPops(redis *redis.Redis, user string, pops []string) error {
+	if len(pops) == 0 {
+		return nil
+	}
+
+	existingPops, err := GetUserPops(redis, user)
+	if err != nil {
+		return err
+	}
+
+	toRemove := make(map[string]bool)
+	for _, p := range pops {
+		toRemove[p] = true
+	}
+
+	var newPops []string
+	for _, p := range existingPops {
+		if !toRemove[p] {
+			newPops = append(newPops, p)
+		}
+	}
+
+	if len(newPops) == 0 {
+		_, err := redis.Hdel(redisKeyUsers, user)
+		return err
+	}
+
+	newPopsStr := strings.Join(newPops, ",")
+	return redis.Hset(redisKeyUsers, user, newPopsStr)
+}

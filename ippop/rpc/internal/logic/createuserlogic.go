@@ -2,8 +2,6 @@ package logic
 
 import (
 	"context"
-	"crypto/md5"
-	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
@@ -64,8 +62,7 @@ func (l *CreateUserLogic) CreateUser(in *pb.CreateUserReq) (*pb.CreateUserResp, 
 		}
 	}
 
-	hash := md5.Sum([]byte(in.Password))
-	passwordMD5 := hex.EncodeToString(hash[:])
+	passwordMD5 := in.PasswordMd5
 
 	trafficLimit := in.TrafficLimit
 	if trafficLimit == nil {
@@ -150,8 +147,7 @@ func (l *CreateUserLogic) createUserWithoutBindDevice(in *pb.CreateUserReq) (*pb
 		}
 	}
 
-	hash := md5.Sum([]byte(in.Password))
-	passwordMD5 := hex.EncodeToString(hash[:])
+	passwordMD5 := in.PasswordMd5
 
 	trafficLimit := in.TrafficLimit
 	if trafficLimit == nil {

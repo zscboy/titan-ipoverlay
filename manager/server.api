@@ -121,6 +121,14 @@ type (
 		UserName string `json:"user_name"`
 		Action   string `json:"action"`
 	}
+	AddUserPopReq {
+		UserName string   `json:"user_name"`
+		PopIds   []string `json:"pop_ids"`
+	}
+	RemoveUserPopReq {
+		UserName string   `json:"user_name"`
+		PopIds   []string `json:"pop_ids"`
+	}
 	User {
 		UserName string `json:"user_name"`
 		// if TrafficLimit is nil, will allocate 1 mouth and 1000GB traffic
@@ -283,6 +291,12 @@ service server-api {
 
 	@handler startOrStopUser
 	post /user/startorstop (StartOrStopUserReq) returns (UserOperationResp)
+
+	@handler addUserPop
+	post /user/pop/add (AddUserPopReq) returns (UserOperationResp)
+
+	@handler removeUserPop
+	post /user/pop/remove (RemoveUserPopReq) returns (UserOperationResp)
 
 	@handler GetUserStatsChart
 	get /user/stats/chart (UserStatsChartReq) returns (UserStatsChartResp)

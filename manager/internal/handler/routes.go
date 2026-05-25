@@ -122,6 +122,16 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 			},
 			{
 				Method:  http.MethodPost,
+				Path:    "/user/pop/add",
+				Handler: addUserPopHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/user/pop/remove",
+				Handler: removeUserPopHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
 				Path:    "/user/routenode/switch",
 				Handler: switchUserRouteNodeHandler(serverCtx),
 			},

@@ -55,6 +55,7 @@ func (l *GetUserLogic) GetUser(in *pb.GetUserReq) (*pb.User, error) {
 		UploadRateLimite:    user.UploadRateLimit,
 		DownloadRateLimit:   user.DownloadRateLimit,
 		LastRouteSwitchTime: user.LastRouteSwitchTime,
+		PasswordMd5:         user.PasswordMD5,
 	}
 
 	if node != nil {

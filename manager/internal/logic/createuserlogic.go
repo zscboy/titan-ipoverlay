@@ -2,6 +2,8 @@ package logic
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 
 	"titan-ipoverlay/ippop/rpc/serverapi"
@@ -62,9 +64,12 @@ func (l *CreateUserLogic) CreateUser(req *types.CreateUserReq) (resp *types.Crea
 	var successPops []string
 	var failedPops []string
 
+	hash := md5.Sum([]byte(req.Password))
+	passwordMD5 := hex.EncodeToString(hash[:])
+
 	for _, popID := range req.PopIds {
 		server := l.svcCtx.Pops[popID]
-		in := &serverapi.CreateUserReq{UserName: req.UserName, Password: req.Password, UploadRateLimite: req.UploadRateLimit, DownloadRateLimit: req.DownloadRateLimit}
+		in := &serverapi.CreateUserReq{UserName: req.UserName, PasswordMd5: passwordMD5, UploadRateLimite: req.UploadRateLimit, DownloadRateLimit: req.DownloadRateLimit}
 		if req.TrafficLimit != nil {
 			in.TrafficLimit = toTrafficLimitReq(req.TrafficLimit)
 		}
