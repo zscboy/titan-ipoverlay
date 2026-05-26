@@ -129,6 +129,21 @@ type ListUserReq struct {
 	End   int    `form:"end"`
 }
 
+type ListGlobalUserReq struct {
+	Start int `form:"start"`
+	End   int `form:"end"`
+}
+
+type GlobalUser struct {
+	UserName string   `json:"user_name"`
+	PopIds   []string `json:"pop_ids"`
+}
+
+type ListGlobalUserResp struct {
+	Users []*GlobalUser `json:"users"`
+	Total int           `json:"total"`
+}
+
 type ListUserResp struct {
 	Users []*User `json:"users"`
 	Total int     `json:"total"`

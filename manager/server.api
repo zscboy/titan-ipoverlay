@@ -149,6 +149,18 @@ type (
 		Start int    `form:"start"`
 		End   int    `form:"end"`
 	}
+	ListGlobalUserReq {
+		Start int `form:"start"`
+		End   int `form:"end"`
+	}
+	GlobalUser {
+		UserName string   `json:"user_name"`
+		PopIds   []string `json:"pop_ids"`
+	}
+	ListGlobalUserResp {
+		Users []*GlobalUser `json:"users"`
+		Total int           `json:"total"`
+	}
 	ListUserResp {
 		Users []*User `json:"users"`
 		Total int     `json:"total"`
@@ -273,6 +285,9 @@ service server-api {
 
 	@handler listUser
 	get /user/list (ListUserReq) returns (ListUserResp)
+
+	@handler listGlobalUser
+	get /user/global/list (ListGlobalUserReq) returns (ListGlobalUserResp)
 
 	@handler modifyUserPassword
 	post /user/password/modify (ModifyUserPasswordReq) returns (UserOperationResp)

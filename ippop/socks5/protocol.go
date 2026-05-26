@@ -74,11 +74,11 @@ func noAcceptableAuth(conn io.Writer) error {
 	return fmt.Errorf("not support auth method")
 }
 
-func userPassAuthFailure(conn io.Writer) error {
+func replyAuthFailure(conn io.Writer) error {
 	if _, err := conn.Write([]byte{userAuthVersion, userAuthFailure}); err != nil {
 		return err
 	}
-	return fmt.Errorf("user authentication failed")
+	return nil
 }
 
 func userPassAuthSuccess(conn io.Writer) error {

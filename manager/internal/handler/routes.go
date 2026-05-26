@@ -111,6 +111,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Handler: listUserHandler(serverCtx),
 			},
 			{
+				Method:  http.MethodGet,
+				Path:    "/user/global/list",
+				Handler: listGlobalUserHandler(serverCtx),
+			},
+			{
 				Method:  http.MethodPost,
 				Path:    "/user/modify",
 				Handler: modifyUserHandler(serverCtx),

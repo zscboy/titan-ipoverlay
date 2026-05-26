@@ -249,18 +249,21 @@ func (socks5Server *Socks5Server) authenticate(conn io.Writer, bufConn io.Reader
 		username, pass, err := socks5Server.readUserAndPassword(bufConn)
 		if err != nil {
 			logx.Errorf("readUserAndPassword error:%s", err.Error())
-			return nil, userPassAuthFailure(conn)
+			e := replyAuthFailure(conn)
+			return nil, fmt.Errorf("auth failed:%v, reply error:%v", err, e)
 		}
 
 		user, err := paserUsername(string(username))
 		if err != nil {
 			logx.Errorf("paserUsername error:%s", err.Error())
-			return nil, userPassAuthFailure(conn)
+			e := replyAuthFailure(conn)
+			return nil, fmt.Errorf("auth failed:%v, reply error:%v", err, e)
 		}
 
 		if err := socks5Server.opts.Handler.HandleUserAuth(string(user.username), string(pass)); err != nil {
 			logx.Errorf("HandleUserAuth error:%s", err.Error())
-			return nil, userPassAuthFailure(conn)
+			e := replyAuthFailure(conn)
+			return nil, fmt.Errorf("auth failed:%v, reply error:%v", err, e)
 		}
 
 		if err := userPassAuthSuccess(conn); err != nil {
