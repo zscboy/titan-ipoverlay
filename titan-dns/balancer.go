@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"sync"
 	"sync/atomic"
 )
@@ -18,7 +19,7 @@ type LoadBalancer struct {
 	mu        sync.RWMutex
 }
 
-func NewLoadBalancer(pops []PopConfig) *LoadBalancer {
+func NewLoadBalancer(pops []PopConfig) (*LoadBalancer, error) {
 	lb := &LoadBalancer{
 		pops:      make(map[string]*PopData),
 		relations: make(map[string][]string),
@@ -37,12 +38,21 @@ func NewLoadBalancer(pops []PopConfig) *LoadBalancer {
 		}
 	}
 
+	// Verify all Ref pointers exist in the configuration
+	for popID, data := range lb.pops {
+		if data.Ref != "" {
+			if _, exists := lb.pops[data.Ref]; !exists {
+				return nil, fmt.Errorf("referenced POP ID %q not found for POP %q", data.Ref, popID)
+			}
+		}
+	}
+
 	// Initial population for followers
 	for popID, follows := range lb.relations {
 		lb.recalculateFollower(popID, follows)
 	}
 
-	return lb
+	return lb, nil
 }
 
 // BalanceBySession selects an IP for a POP using round-robin.

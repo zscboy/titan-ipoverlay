@@ -134,13 +134,17 @@ func (h *DNSHandler) isDomainManaged(name string) bool {
 	return h.balancer.HasPop(popID)
 }
 
-func NewDNSHandler(cfg *Config, path string) *DNSHandler {
+func NewDNSHandler(cfg *Config, path string) (*DNSHandler, error) {
+	lb, err := NewLoadBalancer(cfg.Pops)
+	if err != nil {
+		return nil, err
+	}
 	return &DNSHandler{
 		config:     cfg,
 		configPath: path,
 		cache:      NewStickyCache(cfg.Server.CacheTTL),
-		balancer:   NewLoadBalancer(cfg.Pops),
-	}
+		balancer:   lb,
+	}, nil
 }
 
 func (h *DNSHandler) Start(apiAddr string) error {
@@ -181,8 +185,13 @@ func (h *DNSHandler) ReloadConfig() error {
 		return err
 	}
 
+	lb, err := NewLoadBalancer(cfg.Pops)
+	if err != nil {
+		return err
+	}
+
 	h.config = cfg
-	h.balancer = NewLoadBalancer(cfg.Pops)
+	h.balancer = lb
 	// We keep the cache but it might contain old entries.
 	// For a clean reload, we could h.cache.Clear() if needed.
 

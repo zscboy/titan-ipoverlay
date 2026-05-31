@@ -27,7 +27,10 @@ func main() {
 	}
 
 	// 3. Start DNS and API Server
-	handler := NewDNSHandler(cfg, *configPath)
+	handler, err := NewDNSHandler(cfg, *configPath)
+	if err != nil {
+		log.Fatalf("Fatal: Failed to initialize DNS handler: %v", err)
+	}
 	if err := handler.Start(*apiAddr); err != nil {
 		log.Fatalf("Fatal: Server failed: %v", err)
 	}
