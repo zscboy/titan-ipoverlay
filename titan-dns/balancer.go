@@ -8,6 +8,7 @@ import (
 type PopData struct {
 	IPs     []string
 	rrIndex uint64
+	Ref     string // Reference to base POP ID if this is an alias
 }
 
 type LoadBalancer struct {
@@ -26,6 +27,7 @@ func NewLoadBalancer(pops []PopConfig) *LoadBalancer {
 	for _, p := range pops {
 		lb.pops[p.ID] = &PopData{
 			IPs: p.IPs,
+			Ref: p.Ref,
 		}
 		if len(p.Follow) > 0 {
 			lb.relations[p.ID] = p.Follow
@@ -49,12 +51,18 @@ func (lb *LoadBalancer) BalanceBySession(popID string, session string) (string, 
 	return lb.BalanceByRR(popID)
 }
 
-// BalanceByRR selects an IP for a POP using round-robin.
+// BalanceByRR selects an IP for a POP using round-robin. Resolves reference to the first level if present.
 func (lb *LoadBalancer) BalanceByRR(popID string) (string, uint64) {
 	lb.mu.RLock()
 	data, ok := lb.pops[popID]
+	if ok && data.Ref != "" {
+		if nextData, nextOk := lb.pops[data.Ref]; nextOk {
+			data = nextData
+		}
+	}
 	lb.mu.RUnlock()
-	if !ok || len(data.IPs) == 0 {
+
+	if !ok || data == nil || len(data.IPs) == 0 {
 		return "", 0
 	}
 
@@ -62,12 +70,19 @@ func (lb *LoadBalancer) BalanceByRR(popID string) (string, uint64) {
 	return data.IPs[index%uint64(len(data.IPs))], index
 }
 
-// HasPop checks if a POP exists and has IPs without advancing the counter.
+// HasPop checks if a POP exists and has IPs without advancing the counter. Resolves reference to the first level if present.
 func (lb *LoadBalancer) HasPop(popID string) bool {
 	lb.mu.RLock()
 	defer lb.mu.RUnlock()
+
 	data, ok := lb.pops[popID]
-	return ok && len(data.IPs) > 0
+	if ok && data.Ref != "" {
+		if nextData, nextOk := lb.pops[data.Ref]; nextOk {
+			data = nextData
+		}
+	}
+
+	return ok && data != nil && len(data.IPs) > 0
 }
 
 // UpdatePopIPs allows dynamic updates of the IP pool for a specific POP.
@@ -75,14 +90,14 @@ func (lb *LoadBalancer) UpdatePopIPs(popID string, ips []string) {
 	lb.mu.Lock()
 	defer lb.mu.Unlock()
 
-	// 1. Update the parent (base POP)
+	// 1. Update the POP itself
 	if data, ok := lb.pops[popID]; ok {
 		data.IPs = ips
 	} else {
 		lb.pops[popID] = &PopData{IPs: ips}
 	}
 
-	// 2. Propoagate to all followers
+	// 2. Propagate to all followers
 	if followers, ok := lb.reverse[popID]; ok {
 		for _, followerID := range followers {
 			if follows, ok := lb.relations[followerID]; ok {
@@ -92,8 +107,7 @@ func (lb *LoadBalancer) UpdatePopIPs(popID string, ips []string) {
 	}
 }
 
-// recalculateFollower updates a follower's IP list based on its parents.
-// Assumes lock is already held by the caller for update, or during initialization.
+// UpdatePopFollows allows dynamic updates of the follows relationship.
 func (lb *LoadBalancer) UpdatePopFollows(popID string, follows []string) {
 	lb.mu.Lock()
 	defer lb.mu.Unlock()
@@ -125,8 +139,6 @@ func (lb *LoadBalancer) UpdatePopFollows(popID string, follows []string) {
 	lb.recalculateFollower(popID, follows)
 }
 
-// recalculateFollower updates a follower's IP list based on its parents.
-// Assumes lock is already held by the caller for update, or during initialization.
 func (lb *LoadBalancer) recalculateFollower(followerID string, follows []string) {
 	var combinedIPs []string
 	for _, parentID := range follows {
