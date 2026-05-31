@@ -55,19 +55,21 @@ func (lb *LoadBalancer) BalanceBySession(popID string, session string) (string, 
 func (lb *LoadBalancer) BalanceByRR(popID string) (string, uint64) {
 	lb.mu.RLock()
 	data, ok := lb.pops[popID]
+	ipsData := data
 	if ok && data.Ref != "" {
 		if nextData, nextOk := lb.pops[data.Ref]; nextOk {
-			data = nextData
+			ipsData = nextData
 		}
 	}
 	lb.mu.RUnlock()
 
-	if !ok || data == nil || len(data.IPs) == 0 {
+	if !ok || ipsData == nil || len(ipsData.IPs) == 0 {
 		return "", 0
 	}
 
+	// Increment the original POP's own rrIndex, but select from the base POP's IPs
 	index := atomic.AddUint64(&data.rrIndex, 1) - 1
-	return data.IPs[index%uint64(len(data.IPs))], index
+	return ipsData.IPs[index%uint64(len(ipsData.IPs))], index
 }
 
 // HasPop checks if a POP exists and has IPs without advancing the counter. Resolves reference to the first level if present.
