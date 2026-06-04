@@ -102,8 +102,11 @@ func (a *StaticAllocator) Allocate(user *model.User, target *socks5.SocksTargetI
 	}
 
 	// Fallback switch if the assigned node is not available locally
-	if err := a.source.SwitchNodeForUser(user); err != nil {
-		return nil, nil, err
+	if user.RouteMode != int(model.RouteModeManual) {
+		err := a.source.SwitchNodeForUser(user)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
 	tun = a.source.GetLocalTunnel(user.RouteNodeID)
