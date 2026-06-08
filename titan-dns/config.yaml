@@ -3,6 +3,13 @@ server:
     domain_suffix: .pop.adqczcf.xyz
     ttl_seconds: 60
     secret: titan-dns-secret-2026
+monitor:
+    enabled: true
+    port: 8080
+    interval_seconds: 30
+    timeout_seconds: 3
+    unhealthy_threshold: 3
+    concurrency_limit: 5
 pops:
     - id: pop.adqczcf.xyz
       name: Singapore test pop

@@ -55,14 +55,34 @@ func NewLoadBalancer(pops []PopConfig) (*LoadBalancer, error) {
 	return lb, nil
 }
 
+// GetAllUniqueIPs returns a slice of all unique configured IPs across all POPs.
+func (lb *LoadBalancer) GetAllUniqueIPs() []string {
+	lb.mu.RLock()
+	defer lb.mu.RUnlock()
+	ipMap := make(map[string]bool)
+	var ips []string
+	for _, pop := range lb.pops {
+		if pop.Ref != "" {
+			continue
+		}
+		for _, ip := range pop.IPs {
+			if !ipMap[ip] {
+				ipMap[ip] = true
+				ips = append(ips, ip)
+			}
+		}
+	}
+	return ips
+}
+
 // BalanceBySession selects an IP for a POP using round-robin.
 // Stickiness is handled via external cache in the handler.
-func (lb *LoadBalancer) BalanceBySession(popID string, session string) (string, uint64) {
-	return lb.BalanceByRR(popID)
+func (lb *LoadBalancer) BalanceBySession(popID string, session string, isBlacklisted func(string) bool) (string, uint64) {
+	return lb.BalanceByRR(popID, isBlacklisted)
 }
 
 // BalanceByRR selects an IP for a POP using round-robin. Resolves reference to the first level if present.
-func (lb *LoadBalancer) BalanceByRR(popID string) (string, uint64) {
+func (lb *LoadBalancer) BalanceByRR(popID string, isBlacklisted func(string) bool) (string, uint64) {
 	lb.mu.RLock()
 	data, ok := lb.pops[popID]
 	ipsData := data
@@ -77,9 +97,18 @@ func (lb *LoadBalancer) BalanceByRR(popID string) (string, uint64) {
 		return "", 0
 	}
 
-	// Increment the original POP's own rrIndex, but select from the base POP's IPs
-	index := atomic.AddUint64(&data.rrIndex, 1) - 1
-	return ipsData.IPs[index%uint64(len(ipsData.IPs))], index
+	n := uint64(len(ipsData.IPs))
+
+	for i := uint64(0); i < n; i++ {
+		index := atomic.AddUint64(&data.rrIndex, 1) - 1
+		currIndex := index % n
+		ip := ipsData.IPs[currIndex]
+		if !isBlacklisted(ip) {
+			return ip, index
+		}
+	}
+
+	return "", 0
 }
 
 // HasPop checks if a POP exists and has IPs without advancing the counter. Resolves reference to the first level if present.

@@ -19,8 +19,9 @@ type DNSHandler struct {
 	mu         sync.RWMutex // Changed to RWMutex for better concurrency
 	cache      *StickyCache
 	balancer   *LoadBalancer
-	stats      sync.Map // domain -> *int64
-	logQueries int32    // 0: Stats mode, 1: Log mode
+	blacklist  *Blacklist   // Added for dynamic IP filtering
+	stats      sync.Map     // domain -> *int64
+	logQueries int32        // 0: Stats mode, 1: Log mode
 }
 
 func (h *DNSHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
@@ -81,7 +82,7 @@ func (h *DNSHandler) resolveSubdomain(name string) (string, uint64) {
 
 	// 1. First, check if the full name is exactly a configured POP ID (Direct Fixed Domain)
 	// Example: pop1.pop.abc.aa.com
-	if ip, index := h.balancer.BalanceByRR(name); ip != "" {
+	if ip, index := h.balancer.BalanceByRR(name, h.blacklist.Contains); ip != "" {
 		return ip, index
 	}
 
@@ -99,10 +100,13 @@ func (h *DNSHandler) resolveSubdomain(name string) (string, uint64) {
 	// Try Sticky Hash Balance for the Session
 	// Check cache first for performance
 	if ip, ok := h.cache.Get(name); ok {
-		return ip, 0 // Return 0 index for cache hits
+		if !h.blacklist.Contains(ip) {
+			return ip, 0 // Return 0 index for cache hits
+		}
+		// Cache hit but IP is blacklisted! Bypass cache and force re-balance
 	}
 
-	ip, index := h.balancer.BalanceBySession(popID, sessionID)
+	ip, index := h.balancer.BalanceBySession(popID, sessionID, h.blacklist.Contains)
 	if ip != "" {
 		h.cache.Set(name, ip)
 	}
@@ -144,6 +148,7 @@ func NewDNSHandler(cfg *Config, path string) (*DNSHandler, error) {
 		configPath: path,
 		cache:      NewStickyCache(cfg.Server.CacheTTL),
 		balancer:   lb,
+		blacklist:  NewBlacklist(),
 	}, nil
 }
 
@@ -172,6 +177,22 @@ func (h *DNSHandler) Start(apiAddr string) error {
 
 	// 3. Start statistics loop (prints every 10s and resets)
 	go h.printStatsLoop()
+
+	// 4. Start TCP Health Check Monitor
+	monitor := NewTCPMonitor(
+		func() MonitorConfig {
+			h.mu.RLock()
+			defer h.mu.RUnlock()
+			return h.config.Monitor
+		},
+		func() *LoadBalancer {
+			h.mu.RLock()
+			defer h.mu.RUnlock()
+			return h.balancer
+		},
+		h.blacklist,
+	)
+	monitor.Start()
 
 	return server.ListenAndServe()
 }

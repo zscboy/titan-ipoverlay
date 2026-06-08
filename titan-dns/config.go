@@ -7,9 +7,20 @@ import (
 )
 
 type Config struct {
-	Server ServerConfig `yaml:"server"`
-	Pops   []PopConfig  `yaml:"pops"`
+	Server  ServerConfig  `yaml:"server"`
+	Monitor MonitorConfig `yaml:"monitor"`
+	Pops    []PopConfig   `yaml:"pops"`
 }
+
+type MonitorConfig struct {
+	Enabled            bool `yaml:"enabled"`
+	Port               int  `yaml:"port"`
+	IntervalSeconds    int  `yaml:"interval_seconds"`
+	TimeoutSeconds     int  `yaml:"timeout_seconds"`
+	UnhealthyThreshold int  `yaml:"unhealthy_threshold"`
+	ConcurrencyLimit   int  `yaml:"concurrency_limit"`
+}
+
 
 type ServerConfig struct {
 	Listen       string `yaml:"listen"`

@@ -5,3 +5,4 @@ bin/
 test*
 script_test/
 titan-web/node_modules/
+titan-dns/bin
