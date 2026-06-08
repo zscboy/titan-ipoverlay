@@ -77,12 +77,12 @@ func (lb *LoadBalancer) GetAllUniqueIPs() []string {
 
 // BalanceBySession selects an IP for a POP using round-robin.
 // Stickiness is handled via external cache in the handler.
-func (lb *LoadBalancer) BalanceBySession(popID string, session string, isBlacklisted func(string) bool) (string, uint64) {
-	return lb.BalanceByRR(popID, isBlacklisted)
+func (lb *LoadBalancer) BalanceBySession(popID string, session string, isOffline func(string) bool) (string, uint64) {
+	return lb.BalanceByRR(popID, isOffline)
 }
 
 // BalanceByRR selects an IP for a POP using round-robin. Resolves reference to the first level if present.
-func (lb *LoadBalancer) BalanceByRR(popID string, isBlacklisted func(string) bool) (string, uint64) {
+func (lb *LoadBalancer) BalanceByRR(popID string, isOffline func(string) bool) (string, uint64) {
 	lb.mu.RLock()
 	data, ok := lb.pops[popID]
 	ipsData := data
@@ -103,7 +103,7 @@ func (lb *LoadBalancer) BalanceByRR(popID string, isBlacklisted func(string) boo
 		index := atomic.AddUint64(&data.rrIndex, 1) - 1
 		currIndex := index % n
 		ip := ipsData.IPs[currIndex]
-		if !isBlacklisted(ip) {
+		if !isOffline(ip) {
 			return ip, index
 		}
 	}

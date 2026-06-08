@@ -20,7 +20,7 @@ func (h *DNSHandler) validateSignature(r *http.Request, body []byte) bool {
 	h.mu.RLock()
 	secret := h.config.Server.Secret
 	h.mu.RUnlock()
-	
+
 	if secret == "" {
 		return true // Allow if no secret configured
 	}
@@ -243,4 +243,31 @@ func (h *DNSHandler) handleLogToggleAPI(w http.ResponseWriter, r *http.Request) 
 		"status":  "ok",
 		"message": fmt.Sprintf("DNS query mode set to %s", mode),
 	})
+}
+
+func (h *DNSHandler) handleClearOfflineAPI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Error reading request", http.StatusInternalServerError)
+		return
+	}
+
+	if !h.validateSignature(r, body) {
+		http.Error(w, "Forbidden: Invalid Signature", http.StatusForbidden)
+		log.Printf("Forbidden offline-clear attempt (invalid signature) from %s", r.RemoteAddr)
+		return
+	}
+
+	if h.monitor != nil {
+		h.monitor.ClearHistory()
+	}
+	log.Println("Successfully CLEARED offline IPs registry and health check monitor history")
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok", "message": "offline ips cleared"})
 }

@@ -19,7 +19,8 @@ type DNSHandler struct {
 	mu         sync.RWMutex // Changed to RWMutex for better concurrency
 	cache      *StickyCache
 	balancer   *LoadBalancer
-	blacklist  *Blacklist   // Added for dynamic IP filtering
+	offlineIPs *OfflineIPs  // Added for dynamic IP filtering
+	monitor    *TCPMonitor  // Reference to background health check monitor
 	stats      sync.Map     // domain -> *int64
 	logQueries int32        // 0: Stats mode, 1: Log mode
 }
@@ -82,7 +83,7 @@ func (h *DNSHandler) resolveSubdomain(name string) (string, uint64) {
 
 	// 1. First, check if the full name is exactly a configured POP ID (Direct Fixed Domain)
 	// Example: pop1.pop.abc.aa.com
-	if ip, index := h.balancer.BalanceByRR(name, h.blacklist.Contains); ip != "" {
+	if ip, index := h.balancer.BalanceByRR(name, h.offlineIPs.Contains); ip != "" {
 		return ip, index
 	}
 
@@ -100,13 +101,13 @@ func (h *DNSHandler) resolveSubdomain(name string) (string, uint64) {
 	// Try Sticky Hash Balance for the Session
 	// Check cache first for performance
 	if ip, ok := h.cache.Get(name); ok {
-		if !h.blacklist.Contains(ip) {
+		if !h.offlineIPs.Contains(ip) {
 			return ip, 0 // Return 0 index for cache hits
 		}
-		// Cache hit but IP is blacklisted! Bypass cache and force re-balance
+		// Cache hit but IP is offline! Bypass cache and force re-balance
 	}
 
-	ip, index := h.balancer.BalanceBySession(popID, sessionID, h.blacklist.Contains)
+	ip, index := h.balancer.BalanceBySession(popID, sessionID, h.offlineIPs.Contains)
 	if ip != "" {
 		h.cache.Set(name, ip)
 	}
@@ -148,7 +149,7 @@ func NewDNSHandler(cfg *Config, path string) (*DNSHandler, error) {
 		configPath: path,
 		cache:      NewStickyCache(cfg.Server.CacheTTL),
 		balancer:   lb,
-		blacklist:  NewBlacklist(),
+		offlineIPs: NewOfflineIPs(),
 	}, nil
 }
 
@@ -159,6 +160,7 @@ func (h *DNSHandler) Start(apiAddr string) error {
 		http.HandleFunc("/api/v1/follow", h.handleFollowAPI)
 		http.HandleFunc("/api/v1/reload", h.handleReloadAPI)
 		http.HandleFunc("/api/v1/log", h.handleLogToggleAPI)
+		http.HandleFunc("/api/v1/offline/clear", h.handleClearOfflineAPI)
 		log.Printf("Starting Management API on %s", apiAddr)
 		if err := http.ListenAndServe(apiAddr, nil); err != nil {
 			log.Fatalf("HTTP API failed: %v", err)
@@ -179,7 +181,7 @@ func (h *DNSHandler) Start(apiAddr string) error {
 	go h.printStatsLoop()
 
 	// 4. Start TCP Health Check Monitor
-	monitor := NewTCPMonitor(
+	h.monitor = NewTCPMonitor(
 		func() MonitorConfig {
 			h.mu.RLock()
 			defer h.mu.RUnlock()
@@ -190,9 +192,9 @@ func (h *DNSHandler) Start(apiAddr string) error {
 			defer h.mu.RUnlock()
 			return h.balancer
 		},
-		h.blacklist,
+		h.offlineIPs,
 	)
-	monitor.Start()
+	h.monitor.Start()
 
 	return server.ListenAndServe()
 }
@@ -262,6 +264,12 @@ func (h *DNSHandler) printStatsLoop() {
 		if hasData {
 			// Clear the map to keep memory usage low and remove old entries
 			h.stats = sync.Map{}
+		}
+
+		// Print currently offline IPs if any exist
+		offlineIPList := h.offlineIPs.GetAll()
+		if len(offlineIPList) > 0 {
+			log.Printf("=== Current Offline IPs: %v ===", offlineIPList)
 		}
 	}
 }

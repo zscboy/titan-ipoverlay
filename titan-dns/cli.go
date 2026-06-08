@@ -29,8 +29,10 @@ func handleCLI(cfg *Config, apiAddr, cmd, popID, dataList string) {
 		handleReload(cfg, apiAddr)
 	case "set-log":
 		handleSetLog(cfg, apiAddr, dataList)
+	case "clear-offline":
+		handleClearOffline(cfg, apiAddr)
 	default:
-		log.Fatal("Unknown command. Supported: set-ips, set-follow, reload, set-log")
+		log.Fatal("Unknown command. Supported: set-ips, set-follow, reload, set-log, clear-offline")
 	}
 }
 
@@ -145,4 +147,11 @@ func handleSetLog(cfg *Config, apiAddr, value string) {
 		"enable": enable,
 	}
 	sendSignedRequest(apiAddr, "/api/v1/log", cfg.Server.Secret, payload)
+}
+
+func handleClearOffline(cfg *Config, apiAddr string) {
+	payload := map[string]interface{}{
+		"action": "clear",
+	}
+	sendSignedRequest(apiAddr, "/api/v1/offline/clear", cfg.Server.Secret, payload)
 }

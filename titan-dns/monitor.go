@@ -14,42 +14,67 @@ type IPStatusTracker struct {
 	consecutiveFailures int
 }
 
-// Blacklist maintains a thread-safe map of unreachable IPs.
-type Blacklist struct {
+// OfflineIPs maintains a thread-safe map of unreachable IPs.
+type OfflineIPs struct {
 	ips sync.Map // map[string]bool
 }
 
-func NewBlacklist() *Blacklist {
-	return &Blacklist{}
+func NewOfflineIPs() *OfflineIPs {
+	return &OfflineIPs{}
 }
 
-func (b *Blacklist) Add(ip string) {
-	b.ips.Store(ip, true)
+func (o *OfflineIPs) Add(ip string) {
+	o.ips.Store(ip, true)
 }
 
-func (b *Blacklist) Remove(ip string) {
-	b.ips.Delete(ip)
+func (o *OfflineIPs) Remove(ip string) {
+	o.ips.Delete(ip)
 }
 
-func (b *Blacklist) Contains(ip string) bool {
-	_, ok := b.ips.Load(ip)
+func (o *OfflineIPs) Contains(ip string) bool {
+	_, ok := o.ips.Load(ip)
 	return ok
+}
+
+func (o *OfflineIPs) GetAll() []string {
+	var list []string
+	o.ips.Range(func(key, value interface{}) bool {
+		list = append(list, key.(string))
+		return true
+	})
+	return list
+}
+
+func (o *OfflineIPs) Clear() {
+	o.ips.Range(func(key, value interface{}) bool {
+		o.ips.Delete(key)
+		return true
+	})
 }
 
 // TCPMonitor runs a background health check loop for POP IPs.
 type TCPMonitor struct {
 	getConfig   func() MonitorConfig
 	getBalancer func() *LoadBalancer
-	blacklist   *Blacklist
+	offlineIPs  *OfflineIPs
 	history     sync.Map // Track status histories (ip -> *IPStatusTracker)
 }
 
-func NewTCPMonitor(getConfig func() MonitorConfig, getBalancer func() *LoadBalancer, blacklist *Blacklist) *TCPMonitor {
+func NewTCPMonitor(getConfig func() MonitorConfig, getBalancer func() *LoadBalancer, offlineIPs *OfflineIPs) *TCPMonitor {
 	return &TCPMonitor{
 		getConfig:   getConfig,
 		getBalancer: getBalancer,
-		blacklist:   blacklist,
+		offlineIPs:  offlineIPs,
 	}
+}
+
+func (m *TCPMonitor) ClearHistory() {
+	m.offlineIPs.Clear()
+
+	m.history.Range(func(key, value interface{}) bool {
+		m.history.Delete(key)
+		return true
+	})
 }
 
 // Start runs the background loop to periodically test IP connectivity.
@@ -117,17 +142,17 @@ func (m *TCPMonitor) checkAllIPs() {
 			if err != nil {
 				tracker.consecutiveFailures++
 				if tracker.consecutiveFailures >= unhealthyThreshold {
-					if !m.blacklist.Contains(targetIP) {
-						log.Printf("[MONITOR] IP %s has failed %d consecutive checks. Adding to blacklist. Error: %v", targetIP, tracker.consecutiveFailures, err)
-						m.blacklist.Add(targetIP)
+					if !m.offlineIPs.Contains(targetIP) {
+						log.Printf("[MONITOR] IP %s has failed %d consecutive checks. Marking as offline. Error: %v", targetIP, tracker.consecutiveFailures, err)
+						m.offlineIPs.Add(targetIP)
 					}
 				}
 			} else {
 				conn.Close()
 				tracker.consecutiveFailures = 0
-				if m.blacklist.Contains(targetIP) {
-					log.Printf("[MONITOR] IP %s is now REACHABLE. Removing from blacklist.", targetIP)
-					m.blacklist.Remove(targetIP)
+				if m.offlineIPs.Contains(targetIP) {
+					log.Printf("[MONITOR] IP %s is now REACHABLE. Marking as online.", targetIP)
+					m.offlineIPs.Remove(targetIP)
 				}
 			}
 			tracker.mu.Unlock()
