@@ -80,6 +80,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Handler: migrateNodesHandler(serverCtx),
 			},
 			{
+				Method:  http.MethodPost,
+				Path:    "/node/migrate/list",
+				Handler: migrateNodeListHandler(serverCtx),
+			},
+			{
 				// Export all POP node IDs as CSV download
 				Method:  http.MethodGet,
 				Path:    "/pop/nodes/export",
@@ -107,13 +112,13 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 			},
 			{
 				Method:  http.MethodGet,
-				Path:    "/user/list",
-				Handler: listUserHandler(serverCtx),
+				Path:    "/user/global/list",
+				Handler: listGlobalUserHandler(serverCtx),
 			},
 			{
 				Method:  http.MethodGet,
-				Path:    "/user/global/list",
-				Handler: listGlobalUserHandler(serverCtx),
+				Path:    "/user/list",
+				Handler: listUserHandler(serverCtx),
 			},
 			{
 				Method:  http.MethodPost,

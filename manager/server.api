@@ -346,6 +346,9 @@ service server-api {
 
 	@handler migrateNodes
 	post /node/migrate (MigrateNodesReq) returns (UserOperationResp)
+
+	@handler migrateNodeList
+	post /node/migrate/list (MigrateNodeListReq) returns (UserOperationResp)
 }
 
 type (
@@ -354,6 +357,10 @@ type (
 		TargetPop string `json:"target_pop"`
 		Count     int    `json:"count"`
 		FromHead  bool   `json:"from_head"`
+	}
+	MigrateNodeListReq {
+		NodeIds   []string `json:"node_ids"`
+		TargetPop string   `json:"target_pop"`
 	}
 )
 

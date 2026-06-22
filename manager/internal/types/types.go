@@ -102,6 +102,11 @@ type GetUserResp struct {
 	PopIds []string `json:"pop_ids"`
 }
 
+type GlobalUser struct {
+	UserName string   `json:"user_name"`
+	PopIds   []string `json:"pop_ids"`
+}
+
 type IPBlacklistReq struct {
 	PopID  string   `json:"pop_id,optional"`
 	IPList []string `json:"ip_list"`
@@ -109,6 +114,16 @@ type IPBlacklistReq struct {
 
 type KickNodeReq struct {
 	NodeID string `form:"nodeid"`
+}
+
+type ListGlobalUserReq struct {
+	Start int `form:"start"`
+	End   int `form:"end"`
+}
+
+type ListGlobalUserResp struct {
+	Users []*GlobalUser `json:"users"`
+	Total int           `json:"total"`
 }
 
 type ListNodeReq struct {
@@ -129,21 +144,6 @@ type ListUserReq struct {
 	End   int    `form:"end"`
 }
 
-type ListGlobalUserReq struct {
-	Start int `form:"start"`
-	End   int `form:"end"`
-}
-
-type GlobalUser struct {
-	UserName string   `json:"user_name"`
-	PopIds   []string `json:"pop_ids"`
-}
-
-type ListGlobalUserResp struct {
-	Users []*GlobalUser `json:"users"`
-	Total int           `json:"total"`
-}
-
 type ListUserResp struct {
 	Users []*User `json:"users"`
 	Total int     `json:"total"`
@@ -156,6 +156,11 @@ type LoginReq struct {
 
 type LoginResp struct {
 	Token string `json:"token"`
+}
+
+type MigrateNodeListReq struct {
+	NodeIds   []string `json:"node_ids"`
+	TargetPop string   `json:"target_pop"`
 }
 
 type MigrateNodesReq struct {
