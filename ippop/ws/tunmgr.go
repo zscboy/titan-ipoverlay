@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 	"titan-ipoverlay/ippop/config"
+	"titan-ipoverlay/ippop/geoip"
 	"titan-ipoverlay/ippop/metrics"
 	"titan-ipoverlay/ippop/model"
 	"titan-ipoverlay/ippop/socks5"
@@ -66,6 +67,10 @@ type TunnelManager struct {
 }
 
 func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
+	if err := geoip.Init(config.GeoIP.DBPath); err != nil {
+		logx.Errorf("geoip.Init failed: %v", err)
+	}
+
 	if err := model.DeleteNodeOnlineData(context.TODO(), redis); err != nil {
 		panic(err)
 	}
@@ -320,6 +325,9 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, n
 	node.Online = true
 	node.LoginAt = time.Now().Format(model.TimeLayout)
 
+	region := geoip.LookupCountry(nodeIP)
+	node.Region = region
+
 	localIP := ""
 	if addr, _, err := net.SplitHostPort(conn.LocalAddr().String()); err == nil {
 		localIP = addr
@@ -340,6 +348,7 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, n
 		UploadRateLimit:   config.WS.UploadRateLimit,
 		IsBlacklisted:     node.IsBlacklisted,
 		LocalIP:           localIP,
+		Region:            region,
 	}
 
 	tun := newTunnel(conn, tm, opts, ctx)

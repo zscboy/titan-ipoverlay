@@ -10,9 +10,12 @@ import (
 )
 
 // AcquireExclusiveNode implements NodeSource interface
-func (tm *TunnelManager) AcquireExclusiveNode(ctx context.Context) (string, *Tunnel, error) {
-	ip, tun := tm.ipPool.AcquireIP("")
+func (tm *TunnelManager) AcquireExclusiveNode(ctx context.Context, criteria AllocationCriteria) (string, *Tunnel, error) {
+	ip, tun := tm.ipPool.AcquireIP(criteria.Region)
 	if tun == nil {
+		if criteria.Region != "" {
+			return "", nil, fmt.Errorf("no free ip found in region %q", criteria.Region)
+		}
 		return "", nil, fmt.Errorf("no free ip found in pool")
 	}
 	return ip, tun, nil

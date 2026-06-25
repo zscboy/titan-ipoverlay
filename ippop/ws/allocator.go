@@ -12,7 +12,7 @@ import (
 
 // NodeSource defines the capabilities required from the tunnel provider.
 type NodeSource interface {
-	AcquireExclusiveNode(ctx context.Context) (string, *Tunnel, error)
+	AcquireExclusiveNode(ctx context.Context, criteria AllocationCriteria) (string, *Tunnel, error)
 	ReleaseExclusiveNodes(nodeIDs []string, ips []string)
 	GetLocalTunnel(nodeID string) *Tunnel
 	SwitchNodeForUser(user *model.User) error
@@ -111,4 +111,17 @@ func (a *StaticAllocator) Allocate(user *model.User, target *socks5.SocksTargetI
 
 	tun = a.source.GetLocalTunnel(user.RouteNodeID)
 	return tun, nil, nil
+}
+
+type AllocationCriteria struct {
+	Region string
+}
+
+func criteriaFromTarget(target *socks5.SocksTargetInfo) AllocationCriteria {
+	if target == nil {
+		return AllocationCriteria{}
+	}
+	return AllocationCriteria{
+		Region: target.Region,
+	}
 }

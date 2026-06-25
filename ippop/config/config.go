@@ -115,6 +115,11 @@ type TrafficStats struct {
 	EnableUserTraffic bool `json:",default=false"`
 }
 
+type GeoIP struct {
+	//lint:ignore SA5008 go-zero allows "optional" in struct tags
+	DBPath string `json:",optional"`
+}
+
 type Config struct {
 	// APIServer api.APIServerConfig
 	WS        WS
@@ -123,6 +128,8 @@ type Config struct {
 	Log       logx.LogConf
 	//lint:ignore SA5008 go-zero allows "optional" in struct tags
 	HTTPProxy string `json:",optional"`
+	//lint:ignore SA5008 go-zero allows "optional" in struct tags
+	GeoIP GeoIP `json:",optional"`
 	//lint:ignore SA5008 go-zero allows "optional" in struct tags
 	Pprof Pprof `json:",optional"`
 	//lint:ignore SA5008 go-zero allows "optional" in struct tags

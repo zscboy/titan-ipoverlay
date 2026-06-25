@@ -26,6 +26,7 @@ type Node struct {
 	NetDelay      int64   `redis:"net_delay"`
 	BandwidthMbps float64 `redis:"bandwidth_mbps"`
 	IsBlacklisted bool
+	Region        string  `redis:"region"`
 }
 
 func HandleNodeOnline(ctx context.Context, redis *redis.Redis, node *Node) error {
