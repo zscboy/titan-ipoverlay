@@ -446,6 +446,7 @@ func (t *Tunnel) onProxySessionDataFromTunnel(sessionID string, data []byte, t1S
 	v, ok := t.proxys.Load(sessionID)
 	if !ok {
 		logx.Debugf("Tunnel %s %s onProxySessionDataFromTunnel, can not found session %s", t.opts.Id, t.opts.IP, sessionID)
+		t.closeRemoteSession(sessionID)
 		return nil
 	}
 
@@ -462,6 +463,23 @@ func (t *Tunnel) onProxySessionDataFromTunnel(sessionID string, data []byte, t1S
 	// T2 包括：protobuf 解码、消息路由、查找 session
 	// proxy.write() 会记录 T2 和 T3
 	return proxy.write(data, t1EndTime)
+}
+
+func (t *Tunnel) closeRemoteSession(sessionID string) {
+	msg := &pb.Message{}
+	msg.Type = pb.MessageType_PROXY_SESSION_CLOSE
+	msg.SessionId = sessionID
+	msg.Payload = nil
+
+	buf, err := proto.Marshal(msg)
+	if err != nil {
+		logx.Errorf("Tunnel %s %s closeRemoteSession, EncodeMessage failed:%s", t.opts.Id, t.opts.IP, err.Error())
+		return
+	}
+
+	if err = t.write(buf); err != nil {
+		logx.Errorf("Tunnel %s %s closeRemoteSession, write message to tunnel failed:%s", t.opts.Id, t.opts.IP, err.Error())
+	}
 }
 
 func (t *Tunnel) onProxyTCPConnClose(sessionID string) {
