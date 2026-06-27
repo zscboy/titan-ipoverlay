@@ -633,8 +633,14 @@ func (tm *TunnelManager) keepalive() {
 				lineInfo += fmt.Sprintf("%s:%d ", line, nodes)
 			}
 
-			logx.Infof("TunnelManager.keepalive lines:[ %s], tunnel count:%d/%d, cost:%v, ipCount:%d, freeCount:%d, blackCount:%d, assignedCount:%d, session len:%d",
-				lineInfo, count, stats.TunnelCount, time.Since(now), stats.TotalIPCount, stats.FreeIPCount, stats.BlacklistIPCount, stats.AssignedIPCount, tm.sessionManager.SessionLen())
+			regionInfo := ""
+			for region, nodes := range stats.RegionNodes {
+				freeCount := stats.RegionFreeIPs[region]
+				regionInfo += fmt.Sprintf("%s(nodes:%d,free:%d) ", region, nodes, freeCount)
+			}
+
+			logx.Infof("TunnelManager.keepalive lines:[ %s], regions:[ %s], tunnel count:%d/%d, cost:%v, ipCount:%d, freeCount:%d, blackCount:%d, assignedCount:%d, session len:%d",
+				lineInfo, regionInfo, count, stats.TunnelCount, time.Since(now), stats.TotalIPCount, stats.FreeIPCount, stats.BlacklistIPCount, stats.AssignedIPCount, tm.sessionManager.SessionLen())
 			tickCount = 0
 		}
 	}

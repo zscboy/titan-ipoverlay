@@ -33,6 +33,7 @@ type IPPool struct {
 	assignedCount   int                   // New: count of IPs currently assigned
 	tunnelCount     int                   // total count of tunnels in the pool
 	lineNodes       map[string]int        // Real-time: LocalIP -> tunnel count
+	regionNodes     map[string]int        // Real-time: Region -> tunnel count
 }
 
 type PoolStats struct {
@@ -42,7 +43,8 @@ type PoolStats struct {
 	AssignedIPCount  int
 	TunnelCount      int
 	LineNodes        map[string]int // LineID (LocalIP) -> NodeCount in free list
-	RegionNodes      map[string]int // Region -> NodeCount in free list
+	RegionNodes      map[string]int // Region -> Active node/tunnel count
+	RegionFreeIPs    map[string]int // Region -> Free IP count in regionFreeList
 }
 
 func NewIPPool() *IPPool {
@@ -52,6 +54,7 @@ func NewIPPool() *IPPool {
 		localIPFreeList: make(map[string]*list.List),
 		regionFreeList:  make(map[string]*list.List),
 		lineNodes:       make(map[string]int),
+		regionNodes:     make(map[string]int),
 	}
 }
 
@@ -142,6 +145,9 @@ func (p *IPPool) AddTunnel(t *Tunnel, isBlacklisted bool) {
 	entry.tunnels[nodeID] = t
 	p.tunnelCount++
 	p.lineNodes[localIP]++
+	if region != "" {
+		p.regionNodes[region]++
+	}
 }
 
 // RemoveTunnel removes a tunnel. If it was the last tunnel for an IP, the IP is removed.
@@ -157,6 +163,12 @@ func (p *IPPool) RemoveTunnel(t *Tunnel) {
 	delete(entry.tunnels, t.opts.Id)
 	p.tunnelCount--
 	p.lineNodes[t.opts.LocalIP]--
+	if t.opts.Region != "" {
+		p.regionNodes[t.opts.Region]--
+		if p.regionNodes[t.opts.Region] <= 0 {
+			delete(p.regionNodes, t.opts.Region)
+		}
+	}
 
 	// If the tunnel being removed was the one assigned to a session
 	if entry.assignedNodeID == t.opts.Id {
@@ -354,9 +366,21 @@ func (p *IPPool) GetPoolStats() PoolStats {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	stats := make(map[string]int)
+	lineNodes := make(map[string]int)
 	for k, v := range p.lineNodes {
-		stats[k] = v
+		lineNodes[k] = v
+	}
+
+	regionNodes := make(map[string]int)
+	for k, v := range p.regionNodes {
+		regionNodes[k] = v
+	}
+
+	regionFreeIPs := make(map[string]int)
+	for region, l := range p.regionFreeList {
+		if l != nil && l.Len() > 0 {
+			regionFreeIPs[region] = l.Len()
+		}
 	}
 
 	return PoolStats{
@@ -365,8 +389,9 @@ func (p *IPPool) GetPoolStats() PoolStats {
 		BlacklistIPCount: p.blacklistCount,
 		AssignedIPCount:  p.assignedCount,
 		TunnelCount:      p.tunnelCount,
-		LineNodes:        stats,
-		// RegionNodes:      regionNodes,
+		LineNodes:        lineNodes,
+		RegionNodes:      regionNodes,
+		RegionFreeIPs:    regionFreeIPs,
 	}
 }
 
