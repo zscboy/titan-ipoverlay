@@ -36,6 +36,7 @@ const (
 	userSessionExpireInterval = 120
 	userSessionExpireDuration = 2 * time.Minute
 	acceptLockShards          = 16384
+	maxKeepaliveRegions       = 20
 )
 
 // UserSession and ExpiredSession are now handled by the allocator module.
@@ -634,7 +635,12 @@ func (tm *TunnelManager) keepalive() {
 			}
 
 			regionInfo := ""
-			for region, nodes := range stats.RegionNodes {
+			for i, stat := range stats.RegionNodes {
+				if i >= maxKeepaliveRegions {
+					break
+				}
+				region := stat.Region
+				nodes := stat.NodeCount
 				freeCount := stats.RegionFreeIPs[region]
 				regionInfo += fmt.Sprintf("%s(nodes:%d,free:%d) ", region, nodes, freeCount)
 			}

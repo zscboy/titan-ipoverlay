@@ -36,15 +36,20 @@ type IPPool struct {
 	regionNodes     map[string]int        // Real-time: Region -> tunnel count
 }
 
+type RegionNodeStat struct {
+	Region    string `json:"region"`
+	NodeCount int    `json:"nodeCount"`
+}
+
 type PoolStats struct {
 	TotalIPCount     int
 	FreeIPCount      int
 	BlacklistIPCount int
 	AssignedIPCount  int
 	TunnelCount      int
-	LineNodes        map[string]int // LineID (LocalIP) -> NodeCount in free list
-	RegionNodes      map[string]int // Region -> Active node/tunnel count
-	RegionFreeIPs    map[string]int // Region -> Free IP count in regionFreeList
+	LineNodes        map[string]int   // LineID (LocalIP) -> NodeCount in free list
+	RegionNodes      []RegionNodeStat // Region -> Active node/tunnel count, sorted by Value desc
+	RegionFreeIPs    map[string]int   // Region -> Free IP count in regionFreeList
 }
 
 func NewIPPool() *IPPool {
@@ -371,10 +376,13 @@ func (p *IPPool) GetPoolStats() PoolStats {
 		lineNodes[k] = v
 	}
 
-	regionNodes := make(map[string]int)
+	var regionNodes []RegionNodeStat
 	for k, v := range p.regionNodes {
-		regionNodes[k] = v
+		regionNodes = append(regionNodes, RegionNodeStat{Region: k, NodeCount: v})
 	}
+	sort.Slice(regionNodes, func(i, j int) bool {
+		return regionNodes[i].NodeCount > regionNodes[j].NodeCount
+	})
 
 	regionFreeIPs := make(map[string]int)
 	for region, l := range p.regionFreeList {
