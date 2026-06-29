@@ -78,7 +78,7 @@ func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*svc.Pop, error
 	}
 
 	// 2. Sticky allocation (keep existing pop if IP hasn't changed or matches Vendor Strategy)
-	popID, nodeIP, err := l.getNodePopIP(req.NodeId)
+	popID, nodeIP, _, err := l.getNodePopIP(req.NodeId)
 	if err != nil {
 		logx.Errorf("GetNodePopIP error: %v, node %s ip %s", err, req.NodeId, ip)
 		return nil, err
@@ -119,7 +119,7 @@ func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*svc.Pop, error
 		return nil, err
 	}
 
-	if pop, err := l.matchAndAllocatePop(l.svcCtx.RegionStrategy[location.Country], StrategyNameRegion+location.Country, req.NodeId, ip); err != nil {
+	if pop, err := l.matchAndAllocatePop(l.svcCtx.RegionStrategy[location.Country], StrategyNameRegion+location.Country, req.NodeId, ip, location.CountryCode); err != nil {
 		logx.Errorf("matchAndAllocatePop region error: %v", err)
 		return nil, err
 	} else if pop != nil {
@@ -127,7 +127,7 @@ func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*svc.Pop, error
 	}
 
 	// 4. Vendor Strategy (P3)
-	if pop, err := l.matchAndAllocatePop(l.svcCtx.VendorStrategy[req.Vendor], StrategyNameVendor+req.Vendor, req.NodeId, ip); err != nil {
+	if pop, err := l.matchAndAllocatePop(l.svcCtx.VendorStrategy[req.Vendor], StrategyNameVendor+req.Vendor, req.NodeId, ip, location.CountryCode); err != nil {
 		logx.Errorf("matchAndAllocatePop vendor error: %v", err)
 		return nil, err
 	} else if pop != nil {
@@ -138,14 +138,14 @@ func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*svc.Pop, error
 	defaultPopID := l.svcCtx.Config.Strategy.DefaultPopId
 	if pop, ok := l.svcCtx.Pops[defaultPopID]; ok {
 		logx.Debugf("node %s allocate default pop:%s", req.NodeId, defaultPopID)
-		l.saveNodePop(req.NodeId, defaultPopID, ip)
+		l.saveNodePop(req.NodeId, defaultPopID, ip, location.CountryCode)
 		return pop, nil
 	}
 
 	return nil, fmt.Errorf("no pop found for %s, location:%v, vendor:%s", req.NodeId, location, req.Vendor)
 }
 
-func (l *GetNodePopLogic) matchAndAllocatePop(popIds []string, strategyName, nodeID, ip string) (*svc.Pop, error) {
+func (l *GetNodePopLogic) matchAndAllocatePop(popIds []string, strategyName, nodeID, ip, countryCode string) (*svc.Pop, error) {
 	if len(popIds) == 0 {
 		return nil, nil
 	}
@@ -157,39 +157,40 @@ func (l *GetNodePopLogic) matchAndAllocatePop(popIds []string, strategyName, nod
 
 	if pop != nil {
 		logx.Debugf("node %s matched %s, allocate pop:%s", nodeID, strategyName, pop.Config.Id)
-		l.saveNodePop(nodeID, pop.Config.Id, ip)
+		l.saveNodePop(nodeID, pop.Config.Id, ip, countryCode)
 		return pop, nil
 	}
 
 	return nil, fmt.Errorf("no pop found for %s, strategy: %s", nodeID, strategyName)
 }
 
-func (l *GetNodePopLogic) saveNodePop(nodeID, popID, ip string) {
-	if err := model.SetNodePopIP(l.svcCtx.Redis, nodeID, popID, ip); err != nil {
+func (l *GetNodePopLogic) saveNodePop(nodeID, popID, ip, countryCode string) {
+	if err := model.SetNodePopIP(l.svcCtx.Redis, nodeID, popID, ip, countryCode); err != nil {
 		logx.Errorf("allocatePop SetNodePop error %v", err)
 		return
 	}
-	l.svcCtx.NodePopCache.Store(nodeID, &svc.NodeCacheItem{PopID: popID, IP: ip})
+	l.svcCtx.NodePopCache.Store(nodeID, &svc.NodeCacheItem{PopID: popID, IP: ip, CountryCode: countryCode})
 }
 
-func (l *GetNodePopLogic) getNodePopIP(nodeID string) (string, string, error) {
+func (l *GetNodePopLogic) getNodePopIP(nodeID string) (string, string, string, error) {
 	if val, ok := l.svcCtx.NodePopCache.Load(nodeID); ok {
 		if item, ok := val.(*svc.NodeCacheItem); ok {
-			return item.PopID, item.IP, nil
+			return item.PopID, item.IP, item.CountryCode, nil
 		}
 	}
 
-	pID, nIP, err := model.GetNodePopIP(l.svcCtx.Redis, nodeID)
+	pID, nIP, cBytes, err := model.GetNodePopIP(l.svcCtx.Redis, nodeID)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
 	popID := string(pID)
 	nodeIP := string(nIP)
+	countryCode := string(cBytes)
 	if len(popID) > 0 {
-		l.svcCtx.NodePopCache.Store(nodeID, &svc.NodeCacheItem{PopID: popID, IP: nodeIP})
+		l.svcCtx.NodePopCache.Store(nodeID, &svc.NodeCacheItem{PopID: popID, IP: nodeIP, CountryCode: countryCode})
 	}
-	return popID, nodeIP, nil
+	return popID, nodeIP, countryCode, nil
 }
 
 func (l *GetNodePopLogic) selectPopFromList(ctx context.Context, strategyName string, popIds []string) (*svc.Pop, error) {
@@ -250,7 +251,7 @@ func (l *GetNodePopLogic) getLocalInfo(ip string) (*model.IPLocation, error) {
 func (l *GetNodePopLogic) httpGetLocationInfo(ip string) (*model.IPLocation, error) {
 	logx.Infof("get %s local info from %s", ip, l.svcCtx.Config.GeoAPI.API)
 
-	url := fmt.Sprintf("%s?ip=%s", l.svcCtx.Config.GeoAPI.API, ip)
+	url := fmt.Sprintf("%s%s", l.svcCtx.Config.GeoAPI.API, ip)
 
 	client := &http.Client{
 		Timeout: 3 * time.Second,

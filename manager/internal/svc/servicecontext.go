@@ -23,8 +23,9 @@ type Pop struct {
 }
 
 type NodeCacheItem struct {
-	PopID string
-	IP    string
+	PopID       string
+	IP          string
+	CountryCode string
 }
 
 type ServiceContext struct {

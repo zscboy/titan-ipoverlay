@@ -49,7 +49,7 @@ func (l *MigrateNodeListLogic) MigrateNodeList(req *types.MigrateNodeListReq) (r
 	groups := make(map[string]map[string]string)
 
 	for _, nodeID := range req.NodeIds {
-		popBytes, ipBytes, err := model.GetNodePopIP(l.svcCtx.Redis, nodeID)
+		popBytes, ipBytes, _, err := model.GetNodePopIP(l.svcCtx.Redis, nodeID)
 		if err != nil {
 			logx.Errorf("failed to get pop and ip for node %s: %v", nodeID, err)
 			continue

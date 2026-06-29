@@ -10,9 +10,9 @@ import (
 	"github.com/zeromicro/go-zero/core/stores/redis"
 )
 
-// popAndIP = pop:ip, ip allow empty
-func SetNodePopIP(rds *redis.Redis, nodeID, pop, ip string) error {
-	popID, _, err := GetNodePopIP(rds, nodeID)
+// popAndIP = pop:ip:countryCode, ip and countryCode allow empty
+func SetNodePopIP(rds *redis.Redis, nodeID, pop, ip, countryCode string) error {
+	popID, _, _, err := GetNodePopIP(rds, nodeID)
 	if err != nil {
 		return err
 	}
@@ -31,31 +31,40 @@ func SetNodePopIP(rds *redis.Redis, nodeID, pop, ip string) error {
 	}
 
 	pipe.SAdd(ctx, fmt.Sprintf(redisKeyPopNodes, pop), nodeID)
-	pipe.HSet(ctx, redisKeyNodes, nodeID, fmt.Sprintf("%s:%s", pop, ip))
+	
+	val := fmt.Sprintf("%s:%s", pop, ip)
+	if len(countryCode) > 0 {
+		val = fmt.Sprintf("%s:%s:%s", pop, ip, strings.ToLower(countryCode))
+	}
+	pipe.HSet(ctx, redisKeyNodes, nodeID, val)
 	_, err = pipe.Exec(ctx)
 	return err
 }
 
-func GetNodePopIP(red *redis.Redis, nodeID string) ([]byte, []byte, error) {
+// GetNodePopIP returns (popID, ip, countryCode, error) for the given nodeID
+func GetNodePopIP(red *redis.Redis, nodeID string) ([]byte, []byte, []byte, error) {
 	popAndIP, err := red.Hget(redisKeyNodes, nodeID)
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
-			return nil, nil, nil
+			return nil, nil, nil, nil
 		}
 
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	vs := strings.Split(popAndIP, ":")
+	if len(vs) > 2 {
+		return []byte(vs[0]), []byte(vs[1]), []byte(vs[2]), nil
+	}
 	if len(vs) > 1 {
-		return []byte(vs[0]), []byte(vs[1]), nil
+		return []byte(vs[0]), []byte(vs[1]), nil, nil
 	}
 
-	return []byte(vs[0]), nil, nil
+	return []byte(vs[0]), nil, nil, nil
 }
 
 func DeleteNode(redis *redis.Redis, nodeID string) error {
-	popID, _, err := GetNodePopIP(redis, nodeID)
+	popID, _, _, err := GetNodePopIP(redis, nodeID)
 	if err != nil {
 		return err
 	}

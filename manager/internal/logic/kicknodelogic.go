@@ -27,7 +27,7 @@ func NewKickNodeLogic(ctx context.Context, svcCtx *svc.ServiceContext) *KickNode
 }
 
 func (l *KickNodeLogic) KickNode(req *types.KickNodeReq) (resp *types.UserOperationResp, err error) {
-	popID, _, err := model.GetNodePopIP(l.svcCtx.Redis, req.NodeID)
+	popID, _, _, err := model.GetNodePopIP(l.svcCtx.Redis, req.NodeID)
 	if err != nil {
 		return &types.UserOperationResp{ErrMsg: err.Error()}, nil
 	}

@@ -39,7 +39,7 @@ func (l *SwitchUserRouteNodeLogic) SwitchUserRouteNode(req *types.SwitchUserRout
 	// Determine which POP the NodeId belongs to
 	var targetPopID string
 	if len(req.NodeId) > 0 {
-		popBytes, _, err := model.GetNodePopIP(l.svcCtx.Redis, req.NodeId)
+		popBytes, _, _, err := model.GetNodePopIP(l.svcCtx.Redis, req.NodeId)
 		if err != nil {
 			return &types.UserOperationResp{ErrMsg: fmt.Sprintf("get node pop failed: %v", err)}, nil
 		}
