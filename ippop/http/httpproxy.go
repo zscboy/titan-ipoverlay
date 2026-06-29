@@ -131,6 +131,7 @@ func (p *HttpProxy) handleHTTP(w http.ResponseWriter, r *http.Request, user *Use
 		Username:       user.username,
 		Session:        user.session,
 		SessTime:       user.sessTime,
+		Region:         user.region,
 		ExtraBytes:     buf.Bytes(),
 		ConnCreateTime: time.Now(),
 	})
