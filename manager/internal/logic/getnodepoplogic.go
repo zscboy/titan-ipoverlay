@@ -24,20 +24,10 @@ const (
 	StrategyNameVendor        = "vendor"
 )
 
-type Location struct {
-	Country  string `json:"country"`
-	Province string `json:"province"`
-	City     string `json:"city"`
-	IP       string `json:"ip"`
-}
-
-//	type LocationData struct {
-//		Location *Location `json:"location"`
-//	}
 type LocationResp struct {
-	Code int       `json:"code"`
-	Data *Location `json:"data"`
-	Msg  string    `json:"msg"`
+	Code int               `json:"code"`
+	Data *model.IPLocation `json:"data"`
+	Msg  string            `json:"msg"`
 }
 
 type GetNodePopLogic struct {
@@ -228,10 +218,10 @@ func (l *GetNodePopLogic) selectPopFromList(ctx context.Context, strategyName st
 	return nil, fmt.Errorf("selectPopFromList no pop found for %s, strategy: %s", strategyName, popIds)
 }
 
-func (l *GetNodePopLogic) getLocalInfo(ip string) (*Location, error) {
+func (l *GetNodePopLogic) getLocalInfo(ip string) (*model.IPLocation, error) {
 	loc, err := model.GetIPLocation(l.svcCtx.Redis, ip)
 	if err == nil {
-		return &Location{IP: loc.IP, City: loc.City, Province: loc.Province, Country: loc.Country}, nil
+		return loc, nil
 	} else if err != redis.Nil {
 		logx.Errorf("GetIPLocation error: %v", err)
 	}
@@ -243,8 +233,7 @@ func (l *GetNodePopLogic) getLocalInfo(ip string) (*Location, error) {
 			return nil, err
 		}
 
-		redisIPLocation := model.IPLocation{IP: location.IP, City: location.City, Province: location.Province, Country: location.Country}
-		if err := model.SaveIPLocation(l.svcCtx.Redis, &redisIPLocation); err != nil {
+		if err := model.SaveIPLocation(l.svcCtx.Redis, location); err != nil {
 			logx.Errorf("SaveIPLocation:%v", err)
 		}
 
@@ -255,10 +244,10 @@ func (l *GetNodePopLogic) getLocalInfo(ip string) (*Location, error) {
 		return nil, err
 	}
 
-	return v.(*Location), nil
+	return v.(*model.IPLocation), nil
 }
 
-func (l *GetNodePopLogic) httpGetLocationInfo(ip string) (*Location, error) {
+func (l *GetNodePopLogic) httpGetLocationInfo(ip string) (*model.IPLocation, error) {
 	logx.Infof("get %s local info from %s", ip, l.svcCtx.Config.GeoAPI.API)
 
 	url := fmt.Sprintf("%s?ip=%s", l.svcCtx.Config.GeoAPI.API, ip)

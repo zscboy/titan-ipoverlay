@@ -8,10 +8,11 @@ import (
 )
 
 type IPLocation struct {
-	Country  string `json:"country"`
-	Province string `json:"province"`
-	City     string `json:"city"`
-	IP       string `json:"ip"`
+	Country     string `json:"country"`
+	Province    string `json:"province"`
+	City        string `json:"city"`
+	IP          string `json:"ip"`
+	CountryCode string `json:"country_code"`
 }
 
 func SaveIPLocation(rdb *redis.Redis, loc *IPLocation) error {
