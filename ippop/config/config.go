@@ -153,6 +153,8 @@ type Config struct {
 	FilterRules FilterRules
 	//lint:ignore SA5008 go-zero allows "optional" in struct tags
 	NodeID string `json:",optional"`
+	//lint:ignore SA5008 go-zero allows "optional" in struct tags
+	EnableCountryCode bool `json:",optional"`
 	// TLSKeyPair TLSKeyPair
 }
 

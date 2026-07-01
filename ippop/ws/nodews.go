@@ -47,9 +47,11 @@ func (ws *NodeWS) ServeWS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	countryCode := ""
-	if val := r.Context().Value("country_code"); val != nil {
-		if code, ok := val.(string); ok {
-			countryCode = code
+	if ws.tunMgr.config.EnableCountryCode {
+		if val := r.Context().Value("country_code"); val != nil {
+			if code, ok := val.(string); ok {
+				countryCode = code
+			}
 		}
 	}
 	logx.Infof("NodeWS.ServeWS node %s countryCode %s ip %s", req.NodeId, countryCode, ip)
@@ -61,7 +63,7 @@ func (ws *NodeWS) ServeWS(w http.ResponseWriter, r *http.Request) {
 	}
 	defer c.Close()
 
-	ws.tunMgr.acceptWebsocket(c, &req, ip)
+	ws.tunMgr.acceptWebsocket(c, &req, ip, countryCode)
 
 }
 
