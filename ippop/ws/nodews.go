@@ -46,6 +46,14 @@ func (ws *NodeWS) ServeWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	countryCode := ""
+	if val := r.Context().Value("country_code"); val != nil {
+		if code, ok := val.(string); ok {
+			countryCode = code
+		}
+	}
+	logx.Infof("NodeWS.ServeWS node %s countryCode %s ip %s", req.NodeId, countryCode, ip)
+
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		httpx.ErrorCtx(r.Context(), w, err)

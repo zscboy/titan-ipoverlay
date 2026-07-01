@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -45,43 +46,43 @@ func NewGetNodePopLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetNod
 }
 
 func (l *GetNodePopLogic) GetNodePop(req *types.GetNodePopReq) (resp *types.GetNodePopResp, err error) {
-	popEntity, err := l.allocatePop(req)
+	popEntity, countryCode, err := l.allocatePop(req)
 	if err != nil {
 		return nil, err
 	}
 
-	tokenBytes, err := l.generateJwtToken(popEntity.AccessSecret, popEntity.AccessExpire, req.NodeId)
+	lowerCountryCode := strings.ToLower(countryCode)
+	tokenBytes, err := l.generateJwtToken(popEntity.AccessSecret, popEntity.AccessExpire, req.NodeId, lowerCountryCode)
 	if err != nil {
 		return nil, err
 	}
 
-	logx.Debugf("GetNodePop, %s accessPoint %s, getTokenResp:%s", req.NodeId, popEntity.Config.WSURL, string(tokenBytes))
+	logx.Debugf("GetNodePop node %s countryCode %s accessPoint %s, getTokenResp:%s", req.NodeId, lowerCountryCode, popEntity.Config.WSURL, string(tokenBytes))
 	return &types.GetNodePopResp{ServerURL: popEntity.Config.WSURL, AccessToken: string(tokenBytes)}, nil
 }
 
-func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*svc.Pop, error) {
+func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*svc.Pop, string, error) {
 	ipValue := l.ctx.Value("Remote-IP")
 	ip := ipValue.(string)
 	if len(ip) == 0 {
-		return nil, fmt.Errorf("can not get remote ip")
+		return nil, "", fmt.Errorf("can not get remote ip")
 	}
 
 	// 1. Check Blacklist Priority (P1)
 	_, isBlacklisted := l.svcCtx.BlacklistMap.Load(ip)
-
 	if isBlacklisted {
 		blacklistPopID := l.svcCtx.Config.Strategy.BlacklistPopId
 		logx.Infof("allocatePop node %s ip %s is in blacklist, redirect to blacklist pop %s", req.NodeId, ip, blacklistPopID)
 		if pop, ok := l.svcCtx.Pops[blacklistPopID]; ok {
-			return pop, nil
+			return pop, "", nil
 		}
 	}
 
 	// 2. Sticky allocation (keep existing pop if IP hasn't changed or matches Vendor Strategy)
-	popID, nodeIP, _, err := l.getNodePopIP(req.NodeId)
+	popID, nodeIP, countryCode, err := l.getNodePopIP(req.NodeId)
 	if err != nil {
 		logx.Errorf("GetNodePopIP error: %v, node %s ip %s", err, req.NodeId, ip)
-		return nil, err
+		return nil, "", err
 	}
 
 	if len(popID) > 0 {
@@ -91,7 +92,7 @@ func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*svc.Pop, error
 		if ip == nodeIP {
 			if exists {
 				logx.Debugf("allocatePop node %s ip %s sticky to existing pop %s", req.NodeId, nodeIP, popID)
-				return pop, nil
+				return pop, countryCode, nil
 			}
 			logx.Errorf("allocatePop node %s ip %s sticky pop %s not found in memory", req.NodeId, nodeIP, popID)
 		} else {
@@ -100,7 +101,7 @@ func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*svc.Pop, error
 			if hasVendorStrategy {
 				if exists {
 					logx.Infof("allocatePop node %s vendor %s strategy: keep pop %s despite ip change (%s -> %s)", req.NodeId, req.Vendor, popID, nodeIP, ip)
-					return pop, nil
+					return pop, countryCode, nil
 				}
 				logx.Errorf("allocatePop node %s vendor strategy: sticky pop %s not found", req.NodeId, popID)
 			} else {
@@ -116,22 +117,22 @@ func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*svc.Pop, error
 	location, err := l.getLocalInfo(ip)
 	if err != nil {
 		logx.Errorf("GetIPLocation error: %v, node %s, ip %s", err, req.NodeId, ip)
-		return nil, err
+		return nil, "", err
 	}
 
 	if pop, err := l.matchAndAllocatePop(l.svcCtx.RegionStrategy[location.Country], StrategyNameRegion+location.Country, req.NodeId, ip, location.CountryCode); err != nil {
 		logx.Errorf("matchAndAllocatePop region error: %v", err)
-		return nil, err
+		return nil, "", err
 	} else if pop != nil {
-		return pop, nil
+		return pop, location.CountryCode, nil
 	}
 
 	// 4. Vendor Strategy (P3)
 	if pop, err := l.matchAndAllocatePop(l.svcCtx.VendorStrategy[req.Vendor], StrategyNameVendor+req.Vendor, req.NodeId, ip, location.CountryCode); err != nil {
 		logx.Errorf("matchAndAllocatePop vendor error: %v", err)
-		return nil, err
+		return nil, "", err
 	} else if pop != nil {
-		return pop, nil
+		return pop, location.CountryCode, nil
 	}
 
 	// 5. Default Strategy (P4)
@@ -139,10 +140,10 @@ func (l *GetNodePopLogic) allocatePop(req *types.GetNodePopReq) (*svc.Pop, error
 	if pop, ok := l.svcCtx.Pops[defaultPopID]; ok {
 		logx.Debugf("node %s allocate default pop:%s", req.NodeId, defaultPopID)
 		l.saveNodePop(req.NodeId, defaultPopID, ip, location.CountryCode)
-		return pop, nil
+		return pop, location.CountryCode, nil
 	}
 
-	return nil, fmt.Errorf("no pop found for %s, location:%v, vendor:%s", req.NodeId, location, req.Vendor)
+	return nil, "", fmt.Errorf("no pop found for %s, location:%v, vendor:%s", req.NodeId, location, req.Vendor)
 }
 
 func (l *GetNodePopLogic) matchAndAllocatePop(popIds []string, strategyName, nodeID, ip, countryCode string) (*svc.Pop, error) {
@@ -292,11 +293,12 @@ func (l *GetNodePopLogic) httpGetLocationInfo(ip string) (*model.IPLocation, err
 	return location, nil
 }
 
-func (l *GetNodePopLogic) generateJwtToken(secret string, expire int64, nodeId string) ([]byte, error) {
+func (l *GetNodePopLogic) generateJwtToken(secret string, expire int64, nodeId string, countryCode string) ([]byte, error) {
 	claims := jwt.MapClaims{
-		"user": nodeId,
-		"exp":  time.Now().Add(time.Second * time.Duration(expire)).Unix(),
-		"iat":  time.Now().Add(-5 * time.Minute).Unix(),
+		"user":         nodeId,
+		"country_code": countryCode,
+		"exp":          time.Now().Add(time.Second * time.Duration(expire)).Unix(),
+		"iat":          time.Now().Add(-5 * time.Minute).Unix(),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
