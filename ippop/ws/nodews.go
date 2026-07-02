@@ -32,7 +32,7 @@ func NewNodeWS(tunMgr *TunnelManager) *NodeWS {
 }
 
 func (ws *NodeWS) ServeWS(w http.ResponseWriter, r *http.Request) {
-	logx.Infof("NodeWS.ServeWS %s %s", r.URL.Path, r.URL.RawQuery)
+	logx.Infof("NodeWS.ServeWS %s %s, remote:%s, countryCode:%s", r.URL.Path, r.URL.RawQuery, r.RemoteAddr, r.Context().Value("country_code").(string))
 
 	var req NodeWSReq
 	if err := httpx.Parse(r, &req); err != nil {
@@ -54,7 +54,6 @@ func (ws *NodeWS) ServeWS(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	logx.Infof("NodeWS.ServeWS node %s countryCode %s ip %s", req.NodeId, countryCode, ip)
 
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {

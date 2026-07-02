@@ -10,6 +10,8 @@ import (
 	"github.com/zeromicro/go-zero/core/stores/redis"
 )
 
+const batchSize = 1000
+
 // popAndIP = pop:ip:countryCode, ip and countryCode allow empty
 func SetNodePopIP(rds *redis.Redis, nodeID, pop, ip, countryCode string) error {
 	popID, _, _, err := GetNodePopIP(rds, nodeID)
@@ -127,6 +129,29 @@ func BatchMoveNodesToPop(rds *redis.Redis, nodeIDToIP map[string]string, sourceP
 		nodeIDs = append(nodeIDs, nodeID)
 	}
 
+	// Get existing country codes to retain them (batch query, max 1000 per batch)
+	countryCodes := make(map[string]string)
+	for i := 0; i < len(nodeIDs); i += batchSize {
+		end := i + batchSize
+		if end > len(nodeIDs) {
+			end = len(nodeIDs)
+		}
+		batchNodeIDs := nodeIDs[i:end]
+		vals, err := rds.Hmget(redisKeyNodes, batchNodeIDs...)
+		if err != nil {
+			return err
+		}
+		for j, val := range vals {
+			if len(val) > 0 {
+				vs := strings.Split(val, ":")
+				if len(vs) > 2 {
+					nodeID := batchNodeIDs[j]
+					countryCodes[nodeID] = vs[2]
+				}
+			}
+		}
+	}
+
 	ctx := context.Background()
 	pipe, err := rds.TxPipeline()
 	if err != nil {
@@ -141,7 +166,12 @@ func BatchMoveNodesToPop(rds *redis.Redis, nodeIDToIP map[string]string, sourceP
 
 	fields := make(map[string]interface{}, len(nodeIDToIP))
 	for nodeID, ip := range nodeIDToIP {
-		fields[nodeID] = fmt.Sprintf("%s:%s", targetPop, ip)
+		countryCode := countryCodes[nodeID]
+		if len(countryCode) > 0 {
+			fields[nodeID] = fmt.Sprintf("%s:%s:%s", targetPop, ip, strings.ToLower(countryCode))
+		} else {
+			fields[nodeID] = fmt.Sprintf("%s:%s", targetPop, ip)
+		}
 	}
 	pipe.HMSet(ctx, redisKeyNodes, fields)
 

@@ -5,6 +5,8 @@ import (
 	"sort"
 	"sync"
 	"titan-ipoverlay/ippop/types"
+
+	"github.com/zeromicro/go-zero/core/logx"
 )
 
 // ipEntry tracks an IP and its associated tunnels
@@ -246,6 +248,8 @@ func (p *IPPool) AcquireIP(region string) (string, *Tunnel) {
 		if l, ok := p.regionFreeList[region]; ok && l.Len() > 0 {
 			return p.acquireFromListLocked(l)
 		}
+		logx.Errorf("AcquireIP region %s not found", region)
+		return "", nil
 	}
 
 	// 2. If multiple local IPs detected, use Line strategy (balanced)
