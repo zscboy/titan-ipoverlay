@@ -36,6 +36,7 @@ const (
 	userSessionExpireDuration = 2 * time.Minute
 	acceptLockShards          = 16384
 	maxKeepaliveRegions       = 20
+	maxUserIPSessionIdleTime  = 5 * time.Minute
 )
 
 // UserSession and ExpiredSession are now handled by the allocator module.
@@ -461,6 +462,9 @@ func (tm *TunnelManager) getTunnelByUser(user *model.User) (*Tunnel, error) {
 func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks5.SocksTargetInfo) (err error) {
 	logx.Debugf("HandleSocks5TCP, user %s, DomainName %s, port %d, remote:%s, connCount:%d, connTime:%d",
 		targetInfo.Username, targetInfo.DomainName, targetInfo.Port, tcpConn.RemoteAddr().String(), tm.socks5ConnCount.Load(), time.Since(targetInfo.ConnCreateTime).Milliseconds())
+	if targetInfo.SessTime > maxUserIPSessionIdleTime {
+		targetInfo.SessTime = maxUserIPSessionIdleTime
+	}
 
 	tm.socks5ConnCount.Add(1)
 	defer tm.socks5ConnCount.Add(-1)
@@ -500,7 +504,7 @@ func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks
 		return fmt.Errorf("can not allocate tunnel, user %s", targetInfo.Username)
 	}
 
-	logx.Infof("HandleSocks5TCP: user %s session [%s] sessionTime [%d] allocated on node %s, target %s:%d, remote %s", targetInfo.Username, targetInfo.Session, targetInfo.SessTime, tun.opts.Id, targetInfo.DomainName, targetInfo.Port, tcpConn.RemoteAddr().String())
+	logx.Infof("HandleSocks5TCP: user %s session [%s] region [%s] sessionTime [%f s] allocated on node %s, target %s:%d, remote %s", targetInfo.Username, targetInfo.Session, targetInfo.Region, targetInfo.SessTime.Seconds(), tun.opts.Id, targetInfo.DomainName, targetInfo.Port, tcpConn.RemoteAddr().String())
 
 	if userSession != nil {
 		defer tm.sessionManager.Decrement(userSession)
