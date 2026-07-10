@@ -102,7 +102,12 @@ type Tunnel struct {
 	rateLimiterLock sync.Mutex
 	// if socks5 client connect with session
 	userSessionID string
-	delay         int64
+	// delay 为 POP<->盒子 的实测 RTT(毫秒),由 onPong(pong goroutine)写、分配 goroutine 读,
+	// 故用 atomic.Int64 保证并发安全。P2C 就近调度(AcquireP2CPollingIP)读取它计算选盒分数。
+	delay atomic.Int64
+	// lastPongAt 为最近一次收到 pong 的 Unix 毫秒时间戳(0=从未)。忙隧道的被动 keepalive
+	// 会长期跳过主动 ping 使 delay 冻结,P2C 用它判定 delay 是否陈旧(>60s 弃权)。
+	lastPongAt atomic.Int64
 	// This must be performed as a locking operation within addTunnel or swap tunnel
 	index int
 
@@ -203,8 +208,9 @@ func (t *Tunnel) onPong(data []byte) {
 	}
 
 	timestamp := int64(binary.LittleEndian.Uint64(data))
-	t.delay = time.Since(time.UnixMicro(timestamp)).Milliseconds()
+	t.delay.Store(time.Since(time.UnixMicro(timestamp)).Milliseconds())
 	// metrics.TunnelDelay.WithLabelValues(t.opts.Id, t.tunMgr.config.GetNodeID()).Set(float64(t.delay))
+	t.lastPongAt.Store(time.Now().UnixMilli())
 
 	t.waitPong.Store(0)
 }

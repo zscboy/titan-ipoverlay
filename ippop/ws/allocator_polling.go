@@ -15,10 +15,13 @@ func NewPollingAllocator(source NodeSource) *PollingAllocator {
 }
 
 func (a *PollingAllocator) Allocate(user *model.User, target *socks5.SocksTargetInfo) (*Tunnel, *UserSession, error) {
+	if user != nil && user.P2CPolling == 1 {
+		_, tun, err := a.source.AcquireP2CPollingNode()
+		return tun, nil, err
+	}
 	_, tun, err := a.source.AcquirePollingNode()
 	if err != nil {
 		return nil, nil, err
 	}
-
 	return tun, nil, nil
 }

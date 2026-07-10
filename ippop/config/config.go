@@ -140,6 +140,27 @@ type Config struct {
 	//lint:ignore SA5008 go-zero allows "optional" in struct tags
 	TrafficStats TrafficStats `json:",optional"`
 
+	// P2C 负载感知就近 polling(默认关):每请求随机抽 Depth 个空闲盒,按
+	// score = 实测RTT + LoadPenaltyMs×在途会话数 取低者;每第 RRInterval 个请求
+	// 走轮询队首保底(任何盒子最多隔 池大小×RRInterval 个请求必被选中)。
+	// Depth: 0/1=关闭(行为与原混播逐字节一致);建议灰度 2,上限 4。
+	//lint:ignore SA5008 go-zero allows "default" in struct tags
+	PollingP2CDepth int `json:",default=0"`
+	// RRInterval: 保底间隔 R,范围[1,10],1=逐请求保底(语义等价原混播,安全滑轨);
+	// >10 会被钳制:R 过大时新盒/冷启动盒只能靠保底喂养,饥饿上界失去意义。
+	//lint:ignore SA5008 go-zero allows "default" in struct tags
+	PollingP2CRRInterval int `json:",default=5"`
+	// LoadPenaltyMs: λ,每个在途会话折算的毫秒惩罚。<50 时 P2C 被强制关闭——
+	// 纯 RTT 竞速会把并发堆到快盒上(仿真:λ=0 时 1007 断连率翻倍)。
+	//lint:ignore SA5008 go-zero allows "default" in struct tags
+	PollingP2CLoadPenaltyMs int `json:",default=100"`
+	// MinPool: 空闲 IP 少于此数时整体退化为原混播(薄池护栏)。
+	//lint:ignore SA5008 go-zero allows "default" in struct tags
+	PollingP2CMinPool int `json:",default=16"`
+	// MaxBoxSessions: 单盒在途会话硬上限,0=关;开启时建议锚定住宅盒实际容量(个位数~十位数)。
+	//lint:ignore SA5008 go-zero allows "default" in struct tags
+	PollingP2CMaxBoxSessions int `json:",default=0"`
+
 	JwtAuth JwtAuth
 	Socks5  Socks5
 	// Domain      string `json:",optional"`

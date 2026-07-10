@@ -63,6 +63,8 @@ type TunnelManager struct {
 	acceptLocks []sync.Mutex
 	// 会话性能数据收集器
 	perfCollector *SessionPerfCollector
+	// sanitized P2C params cached at startup; config is immutable after construction.
+	p2cParams P2CParams
 }
 
 func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
@@ -89,6 +91,18 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 	tm.allocatorRegistry.Register(model.RouteModeTimed, NewStaticAllocator(tm))
 	tm.allocatorRegistry.Register(model.RouteModeCustom, NewSessionAllocator(tm.sessionManager, tm))
 	tm.allocatorRegistry.Register(model.RouteModePolling, NewPollingAllocator(tm))
+
+	p2cCached, warn := sanitizeP2CParams(P2CParams{
+		Depth:          config.PollingP2CDepth,
+		RREvery:        config.PollingP2CRRInterval,
+		LambdaMs:       config.PollingP2CLoadPenaltyMs,
+		MinPool:        config.PollingP2CMinPool,
+		MaxBoxSessions: config.PollingP2CMaxBoxSessions,
+	})
+	if warn != "" {
+		logx.Errorf("TunnelManager P2C config sanitized: %s", warn)
+	}
+	tm.p2cParams = p2cCached
 
 	tm.loadBlacklist()
 
@@ -624,8 +638,9 @@ func (tm *TunnelManager) keepalive() {
 				lineInfo += fmt.Sprintf("%s:%d ", line, nodes)
 			}
 
-			logx.Infof("TunnelManager.keepalive lines:[ %s], tunnel count:%d/%d, cost:%v, ipCount:%d, freeCount:%d, blackCount:%d, assignedCount:%d, session len:%d",
-				lineInfo, count, stats.TunnelCount, time.Since(now), stats.TotalIPCount, stats.FreeIPCount, stats.BlacklistIPCount, stats.AssignedIPCount, tm.sessionManager.SessionLen())
+			logx.Infof("TunnelManager.keepalive lines:[ %s], tunnel count:%d/%d, cost:%v, ipCount:%d, freeCount:%d, blackCount:%d, assignedCount:%d, session len:%d, p2c race:%d rr:%d fallback:%d pollSlice:%d",
+				lineInfo, count, stats.TunnelCount, time.Since(now), stats.TotalIPCount, stats.FreeIPCount, stats.BlacklistIPCount, stats.AssignedIPCount, tm.sessionManager.SessionLen(),
+				stats.P2CRaceHits, stats.P2CRRHits, stats.P2CFallbacks, stats.PollSliceLen)
 			tickCount = 0
 		}
 	}
