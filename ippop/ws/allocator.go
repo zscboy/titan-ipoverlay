@@ -17,6 +17,7 @@ type NodeSource interface {
 	GetLocalTunnel(nodeID string) *Tunnel
 	SwitchNodeForUser(user *model.User) error
 	AcquirePollingNode() (string, *Tunnel, error)
+	AcquireP2CPollingNode() (string, *Tunnel, error)
 }
 
 // UserSession tracks the binding between a user session and a node.

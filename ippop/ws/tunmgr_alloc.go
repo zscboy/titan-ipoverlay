@@ -71,3 +71,18 @@ func (tm *TunnelManager) AcquirePollingNode() (string, *Tunnel, error) {
 	}
 	return exitIP, tun, nil
 }
+
+// AcquireP2CPollingNode implements NodeSource interface. It degrades to plain
+// polling whenever P2C is globally off (Depth<2, possibly forced by sanitize),
+// so callers may invoke it based on the per-user flag alone.
+func (tm *TunnelManager) AcquireP2CPollingNode() (string, *Tunnel, error) {
+	cfg := tm.p2cParams
+	if cfg.Depth < 2 {
+		return tm.AcquirePollingNode()
+	}
+	exitIP, tun := tm.ipPool.AcquireP2CPollingIP(cfg)
+	if tun == nil {
+		return "", nil, fmt.Errorf("no available IPs in pool for polling")
+	}
+	return exitIP, tun, nil
+}

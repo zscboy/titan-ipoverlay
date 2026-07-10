@@ -66,6 +66,11 @@ type User struct {
 	Off                 bool  `redis:"off"`
 	UploadRateLimit     int64 `redis:"upload_rate_limit"`
 	DownloadRateLimit   int64 `redis:"download_rate_limit"`
+	// P2C 就近 polling 灰度开关：1=该账号 polling 走 P2C 选盒，其他值=原混播。
+	// 老记录缺此字段=零值=关，向后兼容。注意：userCache 是 LRU 无 TTL，直接 HSET Redis 后需
+	// 触发 DeleteCache 才生效；当前 ModifyUser RPC 尚未透传此字段（见后续任务：给
+	// ModifyUserReq 加 P2CPolling），启用灰度前需先补该 RPC 字段或由运维走等效清缓存流程。
+	P2CPolling int `redis:"p2c_polling"`
 }
 
 func (u *User) CalculateNextRouteSwitchTime() int64 {
