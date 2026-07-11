@@ -107,6 +107,14 @@ func newWS(config config.Config, tunMgr *ws.TunnelManager) *rest.Server {
 		Handler: qosHandler.ServeBlacklistList,
 	})
 
+	// 本地用户缓存清理接口
+	userHandler := ws.NewUserHandler(tunMgr)
+	server.AddRoute(rest.Route{
+		Method:  "POST",
+		Path:    "/api/user/cache/delete",
+		Handler: userHandler.ServeDeleteUserCache,
+	})
+
 	return server
 }
 
