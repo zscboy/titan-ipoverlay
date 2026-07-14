@@ -16,7 +16,7 @@ func NewUserHandler(tunMgr *TunnelManager) *UserHandler {
 }
 
 type DeleteUserCacheReq struct {
-	Username string `json:"username" form:"username"`
+	Username string `json:"username,optional" form:"username,optional"`
 }
 
 func (h *UserHandler) isLocalRequest(r *http.Request) bool {
