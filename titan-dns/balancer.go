@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 	"sync/atomic"
 )
@@ -27,7 +28,13 @@ func NewLoadBalancer(pops []PopConfig) (*LoadBalancer, error) {
 	}
 	for _, p := range pops {
 		var expandedIPs []string
-		for ip, weight := range p.IPs {
+		var sortedIPs []string
+		for ip := range p.IPs {
+			sortedIPs = append(sortedIPs, ip)
+		}
+		sort.Strings(sortedIPs)
+		for _, ip := range sortedIPs {
+			weight := p.IPs[ip]
 			if weight <= 0 {
 				weight = 1
 			}
@@ -141,7 +148,13 @@ func (lb *LoadBalancer) UpdatePopIPs(popID string, ips map[string]int) {
 	defer lb.mu.Unlock()
 
 	var expandedIPs []string
-	for ip, weight := range ips {
+	var sortedIPs []string
+	for ip := range ips {
+		sortedIPs = append(sortedIPs, ip)
+	}
+	sort.Strings(sortedIPs)
+	for _, ip := range sortedIPs {
+		weight := ips[ip]
 		if weight <= 0 {
 			weight = 1
 		}

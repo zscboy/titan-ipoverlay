@@ -36,7 +36,6 @@ type PopConfig struct {
 	Name   string         `yaml:"name"`          // Human-readable name for identified
 	IPs    map[string]int `yaml:"ips"`
 	Follow []string       `yaml:"follow"` // Track and aggregate IPs from these POP IDs
-	Weight int            `yaml:"weight"`
 }
 
 func LoadConfig(path string) (*Config, error) {
