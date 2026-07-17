@@ -52,14 +52,30 @@ func handleReload(cfg *Config, apiAddr string) {
 }
 
 func handleSetIPs(cfg *Config, apiAddr, popID, ipList string) {
-	var ips []string
+	log.Printf("CLI: Starting to parse IP list: %q for POP ID: %s", ipList, popID)
+	ips := make(map[string]int)
 	if ipList != "" {
-		ips = strings.Split(ipList, ",")
+		for _, ipRaw := range strings.Split(ipList, ",") {
+			parts := strings.Split(ipRaw, ":")
+			if len(parts) == 2 {
+				weight, err := strconv.Atoi(parts[1])
+				if err != nil {
+					log.Fatalf("CLI: Error: Failed to parse weight %q for IP %q (Error: %v)", parts[1], parts[0], err)
+				}
+				ips[parts[0]] = weight
+				log.Printf("CLI:   Parsed IP %s with weight %d", parts[0], weight)
+				continue
+			}
+			ips[parts[0]] = 1
+			log.Printf("CLI:   Parsed IP %s with default weight 1", parts[0])
+		}
 	}
+	log.Printf("CLI: Final parsed IPs payload: %v", ips)
 	payload := map[string]interface{}{
 		"pop_id": popID,
 		"ips":    ips,
 	}
+	log.Printf("CLI: Sending signed request to update IPs for POP %s...", popID)
 	sendSignedRequest(apiAddr, "/api/v1/pop", cfg.Server.Secret, payload)
 }
 

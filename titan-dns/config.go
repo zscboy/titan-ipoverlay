@@ -31,12 +31,12 @@ type ServerConfig struct {
 }
 
 type PopConfig struct {
-	ID     string   `yaml:"id"`
-	Ref    string   `yaml:"ref,omitempty"` // ID of the referenced POP to inherit configuration from
-	Name   string   `yaml:"name"` // Human-readable name for identified
-	IPs    []string `yaml:"ips"`
-	Follow []string `yaml:"follow"` // Track and aggregate IPs from these POP IDs
-	Weight int      `yaml:"weight"`
+	ID     string         `yaml:"id"`
+	Ref    string         `yaml:"ref,omitempty"` // ID of the referenced POP to inherit configuration from
+	Name   string         `yaml:"name"`          // Human-readable name for identified
+	IPs    map[string]int `yaml:"ips"`
+	Follow []string       `yaml:"follow"` // Track and aggregate IPs from these POP IDs
+	Weight int            `yaml:"weight"`
 }
 
 func LoadConfig(path string) (*Config, error) {

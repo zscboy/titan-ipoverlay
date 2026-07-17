@@ -69,8 +69,8 @@ func (h *DNSHandler) handlePopIPsAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		PopID string   `json:"pop_id"`
-		IPs   []string `json:"ips"`
+		PopID string         `json:"pop_id"`
+		IPs   map[string]int `json:"ips"`
 	}
 
 	if err := json.Unmarshal(body, &req); err != nil {

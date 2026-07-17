@@ -26,8 +26,17 @@ func NewLoadBalancer(pops []PopConfig) (*LoadBalancer, error) {
 		reverse:   make(map[string][]string),
 	}
 	for _, p := range pops {
+		var expandedIPs []string
+		for ip, weight := range p.IPs {
+			if weight <= 0 {
+				weight = 1
+			}
+			for w := 0; w < weight; w++ {
+				expandedIPs = append(expandedIPs, ip)
+			}
+		}
 		lb.pops[p.ID] = &PopData{
-			IPs: p.IPs,
+			IPs: expandedIPs,
 			Ref: p.Ref,
 		}
 		if len(p.Follow) > 0 {
@@ -127,15 +136,25 @@ func (lb *LoadBalancer) HasPop(popID string) bool {
 }
 
 // UpdatePopIPs allows dynamic updates of the IP pool for a specific POP.
-func (lb *LoadBalancer) UpdatePopIPs(popID string, ips []string) {
+func (lb *LoadBalancer) UpdatePopIPs(popID string, ips map[string]int) {
 	lb.mu.Lock()
 	defer lb.mu.Unlock()
 
+	var expandedIPs []string
+	for ip, weight := range ips {
+		if weight <= 0 {
+			weight = 1
+		}
+		for w := 0; w < weight; w++ {
+			expandedIPs = append(expandedIPs, ip)
+		}
+	}
+
 	// 1. Update the POP itself
 	if data, ok := lb.pops[popID]; ok {
-		data.IPs = ips
+		data.IPs = expandedIPs
 	} else {
-		lb.pops[popID] = &PopData{IPs: ips}
+		lb.pops[popID] = &PopData{IPs: expandedIPs}
 	}
 
 	// 2. Propagate to all followers

@@ -11,7 +11,7 @@ func TestBalanceByRR_OfflineIPsTraversal(t *testing.T) {
 		{
 			ID:   "pop1",
 			Name: "Singapore Node",
-			IPs:  []string{"192.168.1.1", "192.168.1.2", "192.168.1.3"},
+			IPs:  map[string]int{"192.168.1.1": 1, "192.168.1.2": 1, "192.168.1.3": 1},
 		},
 	}
 
