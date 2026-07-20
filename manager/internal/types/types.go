@@ -199,6 +199,24 @@ type Pop struct {
 	CountryCode     string `json:"country_code"`
 }
 
+type PopMonitorItem struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	UsedIPCount int     `json:"used_ip_count"`
+	IdleIPCount int     `json:"idle_ip_count"`
+	IdleIPRatio float64 `json:"idle_ip_ratio"`
+}
+
+type PopMonitorReq struct {
+	IdleThreshold float64  `form:"idle_threshold,optional"`
+	IdleOperator  string   `form:"idle_operator,optional"`
+	PopIDs        []string `form:"pop_ids,optional"`
+}
+
+type PopMonitorResp struct {
+	Pops []*PopMonitorItem `json:"pops"`
+}
+
 type RemoveBlacklistReq struct {
 	PopID  string   `json:"pop_id"`
 	IPList []string `json:"ip_list"` // max length 100

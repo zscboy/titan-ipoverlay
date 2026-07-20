@@ -256,6 +256,21 @@ type (
 	LoginResp {
 		Token string `json:"token"`
 	}
+	PopMonitorItem {
+		ID          string  `json:"id"`
+		Name        string  `json:"name"`
+		UsedIPCount int     `json:"used_ip_count"`
+		IdleIPCount int     `json:"idle_ip_count"`
+		IdleIPRatio float64 `json:"idle_ip_ratio"`
+	}
+	PopMonitorReq {
+		IdleThreshold float64  `form:"idle_threshold,optional"`
+		IdleOperator  string   `form:"idle_operator,optional"`
+		PopIDs        []string `form:"pop_ids,optional"`
+	}
+	PopMonitorResp {
+		Pops []*PopMonitorItem `json:"pops"`
+	}
 )
 
 service server-api {
@@ -349,6 +364,9 @@ service server-api {
 
 	@handler migrateNodeList
 	post /node/migrate/list (MigrateNodeListReq) returns (UserOperationResp)
+
+	@handler popMonitor
+	get /pop/monitor (PopMonitorReq) returns (PopMonitorResp)
 }
 
 type (
