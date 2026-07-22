@@ -3,7 +3,9 @@ package svc
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"sync"
+	"time"
 	"titan-ipoverlay/ippop/rpc/serverapi"
 	"titan-ipoverlay/manager/internal/config"
 	"titan-ipoverlay/manager/model"
@@ -39,6 +41,7 @@ type ServiceContext struct {
 	BlacklistMap   sync.Map
 	StrategyRR     sync.Map // map[string]*uint64
 	NodePopCache   sync.Map // map[string]*NodeCacheItem
+	HTTPClient     *http.Client
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
@@ -54,6 +57,12 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		vendorStrategy[rule.Key] = rule.PopIds
 	}
 
+	transport := &http.Transport{
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 100,
+		IdleConnTimeout:     90 * time.Second,
+	}
+
 	sc := &ServiceContext{
 		Config:         c,
 		Redis:          redis,
@@ -61,6 +70,10 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		IPGroup:        &singleflight.Group{},
 		RegionStrategy: regionStrategy,
 		VendorStrategy: vendorStrategy,
+		HTTPClient: &http.Client{
+			Transport: transport,
+			Timeout:   5 * time.Second,
+		},
 	}
 
 	sc.loadBlacklist()
@@ -68,6 +81,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 }
 
 func (sc *ServiceContext) loadBlacklist() {
+	now := time.Now()
 	ips, err := model.GetAllIPBlacklist(sc.Redis)
 	if err != nil {
 		fmt.Printf("loadBlacklist error: %v\n", err)
@@ -77,11 +91,12 @@ func (sc *ServiceContext) loadBlacklist() {
 	for _, ip := range ips {
 		sc.BlacklistMap.Store(ip, true)
 	}
-	fmt.Printf("loaded %d blacklisted ips into sync.Map\n", len(ips))
+	fmt.Printf("loaded %d blacklisted ips into sync.Map, cost %v\n", len(ips), time.Since(now))
 }
 
 // TODO: can not get server info in here, server may be stop
 func newPops(c config.Config) map[string]*Pop {
+	now := time.Now()
 	pops := make(map[string]*Pop)
 	for _, popCfg := range c.Pops {
 		api := serverapi.NewServerAPI(zrpc.MustNewClient(popCfg.RpcClient))
@@ -97,5 +112,6 @@ func newPops(c config.Config) map[string]*Pop {
 			AccessExpire: resp.AccessExpire,
 		}
 	}
+	fmt.Printf("loaded %d pop into sync.Map, cost %v\n", len(pops), time.Since(now))
 	return pops
 }

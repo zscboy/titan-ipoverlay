@@ -49,7 +49,7 @@ func GetAllIPBlacklist(r *redis.Redis) ([]string, error) {
 	var allIPs []string
 	var cursor uint64
 	for {
-		ips, nextCursor, err := r.Sscan(redisKeyIPBlacklist, cursor, "", 1000)
+		ips, nextCursor, err := r.Sscan(redisKeyIPBlacklist, cursor, "", 10000)
 		if err != nil {
 			return nil, err
 		}

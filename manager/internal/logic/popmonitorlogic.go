@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -68,15 +67,17 @@ func (l *PopMonitorLogic) PopMonitor(req *types.PopMonitorReq) (resp *types.PopM
 			popStats, err := l.fetchPopStats(statsURL)
 			if err != nil {
 				l.Errorf("PopMonitorLogic: Failed to fetch stats from POP %s (%s): %v", popID, statsURL, err)
-			} else {
-				item.UsedIPCount = popStats.AssignedIPCount
-				item.IdleIPCount = popStats.FreeIPCount
-				if popStats.TotalIPCount > 0 {
-					item.IdleIPRatio = (float64(popStats.FreeIPCount) / float64(popStats.TotalIPCount)) * 100.0
-				} else {
-					item.IdleIPRatio = 0.0
-				}
+				return // Skip if fetch fails
 			}
+
+			// 如果 IP 总数为 0，则不返回
+			if popStats.TotalIPCount == 0 {
+				return
+			}
+
+			item.UsedIPCount = popStats.AssignedIPCount
+			item.IdleIPCount = popStats.FreeIPCount
+			item.IdleIPRatio = (float64(popStats.FreeIPCount) / float64(popStats.TotalIPCount)) * 100.0
 
 			mu.Lock()
 			items = append(items, item)
@@ -115,35 +116,6 @@ func (l *PopMonitorLogic) PopMonitor(req *types.PopMonitorReq) (resp *types.PopM
 }
 
 func (l *PopMonitorLogic) fetchPopStats(url string) (*PopStats, error) {
-	var lastErr error
-	for attempt := 1; attempt <= 3; attempt++ {
-		stats, err := l.doFetchPopStats(url)
-		if err == nil {
-			return stats, nil
-		}
-
-		lastErr = err
-
-		// Check if it's a timeout error
-		isTimeout := false
-		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-			isTimeout = true
-		} else if strings.Contains(err.Error(), "timeout") || strings.Contains(err.Error(), "deadline exceeded") {
-			isTimeout = true
-		}
-
-		// If it's not a timeout, return immediately (e.g. 404, connection refused)
-		if !isTimeout {
-			return nil, err
-		}
-
-		l.Errorf("PopMonitorLogic: Timeout on attempt %d for url %s, retrying... (Error: %v)", attempt, url, err)
-		time.Sleep(100 * time.Millisecond)
-	}
-	return nil, fmt.Errorf("failed after 3 attempts: %w", lastErr)
-}
-
-func (l *PopMonitorLogic) doFetchPopStats(url string) (*PopStats, error) {
 	ctx, cancel := context.WithTimeout(l.ctx, 3*time.Second)
 	defer cancel()
 
