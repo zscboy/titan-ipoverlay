@@ -98,20 +98,64 @@ func (sc *ServiceContext) loadBlacklist() {
 func newPops(c config.Config) map[string]*Pop {
 	now := time.Now()
 	pops := make(map[string]*Pop)
-	for _, popCfg := range c.Pops {
-		api := serverapi.NewServerAPI(zrpc.MustNewClient(popCfg.RpcClient))
-		resp, err := api.GetServerInfo(context.Background(), &serverapi.Empty{})
-		if err != nil {
-			panic("Get server info failed:" + err.Error())
-		}
-		pops[popCfg.Id] = &Pop{
-			Config:       popCfg,
-			API:          api,
-			Socks5Addr:   resp.Socks5Addr,
-			AccessSecret: resp.AccessSecret,
-			AccessExpire: resp.AccessExpire,
-		}
+
+	type popResult struct {
+		id  string
+		pop *Pop
+		err error
 	}
+
+	popCh := make(chan config.Pop, len(c.Pops))
+	resCh := make(chan popResult, len(c.Pops))
+
+	// 写入全部任务
+	for _, popCfg := range c.Pops {
+		popCh <- popCfg
+	}
+	close(popCh)
+
+	var wg sync.WaitGroup
+	workerCount := 3
+	if len(c.Pops) < workerCount {
+		workerCount = len(c.Pops)
+	}
+
+	// 启动 3 个并发 worker
+	for i := 0; i < workerCount; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for popCfg := range popCh {
+				api := serverapi.NewServerAPI(zrpc.MustNewClient(popCfg.RpcClient))
+				resp, err := api.GetServerInfo(context.Background(), &serverapi.Empty{})
+				if err != nil {
+					resCh <- popResult{err: fmt.Errorf("Get server info failed: %v", err)}
+					continue
+				}
+				resCh <- popResult{
+					id: popCfg.Id,
+					pop: &Pop{
+						Config:       popCfg,
+						API:          api,
+						Socks5Addr:   resp.Socks5Addr,
+						AccessSecret: resp.AccessSecret,
+						AccessExpire: resp.AccessExpire,
+					},
+				}
+			}
+		}()
+	}
+
+	wg.Wait()
+	close(resCh)
+
+	for res := range resCh {
+		if res.err != nil {
+			panic(res.err.Error())
+		}
+		pops[res.id] = res.pop
+	}
+
 	fmt.Printf("loaded %d pop into sync.Map, cost %v\n", len(pops), time.Since(now))
 	return pops
 }
