@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -15,6 +16,8 @@ import (
 
 	"github.com/zeromicro/go-zero/core/logx"
 )
+
+const maxWorkerCount = 5
 
 type PopStats struct {
 	NodeCount        int `json:"node_count"`
@@ -50,39 +53,57 @@ func (l *PopMonitorLogic) PopMonitor(req *types.PopMonitorReq) (resp *types.PopM
 		targetPops[id] = true
 	}
 
+	type popTask struct {
+		id  string
+		pop *svc.Pop
+	}
+
+	taskCh := make(chan popTask, len(l.svcCtx.Pops))
 	for id, pop := range l.svcCtx.Pops {
 		if targetPops[id] {
 			continue // Exclude POPs specified in the filter list
 		}
+		taskCh <- popTask{id: id, pop: pop}
+	}
+	close(taskCh)
+
+	workerCount := maxWorkerCount
+	actualTasks := len(taskCh)
+	if actualTasks < workerCount {
+		workerCount = actualTasks
+	}
+
+	for i := 0; i < workerCount; i++ {
 		wg.Add(1)
-		go func(popID string, popEntity *svc.Pop) {
+		go func() {
 			defer wg.Done()
+			for task := range taskCh {
+				statsURL := getPopStatsURL(task.pop.Config.WSURL)
+				item := &types.PopMonitorItem{
+					ID:   task.id,
+					Name: task.pop.Config.Name,
+				}
 
-			statsURL := getPopStatsURL(popEntity.Config.WSURL)
-			item := &types.PopMonitorItem{
-				ID:   popID,
-				Name: popEntity.Config.Name,
+				popStats, err := l.fetchPopStats(statsURL)
+				if err != nil {
+					l.Errorf("PopMonitorLogic: Failed to fetch stats from POP %s (%s): %v", task.id, statsURL, err)
+					continue // Skip if fetch fails
+				}
+
+				// 如果 IP 总数为 0，则不返回
+				if popStats.TotalIPCount == 0 {
+					continue
+				}
+
+				item.UsedIPCount = popStats.AssignedIPCount
+				item.IdleIPCount = popStats.FreeIPCount
+				item.IdleIPRatio = (float64(popStats.FreeIPCount) / float64(popStats.TotalIPCount)) * 100.0
+
+				mu.Lock()
+				items = append(items, item)
+				mu.Unlock()
 			}
-
-			popStats, err := l.fetchPopStats(statsURL)
-			if err != nil {
-				l.Errorf("PopMonitorLogic: Failed to fetch stats from POP %s (%s): %v", popID, statsURL, err)
-				return // Skip if fetch fails
-			}
-
-			// 如果 IP 总数为 0，则不返回
-			if popStats.TotalIPCount == 0 {
-				return
-			}
-
-			item.UsedIPCount = popStats.AssignedIPCount
-			item.IdleIPCount = popStats.FreeIPCount
-			item.IdleIPRatio = (float64(popStats.FreeIPCount) / float64(popStats.TotalIPCount)) * 100.0
-
-			mu.Lock()
-			items = append(items, item)
-			mu.Unlock()
-		}(id, pop)
+		}()
 	}
 
 	wg.Wait()
@@ -111,6 +132,13 @@ func (l *PopMonitorLogic) PopMonitor(req *types.PopMonitorReq) (resp *types.PopM
 	} else {
 		filtered = items
 	}
+
+	// Sort filtered items by UsedIPCount + IdleIPCount in ascending order (从小到大)
+	sort.Slice(filtered, func(i, j int) bool {
+		sumI := filtered[i].UsedIPCount + filtered[i].IdleIPCount
+		sumJ := filtered[j].UsedIPCount + filtered[j].IdleIPCount
+		return sumI < sumJ
+	})
 
 	return &types.PopMonitorResp{Pops: filtered}, nil
 }
