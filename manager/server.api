@@ -262,6 +262,7 @@ type (
 		UsedIPCount int     `json:"used_ip_count"`
 		IdleIPCount int     `json:"idle_ip_count"`
 		IdleIPRatio float64 `json:"idle_ip_ratio"`
+		TotalIPCount int    `json:"total_ip_count"`
 	}
 	PopMonitorReq {
 		IdleThreshold float64  `form:"idle_threshold,optional"`
@@ -376,9 +377,13 @@ type (
 		Count     int    `json:"count"`
 		FromHead  bool   `json:"from_head"`
 	}
+	NodeIPPair {
+		ID string `json:"id"`
+		IP string `json:"ip"`
+	}
 	MigrateNodeListReq {
-		NodeIds   []string `json:"node_ids"`
-		TargetPop string   `json:"target_pop"`
+		Nodes     []NodeIPPair `json:"nodes"`
+		TargetPop string       `json:"target_pop"`
 	}
 )
 

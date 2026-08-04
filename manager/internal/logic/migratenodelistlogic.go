@@ -34,28 +34,33 @@ func (l *MigrateNodeListLogic) MigrateNodeList(req *types.MigrateNodeListReq) (r
 		return &types.UserOperationResp{Success: false, ErrMsg: "target pop not found"}, nil
 	}
 
-	if len(req.NodeIds) == 0 {
+	if len(req.Nodes) == 0 {
 		return &types.UserOperationResp{Success: true}, nil
 	}
 
-	if len(req.NodeIds) > maxMigrateNodeListSize {
-		return &types.UserOperationResp{Success: false, ErrMsg: fmt.Sprintf("node ids list exceeds maximum limit of %d", maxMigrateNodeListSize)}, nil
+	if len(req.Nodes) > maxMigrateNodeListSize {
+		return &types.UserOperationResp{Success: false, ErrMsg: fmt.Sprintf("nodes list exceeds maximum limit of %d", maxMigrateNodeListSize)}, nil
 	}
 
+	nodeIDs := make([]string, 0, len(req.Nodes))
+	for _, nodeItem := range req.Nodes {
+		nodeIDs = append(nodeIDs, nodeItem.ID)
+	}
 
+	nodePopMap, err := model.GetNodePopIPs(l.svcCtx.Redis, nodeIDs)
+	if err != nil {
+		logx.Errorf("failed to batch get pop for nodes: %v", err)
+		return &types.UserOperationResp{Success: false, ErrMsg: "failed to retrieve source pop info: " + err.Error()}, nil
+	}
 
 	// 1. Group nodes by their current Pop ID
 	// Group format: sourcePopID -> map[nodeID]ip
 	groups := make(map[string]map[string]string)
 
-	for _, nodeID := range req.NodeIds {
-		popBytes, ipBytes, _, err := model.GetNodePopIP(l.svcCtx.Redis, nodeID)
-		if err != nil {
-			logx.Errorf("failed to get pop and ip for node %s: %v", nodeID, err)
-			continue
-		}
-		popID := string(popBytes)
-		ip := string(ipBytes)
+	for _, nodeItem := range req.Nodes {
+		nodeID := nodeItem.ID
+		ip := nodeItem.IP
+		popID := nodePopMap[nodeID]
 
 		if len(popID) == 0 || len(ip) == 0 {
 			logx.Errorf("node %s has empty pop (%s) or ip (%s)", nodeID, popID, ip)

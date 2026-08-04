@@ -98,6 +98,7 @@ func (l *PopMonitorLogic) PopMonitor(req *types.PopMonitorReq) (resp *types.PopM
 				item.UsedIPCount = popStats.AssignedIPCount
 				item.IdleIPCount = popStats.FreeIPCount
 				item.IdleIPRatio = (float64(popStats.FreeIPCount) / float64(popStats.TotalIPCount)) * 100.0
+				item.TotalIPCount = popStats.TotalIPCount
 
 				mu.Lock()
 				items = append(items, item)
@@ -133,11 +134,9 @@ func (l *PopMonitorLogic) PopMonitor(req *types.PopMonitorReq) (resp *types.PopM
 		filtered = items
 	}
 
-	// Sort filtered items by UsedIPCount + IdleIPCount in ascending order (从小到大)
+	// Sort filtered items by total IP count in ascending order
 	sort.Slice(filtered, func(i, j int) bool {
-		sumI := filtered[i].UsedIPCount + filtered[i].IdleIPCount
-		sumJ := filtered[j].UsedIPCount + filtered[j].IdleIPCount
-		return sumI < sumJ
+		return filtered[i].TotalIPCount < filtered[j].TotalIPCount
 	})
 
 	return &types.PopMonitorResp{Pops: filtered}, nil

@@ -65,6 +65,30 @@ func GetNodePopIP(red *redis.Redis, nodeID string) ([]byte, []byte, []byte, erro
 	return []byte(vs[0]), nil, nil, nil
 }
 
+// GetNodePopIPs returns a map of nodeID -> popID using a batch query (Hmget)
+func GetNodePopIPs(red *redis.Redis, nodeIDs []string) (map[string]string, error) {
+	if len(nodeIDs) == 0 {
+		return nil, nil
+	}
+
+	vals, err := red.Hmget(redisKeyNodes, nodeIDs...)
+	if err != nil {
+		return nil, err
+	}
+
+	nodePopMap := make(map[string]string)
+	for i, val := range vals {
+		if len(val) > 0 {
+			vs := strings.Split(val, ":")
+			if len(vs) > 0 && len(vs[0]) > 0 {
+				nodePopMap[nodeIDs[i]] = vs[0]
+			}
+		}
+	}
+
+	return nodePopMap, nil
+}
+
 func DeleteNode(redis *redis.Redis, nodeID string) error {
 	popID, _, _, err := GetNodePopIP(redis, nodeID)
 	if err != nil {

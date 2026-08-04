@@ -158,9 +158,14 @@ type LoginResp struct {
 	Token string `json:"token"`
 }
 
+type NodeIPPair struct {
+	ID string `json:"id"`
+	IP string `json:"ip"`
+}
+
 type MigrateNodeListReq struct {
-	NodeIds   []string `json:"node_ids"`
-	TargetPop string   `json:"target_pop"`
+	Nodes     []NodeIPPair `json:"nodes"`
+	TargetPop string       `json:"target_pop"`
 }
 
 type MigrateNodesReq struct {
@@ -200,11 +205,12 @@ type Pop struct {
 }
 
 type PopMonitorItem struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	UsedIPCount int     `json:"used_ip_count"`
-	IdleIPCount int     `json:"idle_ip_count"`
-	IdleIPRatio float64 `json:"idle_ip_ratio"`
+	ID           string  `json:"id"`
+	Name         string  `json:"name"`
+	UsedIPCount  int     `json:"used_ip_count"`
+	IdleIPCount  int     `json:"idle_ip_count"`
+	IdleIPRatio  float64 `json:"idle_ip_ratio"`
+	TotalIPCount int     `json:"total_ip_count"`
 }
 
 type PopMonitorReq struct {
