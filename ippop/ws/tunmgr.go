@@ -65,6 +65,8 @@ type TunnelManager struct {
 	acceptLocks []sync.Mutex
 	// 会话性能数据收集器
 	perfCollector *SessionPerfCollector
+
+	kickIPChan chan string
 }
 
 func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
@@ -82,6 +84,7 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 		ipPool:        NewIPPool(),
 		acceptLocks:   make([]sync.Mutex, acceptLockShards),
 		perfCollector: NewSessionPerfCollector(config.ClickHouse, config.GetNodeID()),
+		kickIPChan:    make(chan string, 1000),
 	}
 
 	tm.sessionManager = NewSessionManager(tm, userSessionExpireDuration)
@@ -101,6 +104,7 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 	}
 	go tm.perfCollector.Start()
 	go tm.syncBlacklistLoop()
+	go tm.kickIPsWorker()
 	return tm
 }
 
@@ -724,4 +728,37 @@ func (tm *TunnelManager) addUserTrafficStats(user string, downloadTraffic int64,
 	if tm.config.TrafficStats.EnableUserTraffic {
 		tm.userTraffic.add(user, downloadTraffic+uploadTraffic)
 	}
+}
+
+func (tm *TunnelManager) kickIPsWorker() {
+	for ip := range tm.kickIPChan {
+		tm.processKickIP(ip)
+	}
+}
+
+func (tm *TunnelManager) processKickIP(ip string) {
+	// 1. Deactivate in pool first to prevent new assignments
+	tm.ipPool.DeactivateIP(ip)
+
+	// 2. Check if the IP is currently assigned to a user session
+	exists, isAssigned := tm.ipPool.GetIPAssignmentStatus(ip)
+	if !exists {
+		return
+	}
+
+	if isAssigned {
+		logx.Infof("IP %s is currently assigned to a session, skipping kick until released", ip)
+		return
+	}
+
+	// 3. If not assigned, get all tunnels for this IP and kick
+	tunnels := tm.ipPool.GetTunnelsByIP(ip)
+	for _, t := range tunnels {
+		logx.Infof("IP %s is not assigned, kicking tunnel %s", ip, t.opts.Id)
+		t.waitClose()
+	}
+}
+
+func (tm *TunnelManager) GetKickQueueLength() int {
+	return len(tm.kickIPChan)
 }

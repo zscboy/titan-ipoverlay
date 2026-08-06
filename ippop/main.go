@@ -32,6 +32,7 @@ func newWS(config config.Config, tunMgr *ws.TunnelManager) *rest.Server {
 	uploadTest := ws.NewUploadTestHandler(tunMgr)
 	nodeList := ws.NewNodeListQuery(tunMgr)
 	qosHandler := ws.NewQoSHandler(tunMgr)
+	kickHandler := ws.NewKickHandler(tunMgr)
 
 	// ws routes
 	server.AddRoute(rest.Route{
@@ -95,6 +96,16 @@ func newWS(config config.Config, tunMgr *ws.TunnelManager) *rest.Server {
 		Method:  "POST",
 		Path:    "/api/qos/blacklist/clear",
 		Handler: qosHandler.ServeBlacklistClear,
+	})
+	server.AddRoute(rest.Route{
+		Method:  "POST",
+		Path:    "/api/qos/kick",
+		Handler: kickHandler.ServeKickIPs,
+	}, jwtMiddleware)
+	server.AddRoute(rest.Route{
+		Method:  "GET",
+		Path:    "/api/qos/kick/queue",
+		Handler: kickHandler.ServeGetKickQueueLength,
 	})
 	server.AddRoute(rest.Route{
 		Method:  "GET",

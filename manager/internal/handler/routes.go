@@ -40,6 +40,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Handler: addIPBlacklistHandler(serverCtx),
 			},
 			{
+				Method:  http.MethodPost,
+				Path:    "/ip/blacklist/add/v2",
+				Handler: addIPBlacklistV2Handler(serverCtx),
+			},
+			{
 				Method:  http.MethodGet,
 				Path:    "/ip/blacklist/get",
 				Handler: getIPBlacklistHandler(serverCtx),

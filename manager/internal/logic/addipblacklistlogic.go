@@ -3,6 +3,7 @@ package logic
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"titan-ipoverlay/ippop/rpc/serverapi"
 	"titan-ipoverlay/manager/internal/svc"
@@ -52,12 +53,16 @@ func (l *AddIPBlacklistLogic) AddIPBlacklist(req *types.IPBlacklistReq) (resp *t
 		return &types.UserOperationResp{ErrMsg: fmt.Sprintf("pop %s not found", req.PopID)}, nil
 	}
 
-	_, err = server.API.KickNodeByIP(l.ctx, &serverapi.KickNodeByIPReq{
+	startTime := time.Now()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	_, err = server.API.KickNodeByIP(ctx, &serverapi.KickNodeByIPReq{
 		IpList: req.IPList,
 	})
 	if err != nil {
-		logx.Errorf("KickNodeByIP failed for pop %s: %v", req.PopID, err)
-		return &types.UserOperationResp{ErrMsg: fmt.Sprintf("Add blacklist success but kick node failed: %v", err)}, nil
+		logx.Errorf("KickNodeByIP failed for pop %s: %v, kick ips cost time:%v", req.PopID, err, time.Since(startTime))
+		return &types.UserOperationResp{ErrMsg: fmt.Sprintf("Add blacklist success but kick node failed: %v,  kick ips cost time:%v", err, time.Since(startTime))}, nil
 	}
 
 	return &types.UserOperationResp{Success: true}, nil
