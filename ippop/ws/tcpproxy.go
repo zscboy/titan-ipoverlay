@@ -43,6 +43,7 @@ func newTCPProxy(id string, conn net.Conn, t *Tunnel, userName, targetDomain, co
 
 func (proxy *TCPProxy) close() {
 	proxy.closeOnce.Do(func() {
+		logx.Infof("[ProxySession: %s] TCPProxy.close: closing connection for user %s, upload: %d, download: %d", proxy.id, proxy.userName, proxy.uploadTraffic, proxy.downloadTraffic)
 		if proxy.conn != nil {
 			proxy.conn.Close()
 		}
@@ -78,23 +79,25 @@ func (proxy *TCPProxy) close() {
 	})
 }
 
-func (proxy *TCPProxy) closeByClient() {
+func (proxy *TCPProxy) closeByIotClient() {
+	logx.Infof("[ProxySession: %s] TCPProxy.closeByClient: connection closed by iot client", proxy.id)
 	proxy.isCloseByClient = true
 	proxy.close()
 }
 
 func (proxy *TCPProxy) closeWrite() error {
 	if proxy.conn == nil {
-		logx.Errorf("session %s conn == nil", proxy.id)
+		logx.Errorf("[ProxySession: %s] CloseWrite failed: conn is nil", proxy.id)
 		return fmt.Errorf("session %s conn == nil", proxy.id)
 	}
 
 	conn := proxy.conn
 	if tcpConn, ok := conn.(*net.TCPConn); ok {
 		if err := tcpConn.CloseWrite(); err != nil {
-			logx.Errorf("session %s CloseWrite failed: %v", proxy.id, err)
+			logx.Errorf("[ProxySession: %s] CloseWrite failed: %v", proxy.id, err)
 			return err
 		}
+		logx.Infof("[ProxySession: %s] CloseWrite: write direction closed successfully", proxy.id)
 	}
 
 	return nil
@@ -120,6 +123,7 @@ func (proxy *TCPProxy) write(data []byte, t2StartTime time.Time) error {
 	// T3: IPPop → 用户（SOCKS5 写入）
 	_, err := proxy.conn.Write(data)
 	if err != nil {
+		logx.Errorf("[ProxySession: %s] SOCKS5 write error: %v", proxy.id, err)
 		return err
 	}
 
@@ -148,11 +152,11 @@ func (proxy *TCPProxy) waitHalfCloseTimeout() {
 	for {
 		select {
 		case <-proxy.done:
-			logx.Debugf("proxy waitHalfCloseTimeout exit")
+			logx.Infof("[ProxySession: %s] waitHalfCloseTimeout exit", proxy.id)
 			return
 		case <-ticker.C:
 			if time.Since(proxy.activeTime) > timeout {
-				logx.Errorf("session %s half-close idle timeout %f, will delete it", proxy.id, time.Since(proxy.activeTime).Seconds())
+				logx.Errorf("[ProxySession: %s] half-close idle timeout %f, will delete it", proxy.id, time.Since(proxy.activeTime).Seconds())
 				proxy.tunnel.onProxyTCPConnClose(proxy.id)
 				proxy.close()
 				return
@@ -171,14 +175,14 @@ func (proxy *TCPProxy) proxyConn() error {
 
 		if err != nil {
 			if err == io.EOF && proxy.tunnel.isNodeVersionGreatThanV100() {
-				logx.Infof("session %s: SOCKS5 client closed write direction (EOF)", proxy.id)
+				logx.Infof("[ProxySession: %s] SOCKS5 client closed write direction (EOF)", proxy.id)
 
 				proxy.tunnel.onProxyTCPConnHalfClose(proxy.id)
 				go proxy.waitHalfCloseTimeout()
 				return nil
 			}
 
-			logx.Infof("Tunnel %s proxy.proxyConn error user %s session %s: %v", proxy.tunnel.opts.Id, proxy.userName, proxy.id, err)
+			logx.Infof("[ProxySession: %s] Tunnel %s proxy.proxyConn error user %s: %v", proxy.id, proxy.tunnel.opts.Id, proxy.userName, err)
 			if !proxy.isCloseByClient {
 				proxy.tunnel.onProxyTCPConnClose(proxy.id)
 			}

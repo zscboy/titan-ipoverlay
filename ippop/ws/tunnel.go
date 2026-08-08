@@ -418,15 +418,15 @@ func (t *Tunnel) onProxySessionCreateReply(sessionID string, payload []byte) err
 	return nil
 }
 func (t *Tunnel) onProxySessionClose(sessionID string) error {
-	logx.Debugf("Tunnel %s %s onProxySessionClose, session id: %s", t.opts.Id, t.opts.IP, sessionID)
+	logx.Infof("[ProxySession: %s] Tunnel %s %s onProxySessionClose", sessionID, t.opts.Id, t.opts.IP)
 	v, load := t.proxys.LoadAndDelete(sessionID)
 	if !load {
-		logx.Debugf("Tunnel %s %s onProxySessionClose, can not found session %s", t.opts.Id, t.opts.IP, sessionID)
+		logx.Debugf("[ProxySession: %s] Tunnel %s %s onProxySessionClose, cannot find session", sessionID, t.opts.Id, t.opts.IP)
 		return nil
 	}
 
 	session := v.(*TCPProxy)
-	session.closeByClient()
+	session.closeByIotClient()
 	return nil
 }
 
@@ -483,7 +483,7 @@ func (t *Tunnel) closeRemoteSession(sessionID string) {
 }
 
 func (t *Tunnel) onProxyTCPConnClose(sessionID string) {
-	logx.Debugf("Tunnel %s %s onProxyTCPConnClose, session id: %s", t.opts.Id, t.opts.IP, sessionID)
+	logx.Infof("[ProxySession: %s] Tunnel %s %s onProxyTCPConnClose", sessionID, t.opts.Id, t.opts.IP)
 	if _, loaded := t.proxys.LoadAndDelete(sessionID); !loaded {
 		return // already closed
 	}
@@ -495,12 +495,12 @@ func (t *Tunnel) onProxyTCPConnClose(sessionID string) {
 
 	buf, err := proto.Marshal(msg)
 	if err != nil {
-		logx.Errorf("Tunnel %s %s onProxyConnClose, EncodeMessage failed:%s", t.opts.Id, t.opts.IP, err.Error())
+		logx.Errorf("[ProxySession: %s] Tunnel %s %s onProxyConnClose, EncodeMessage failed:%s", sessionID, t.opts.Id, t.opts.IP, err.Error())
 		return
 	}
 
 	if err = t.write(buf); err != nil {
-		logx.Errorf("Tunnel %s %s onProxyConnClose, write message to tunnel failed:%s", t.opts.Id, t.opts.IP, err.Error())
+		logx.Errorf("[ProxySession: %s] Tunnel %s %s onProxyConnClose, write message to tunnel failed:%s", sessionID, t.opts.Id, t.opts.IP, err.Error())
 	}
 }
 
@@ -540,8 +540,8 @@ func (t *Tunnel) onProxyDataFromProxy(sessionID string, data []byte) {
 
 }
 
-func (t *Tunnel) acceptSocks5TCPConn(conn net.Conn, targetInfo *socks5.SocksTargetInfo) error {
-	logx.Debugf("acceptSocks5TCPConn, dest %s:%d", targetInfo.DomainName, targetInfo.Port)
+func (t *Tunnel) acceptSocks5TCPConn(conn net.Conn, targetInfo *socks5.SocksTargetInfo, sessionID string) error {
+	logx.Infof("[ProxySession: %s] acceptSocks5TCPConn: start connection setup to dest %s:%d", sessionID, targetInfo.DomainName, targetInfo.Port)
 	if t.proxys.Count() == 0 {
 		now := time.Now()
 		t.trafficStats.ReadStartTime.Store(&now)
@@ -555,7 +555,6 @@ func (t *Tunnel) acceptSocks5TCPConn(conn net.Conn, targetInfo *socks5.SocksTarg
 		targetIdentifier = "unknown"
 	}
 
-	sessionID := uuid.NewString()
 	proxyTCP := newTCPProxy(sessionID, conn, t, targetInfo.Username, targetIdentifier, t.opts.CountryCode)
 
 	t.proxys.Store(sessionID, proxyTCP)
@@ -564,13 +563,16 @@ func (t *Tunnel) acceptSocks5TCPConn(conn net.Conn, targetInfo *socks5.SocksTarg
 	err := t.createClientWithDest(&pb.DestAddr{Addr: addr}, sessionID)
 	if err != nil {
 		t.proxys.Delete(sessionID)
+		logx.Errorf("[ProxySession: %s] Tunnel.acceptSocks5TCPConn client create by Domain failed, user:%s, cost:%dms, addr:%s, err:%v, tun:%s ip:%s", sessionID, targetInfo.Username, time.Since(now).Milliseconds(), addr, err, t.opts.Id, t.opts.IP)
 		return fmt.Errorf("Tunnel.acceptSocks5TCPConn client create by Domain failed, user:%s, socks5-session:%s, cost:%dms, addr:%s, err:%v, tun:%s ip:%s tunnel-session:%s", targetInfo.Username, targetInfo.Session, time.Since(now).Milliseconds(), addr, err, t.opts.Id, t.opts.IP, sessionID)
 	}
 
 	if len(targetInfo.ExtraBytes) > 0 {
+		logx.Infof("[ProxySession: %s] forwarding %d bytes of initial targetInfo.ExtraBytes to proxy", sessionID, len(targetInfo.ExtraBytes))
 		t.onProxyDataFromProxy(sessionID, targetInfo.ExtraBytes)
 	}
 
+	logx.Infof("[ProxySession: %s] acceptSocks5TCPConn: setup successful, starting proxy transfer loop", sessionID)
 	return proxyTCP.proxyConn()
 }
 

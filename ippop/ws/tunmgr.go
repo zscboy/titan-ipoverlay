@@ -18,6 +18,7 @@ import (
 	"titan-ipoverlay/ippop/types"
 
 	"github.com/bluele/gcache"
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/stores/redis"
@@ -464,8 +465,10 @@ func (tm *TunnelManager) getTunnelByUser(user *model.User) (*Tunnel, error) {
 // have been moved to tunmgr_alloc.go and tunmgr_rpc.go respectively.
 
 func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks5.SocksTargetInfo) (err error) {
-	logx.Debugf("HandleSocks5TCP, user %s, DomainName %s, port %d, remote:%s, connCount:%d, connTime:%d",
-		targetInfo.Username, targetInfo.DomainName, targetInfo.Port, tcpConn.RemoteAddr().String(), tm.socks5ConnCount.Load(), time.Since(targetInfo.ConnCreateTime).Milliseconds())
+	proxySessionID := uuid.NewString()
+
+	logx.Infof("[ProxySession: %s] HandleSocks5TCP start: user %s, DomainName %s, port %d, remote:%s, connCount:%d, connTime:%d",
+		proxySessionID, targetInfo.Username, targetInfo.DomainName, targetInfo.Port, tcpConn.RemoteAddr().String(), tm.socks5ConnCount.Load(), time.Since(targetInfo.ConnCreateTime).Milliseconds())
 	if targetInfo.SessTime > maxUserIPSessionIdleTime {
 		targetInfo.SessTime = maxUserIPSessionIdleTime
 	}
@@ -481,12 +484,14 @@ func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks
 
 	if tm.filterRules.isDeny(targetInfo.DomainName, fmt.Sprintf("%d", targetInfo.Port)) {
 		tm.reportSOCKS5Error("policy_deny")
+		logx.Errorf("[ProxySession: %s] tcp: target %s:%d has been denied by filter rules", proxySessionID, targetInfo.DomainName, targetInfo.Port)
 		return fmt.Errorf("tcp: target %s:%d have been deny", targetInfo.DomainName, targetInfo.Port)
 	}
 
 	user, err := tm.getUserFromCache(targetInfo.Username)
 	if err != nil {
 		tm.reportSOCKS5Error("internal_error")
+		logx.Errorf("[ProxySession: %s] failed to get user %s from cache: %v", proxySessionID, targetInfo.Username, err)
 		return err
 	}
 
@@ -494,33 +499,41 @@ func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks
 	allocator := tm.allocatorRegistry.Get(mode)
 	if allocator == nil {
 		tm.reportSOCKS5Error("invalid_mode")
+		logx.Errorf("[ProxySession: %s] no allocator found for mode %v", proxySessionID, mode)
 		return fmt.Errorf("no allocator for mode %v", mode)
 	}
 
 	tun, userSession, err := allocator.Allocate(user, targetInfo)
 	if err != nil {
 		tm.reportSOCKS5Error("allocate_fail")
+		logx.Errorf("[ProxySession: %s] allocator failed to allocate: %v", proxySessionID, err)
 		return err
 	}
 
 	if tun == nil {
 		tm.reportSOCKS5Error("no_node_available")
+		logx.Errorf("[ProxySession: %s] no tunnel node available for user %s", proxySessionID, targetInfo.Username)
 		return fmt.Errorf("can not allocate tunnel, user %s", targetInfo.Username)
 	}
 
-	logx.Infof("HandleSocks5TCP: user %s session [%s] region [%s] sessionTime [%f s] allocated on node %s, target %s:%d, remote %s", targetInfo.Username, targetInfo.Session, targetInfo.Region, targetInfo.SessTime.Seconds(), tun.opts.Id, targetInfo.DomainName, targetInfo.Port, tcpConn.RemoteAddr().String())
+	logx.Infof("[ProxySession: %s] HandleSocks5TCP: user %s session [%s] region [%s] sessionTime [%f s] allocated on node %s, target %s:%d, remote %s",
+		proxySessionID, targetInfo.Username, targetInfo.Session, targetInfo.Region, targetInfo.SessTime.Seconds(), tun.opts.Id, targetInfo.DomainName, targetInfo.Port, tcpConn.RemoteAddr().String())
 
 	if userSession != nil {
 		defer tm.sessionManager.Decrement(userSession)
 	}
 
-	err = tun.acceptSocks5TCPConn(tcpConn, targetInfo)
+	err = tun.acceptSocks5TCPConn(tcpConn, targetInfo, proxySessionID)
 	if err != nil {
 		if userSession != nil {
 			userSession.ReportError()
 		}
-	} else if userSession != nil {
-		userSession.ResetError()
+		logx.Errorf("[ProxySession: %s] acceptSocks5TCPConn failed: %v", proxySessionID, err)
+	} else {
+		if userSession != nil {
+			userSession.ResetError()
+		}
+		logx.Infof("[ProxySession: %s] acceptSocks5TCPConn completed successfully", proxySessionID)
 	}
 	return err
 }
