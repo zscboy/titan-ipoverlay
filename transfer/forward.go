@@ -10,12 +10,20 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/zeromicro/go-zero/core/logx"
 )
 
 func ConnectBackend(backend BackendInfo, targetHost string, targetPort int, clientUsername, clientPassword string) (net.Conn, error) {
 	dialer := net.Dialer{Timeout: 10 * time.Second}
 	conn, err := dialer.Dial("tcp", backend.Addr)
 	if err != nil {
+		errStr := err.Error()
+		if strings.Contains(errStr, "too many open files") {
+			logx.Errorf("CRITICAL: File descriptor limit reached (too many open files) on ConnectBackend Dial: %v", err)
+		} else if strings.Contains(errStr, "cannot assign requested address") || strings.Contains(errStr, "EADDRNOTAVAIL") {
+			logx.Errorf("CRITICAL: Local port exhaustion (cannot assign requested address) on ConnectBackend Dial: %v", err)
+		}
 		return nil, fmt.Errorf("failed to dial backend %s: %v", backend.Addr, err)
 	}
 

@@ -54,7 +54,12 @@ func (s *Socks5Server) acceptLoop() {
 			if strings.Contains(err.Error(), "use of closed network connection") {
 				return
 			}
-			logx.Errorf("SOCKS5 Accept error: %v", err)
+			errStr := err.Error()
+			if strings.Contains(errStr, "too many open files") {
+				logx.Errorf("CRITICAL: File descriptor limit reached (too many open files) on SOCKS5 Accept: %v", err)
+			} else {
+				logx.Errorf("SOCKS5 Accept error: %v", err)
+			}
 			continue
 		}
 		go s.handleConn(conn)

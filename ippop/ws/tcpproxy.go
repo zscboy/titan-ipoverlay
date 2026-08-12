@@ -43,7 +43,7 @@ func newTCPProxy(id string, conn net.Conn, t *Tunnel, userName, targetDomain, co
 
 func (proxy *TCPProxy) close() {
 	proxy.closeOnce.Do(func() {
-		logx.Infof("[ProxySession: %s] TCPProxy.close: closing connection for user %s, upload: %d, download: %d", proxy.id, proxy.userName, proxy.uploadTraffic, proxy.downloadTraffic)
+		// logx.Infof("[ProxySession: %s] TCPProxy.close: closing connection for user %s, upload: %d, download: %d", proxy.id, proxy.userName, proxy.uploadTraffic, proxy.downloadTraffic)
 		if proxy.conn != nil {
 			proxy.conn.Close()
 		}

@@ -541,7 +541,7 @@ func (t *Tunnel) onProxyDataFromProxy(sessionID string, data []byte) {
 }
 
 func (t *Tunnel) acceptSocks5TCPConn(conn net.Conn, targetInfo *socks5.SocksTargetInfo, sessionID string) error {
-	logx.Infof("[ProxySession: %s] acceptSocks5TCPConn: start connection setup to dest %s:%d", sessionID, targetInfo.DomainName, targetInfo.Port)
+	// logx.Infof("[ProxySession: %s] acceptSocks5TCPConn: start connection setup to dest %s:%d", sessionID, targetInfo.DomainName, targetInfo.Port)
 	if t.proxys.Count() == 0 {
 		now := time.Now()
 		t.trafficStats.ReadStartTime.Store(&now)
@@ -572,7 +572,7 @@ func (t *Tunnel) acceptSocks5TCPConn(conn net.Conn, targetInfo *socks5.SocksTarg
 		t.onProxyDataFromProxy(sessionID, targetInfo.ExtraBytes)
 	}
 
-	logx.Infof("[ProxySession: %s] acceptSocks5TCPConn: setup successful, starting proxy transfer loop", sessionID)
+	// logx.Infof("[ProxySession: %s] acceptSocks5TCPConn: setup successful, starting proxy transfer loop", sessionID)
 	return proxyTCP.proxyConn()
 }
 

@@ -467,8 +467,8 @@ func (tm *TunnelManager) getTunnelByUser(user *model.User) (*Tunnel, error) {
 func (tm *TunnelManager) HandleSocks5TCP(tcpConn *net.TCPConn, targetInfo *socks5.SocksTargetInfo) (err error) {
 	proxySessionID := uuid.NewString()
 
-	logx.Infof("[ProxySession: %s] HandleSocks5TCP start: user %s, DomainName %s, port %d, remote:%s, connCount:%d, connTime:%d",
-		proxySessionID, targetInfo.Username, targetInfo.DomainName, targetInfo.Port, tcpConn.RemoteAddr().String(), tm.socks5ConnCount.Load(), time.Since(targetInfo.ConnCreateTime).Milliseconds())
+	// logx.Infof("[ProxySession: %s] HandleSocks5TCP start: user %s, DomainName %s, port %d, remote:%s, connCount:%d, connTime:%d",
+	// proxySessionID, targetInfo.Username, targetInfo.DomainName, targetInfo.Port, tcpConn.RemoteAddr().String(), tm.socks5ConnCount.Load(), time.Since(targetInfo.ConnCreateTime).Milliseconds())
 	if targetInfo.SessTime > maxUserIPSessionIdleTime {
 		targetInfo.SessTime = maxUserIPSessionIdleTime
 	}
