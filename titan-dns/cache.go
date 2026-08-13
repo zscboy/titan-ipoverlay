@@ -10,75 +10,85 @@ type CacheItem struct {
 	CreatedAt time.Time
 }
 
+const (
+	cleanupInterval  = 10 * time.Minute
+	cleanupBatchSize = 5000
+)
+
 type StickyCache struct {
-	mu    sync.RWMutex
-	items map[string]CacheItem
+	items sync.Map // stores key (string) -> CacheItem
 	ttl   time.Duration
 }
 
 func NewStickyCache(ttlSeconds int) *StickyCache {
 	sc := &StickyCache{
-		items: make(map[string]CacheItem),
-		ttl:   time.Duration(ttlSeconds) * time.Second,
+		ttl: time.Duration(ttlSeconds) * time.Second,
 	}
 	go sc.cleanupTask()
 	return sc
 }
 
 func (c *StickyCache) Get(key string) (string, bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	for {
+		val, ok := c.items.Load(key)
+		if !ok {
+			return "", false
+		}
 
-	item, ok := c.items[key]
-	if !ok {
-		return "", false
+		item := val.(CacheItem)
+		if time.Since(item.CreatedAt) > c.ttl {
+			return "", false
+		}
+
+		// Slide expiration time while preserving the current IP
+		newItem := CacheItem{
+			IP:        item.IP,
+			CreatedAt: time.Now(),
+		}
+		if c.items.CompareAndSwap(key, val, newItem) {
+			return item.IP, true
+		}
+		// If CAS fails (due to concurrent Set or other Get), retry the load-update cycle
 	}
-
-	if time.Since(item.CreatedAt) > c.ttl {
-		delete(c.items, key)
-		return "", false
-	}
-
-	// Update CreatedAt to reset effective life time
-	item.CreatedAt = time.Now()
-	c.items[key] = item
-
-	return item.IP, true
 }
 
 func (c *StickyCache) Set(key, ip string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	c.items[key] = CacheItem{
+	c.items.Store(key, CacheItem{
 		IP:        ip,
 		CreatedAt: time.Now(),
-	}
+	})
 }
 
 // RemoveByPop clears all cache entries belonging to a specific POP node.
 func (c *StickyCache) RemoveByPop(popID string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	importSuffix := "." + popID
-	for k := range c.items {
+	c.items.Range(func(keyGen, valGen any) bool {
+		k := keyGen.(string)
 		// If key is exactly the popID or ends with .popID, remove it
 		if k == popID || (len(k) > len(importSuffix) && k[len(k)-len(importSuffix):] == importSuffix) {
-			delete(c.items, k)
+			c.items.Delete(k)
 		}
-	}
+		return true
+	})
 }
 
 func (c *StickyCache) cleanupTask() {
-	ticker := time.NewTicker(1 * time.Hour)
+	ticker := time.NewTicker(cleanupInterval)
 	for range ticker.C {
-		c.mu.Lock()
-		for k, v := range c.items {
+		counter := 0
+		c.items.Range(func(keyGen, valGen any) bool {
+			k := keyGen.(string)
+			v := valGen.(CacheItem)
 			if time.Since(v.CreatedAt) > c.ttl {
-				delete(c.items, k)
+				c.items.Delete(k)
 			}
-		}
-		c.mu.Unlock()
+
+			counter++
+			if counter%cleanupBatchSize == 0 {
+				// Yield CPU to distribute the cleanup load (1ms sleep every cleanupBatchSize items scanned)
+				time.Sleep(1 * time.Millisecond)
+			}
+			return true
+		})
 	}
 }
