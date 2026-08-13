@@ -19,10 +19,10 @@ type DNSHandler struct {
 	mu         sync.RWMutex // Changed to RWMutex for better concurrency
 	cache      *StickyCache
 	balancer   *LoadBalancer
-	offlineIPs *OfflineIPs  // Added for dynamic IP filtering
-	monitor    *TCPMonitor  // Reference to background health check monitor
-	stats      sync.Map     // domain -> *int64
-	logQueries int32        // 0: Stats mode, 1: Log mode
+	offlineIPs *OfflineIPs // Added for dynamic IP filtering
+	monitor    *TCPMonitor // Reference to background health check monitor
+	stats      sync.Map    // domain -> *int64
+	logQueries int32       // 0: Stats mode, 1: Log mode
 }
 
 func (h *DNSHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
@@ -147,7 +147,7 @@ func NewDNSHandler(cfg *Config, path string) (*DNSHandler, error) {
 	return &DNSHandler{
 		config:     cfg,
 		configPath: path,
-		cache:      NewStickyCache(cfg.Server.CacheTTL),
+		cache:      NewStickyCache(cfg.Server.CacheTTL, cfg.Server.CleanupIntervalSeconds),
 		balancer:   lb,
 		offlineIPs: NewOfflineIPs(),
 	}, nil

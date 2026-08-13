@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"sync"
 	"time"
 )
@@ -11,18 +12,24 @@ type CacheItem struct {
 }
 
 const (
-	cleanupInterval  = 10 * time.Minute
-	cleanupBatchSize = 5000
+	defaultCleanupInterval = 10 * time.Minute
+	cleanupBatchSize       = 5000
 )
 
 type StickyCache struct {
-	items sync.Map // stores key (string) -> CacheItem
-	ttl   time.Duration
+	items           sync.Map // stores key (string) -> CacheItem
+	ttl             time.Duration
+	cleanupInterval time.Duration
 }
 
-func NewStickyCache(ttlSeconds int) *StickyCache {
+func NewStickyCache(ttlSeconds int, cleanupIntervalSeconds int) *StickyCache {
+	interval := time.Duration(cleanupIntervalSeconds) * time.Second
+	if interval <= 0 {
+		interval = defaultCleanupInterval
+	}
 	sc := &StickyCache{
-		ttl: time.Duration(ttlSeconds) * time.Second,
+		ttl:             time.Duration(ttlSeconds) * time.Second,
+		cleanupInterval: interval,
 	}
 	go sc.cleanupTask()
 	return sc
@@ -73,22 +80,25 @@ func (c *StickyCache) RemoveByPop(popID string) {
 }
 
 func (c *StickyCache) cleanupTask() {
-	ticker := time.NewTicker(cleanupInterval)
+	ticker := time.NewTicker(c.cleanupInterval)
 	for range ticker.C {
-		counter := 0
+		totalCounter := 0
+		deleteCount := 0
 		c.items.Range(func(keyGen, valGen any) bool {
 			k := keyGen.(string)
 			v := valGen.(CacheItem)
 			if time.Since(v.CreatedAt) > c.ttl {
 				c.items.Delete(k)
+				deleteCount++
 			}
 
-			counter++
-			if counter%cleanupBatchSize == 0 {
+			totalCounter++
+			if totalCounter%cleanupBatchSize == 0 {
 				// Yield CPU to distribute the cleanup load (1ms sleep every cleanupBatchSize items scanned)
 				time.Sleep(1 * time.Millisecond)
 			}
 			return true
 		})
+		log.Printf("Clean cache items, fund %d, deleted %d", totalCounter, deleteCount)
 	}
 }

@@ -26,8 +26,9 @@ type ServerConfig struct {
 	Listen       string `yaml:"listen"`
 	DomainSuffix string `yaml:"domain_suffix"`
 	RecordTTL    int    `yaml:"record_ttl"` // TTL sent in DNS responses
-	CacheTTL     int    `yaml:"cache_ttl"`  // TTL for internal session cache
-	Secret       string `yaml:"secret"`     // Production grade secret for HMAC
+	CacheTTL               int    `yaml:"cache_ttl"`                // TTL for internal session cache
+	CleanupIntervalSeconds int    `yaml:"cleanup_interval_seconds"` // Interval for background cleanup task
+	Secret                 string `yaml:"secret"`                   // Production grade secret for HMAC
 }
 
 type PopConfig struct {
