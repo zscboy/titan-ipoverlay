@@ -82,13 +82,15 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 		userCache:   gcache.New(userCacheSize).LRU().Build(),
 		filterRules: &Rules{rules: RulesToMap(config.FilterRules.Rules), defaultAction: config.FilterRules.DefaultAction},
 
-		ipPool:        NewIPPool(),
-		acceptLocks:   make([]sync.Mutex, acceptLockShards),
-		perfCollector: NewSessionPerfCollector(config.ClickHouse, config.GetNodeID()),
-		kickIPChan:    make(chan string, 1000),
+		ipPool:      NewIPPool(),
+		acceptLocks: make([]sync.Mutex, acceptLockShards),
+		kickIPChan:  make(chan string, 1000),
 	}
 
 	tm.sessionManager = NewSessionManager(tm, userSessionExpireDuration)
+	tm.perfCollector = NewSessionPerfCollector(config.ClickHouse, config.GetNodeID(), tm.ipPool, tm.sessionManager)
+
+
 	tm.allocatorRegistry = NewAllocatorRegistry()
 	tm.allocatorRegistry.Register(model.RouteModeAuto, NewStaticAllocator(tm))
 	tm.allocatorRegistry.Register(model.RouteModeManual, NewStaticAllocator(tm))

@@ -120,9 +120,14 @@ type SessionPerfCollector struct {
 	db        *sql.DB
 	chEnabled bool
 	nodeID    string
+
+	ipPool         *IPPool
+	sessionManager *SessionManager
+
 	// 通道配置
 	chBufferChan chan *SessionPerfRecord // 无锁 channel buffer
 	metricsChan  chan *collectorEvent
+
 	// 采集协程内部状态
 	userSessions    map[string]int          // 维护用户 -> 会话数
 	metricsCache    map[string]*userMetrics // 缓存用户 Counter
@@ -132,19 +137,22 @@ type SessionPerfCollector struct {
 }
 
 // NewSessionPerfCollector 创建新的收集器
-func NewSessionPerfCollector(chConfig config.ClickHouse, nodeID string) *SessionPerfCollector {
+func NewSessionPerfCollector(chConfig config.ClickHouse, nodeID string, ipPool *IPPool, sm *SessionManager) *SessionPerfCollector {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	c := &SessionPerfCollector{
-		chEnabled:    chConfig.Enable,
-		nodeID:       nodeID,
-		chBufferChan: make(chan *SessionPerfRecord, maxBufferSize*2), // ClickHouse 记录缓冲，应对会话爆发
-		metricsChan:  make(chan *collectorEvent, 5000000),            // 500万缓冲区，应对 8Gbps 爆发
-		userSessions: make(map[string]int),
-		metricsCache: make(map[string]*userMetrics),
-		ctx:          ctx,
-		cancel:       cancel,
+		chEnabled:      chConfig.Enable,
+		nodeID:         nodeID,
+		ipPool:         ipPool,
+		sessionManager: sm,
+		chBufferChan:   make(chan *SessionPerfRecord, maxBufferSize*2), // ClickHouse 记录缓冲，应对会话爆发
+		metricsChan:    make(chan *collectorEvent, 5000000),            // 500万缓冲区，应对 8Gbps 爆发
+		userSessions:   make(map[string]int),
+		metricsCache:   make(map[string]*userMetrics),
+		ctx:            ctx,
+		cancel:         cancel,
 	}
+
 
 	// 初始化 ClickHouse 连接
 	if chConfig.Enable {
@@ -356,8 +364,34 @@ func (c *SessionPerfCollector) GetAggregator(userName string) *UserTrafficAggreg
 	return agg
 }
 
-// flushMetricsToPrometheus 定时将所有用户的原子累加值同步到 Prometheus
+// flushMetricsToPrometheus 定时将 IPPool、SessionManager 以及所有用户的原子累加值同步到 Prometheus
 func (c *SessionPerfCollector) flushMetricsToPrometheus() {
+	// 1. 同步 IPPool 指标
+	if c.ipPool != nil {
+		poolMetrics := c.ipPool.Metrics()
+		metrics.IPPoolTotalIPs.WithLabelValues(c.nodeID).Set(float64(poolMetrics.TotalIPCount))
+		metrics.IPPoolFreeIPs.WithLabelValues(c.nodeID).Set(float64(poolMetrics.FreeIPCount))
+		metrics.IPPoolTunnels.WithLabelValues(c.nodeID).Set(float64(poolMetrics.TunnelCount))
+	}
+
+	// 2. 同步 SessionManager 指标 (UserStickySessions & UserEphemeralIPs)
+	if c.sessionManager != nil {
+		stickyCounts := c.sessionManager.UserSessionCounts()
+		metrics.UserStickySessions.Reset()
+		for user, count := range stickyCounts {
+			sanitizedUser := c.sanitizeUser(user)
+			metrics.UserStickySessions.WithLabelValues(sanitizedUser, c.nodeID).Set(float64(count))
+		}
+
+		ephemeralCounts := c.sessionManager.EphemeralIPCounts()
+		metrics.UserEphemeralIPs.Reset()
+		for user, count := range ephemeralCounts {
+			sanitizedUser := c.sanitizeUser(user)
+			metrics.UserEphemeralIPs.WithLabelValues(sanitizedUser, c.nodeID).Set(float64(count))
+		}
+	}
+
+	// 3. 逐用户刷新流量与速率指标
 	c.userAggregators.Range(func(key, value any) bool {
 		userName := key.(string)
 		sanitizedUser := c.sanitizeUser(userName)

@@ -27,6 +27,8 @@ type SessionManager struct {
 	expireDuration time.Duration
 	source         NodeSource
 	maxErrorCount  int32
+
+	ephemeralIPs ephemeralIPCounter
 }
 
 func NewSessionManager(source NodeSource, expire time.Duration) *SessionManager {
@@ -140,6 +142,10 @@ func (sm *SessionManager) UserSessionCounts() map[string]int {
 	return counts
 }
 
+func (sm *SessionManager) EphemeralIPCounts() map[string]int64 {
+	return sm.ephemeralIPs.snapshot()
+}
+
 func (sm *SessionManager) Decrement(sess *UserSession) {
 	if sess == nil {
 		return
@@ -160,6 +166,7 @@ func (sm *SessionManager) Decrement(sess *UserSession) {
 			}
 			logx.Infof("SessionManager: immediate release ephemeral session for user %s, device %s", sess.username, sess.deviceID)
 			sm.source.ReleaseExclusiveNodes(nodes, ips)
+			sm.ephemeralIPs.dec(sess.username)
 			return
 		}
 
@@ -270,6 +277,7 @@ func (a *SessionAllocator) Allocate(user *model.User, target *socks5.SocksTarget
 			isEphemeral: true,
 		}
 		atomic.StoreInt32(&sess.connectCount, 1)
+		a.sm.ephemeralIPs.inc(user.UserName)
 		return tun, sess, nil
 	}
 

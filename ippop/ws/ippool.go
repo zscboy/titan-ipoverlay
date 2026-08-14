@@ -54,6 +54,12 @@ type PoolStats struct {
 	RegionFreeIPs    map[string]int   // Region -> Free IP count in regionFreeList
 }
 
+type IPPoolMetrics struct {
+	TotalIPCount int
+	FreeIPCount  int
+	TunnelCount  int
+}
+
 func NewIPPool() *IPPool {
 	return &IPPool{
 		allIPs:          make(map[string]*ipEntry),
@@ -404,6 +410,17 @@ func (p *IPPool) GetPoolStats() PoolStats {
 		LineNodes:        lineNodes,
 		RegionNodes:      regionNodes,
 		RegionFreeIPs:    regionFreeIPs,
+	}
+}
+
+func (p *IPPool) Metrics() IPPoolMetrics {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	return IPPoolMetrics{
+		TotalIPCount: len(p.allIPs),
+		FreeIPCount:  p.freeList.Len(),
+		TunnelCount:  p.tunnelCount,
 	}
 }
 

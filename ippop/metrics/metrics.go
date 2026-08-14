@@ -139,4 +139,32 @@ var (
 		Name: "ippop_traffic_by_country_bytes_total",
 		Help: "按国家/地区统计的流量总字节数",
 	}, []string{"user", "country", "node"})
+
+	// IPPool 指标
+	IPPoolTotalIPs = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "ippop_ippool_total_ips",
+		Help: "IPPool 中的 IP 总数",
+	}, []string{"node"})
+
+	IPPoolFreeIPs = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "ippop_ippool_free_ips",
+		Help: "IPPool 中的空闲 IP 数量",
+	}, []string{"node"})
+
+	IPPoolTunnels = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "ippop_ippool_tunnels",
+		Help: "IPPool 中的 Tunnel 数量",
+	}, []string{"node"})
+
+	// 会话与 IP 分配指标
+	UserStickySessions = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "ippop_user_sticky_sessions",
+		Help: "每用户当前持有的粘性会话数（独占 IP 数）",
+	}, []string{"user", "node"})
+
+	UserEphemeralIPs = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "ippop_user_ephemeral_ips",
+		Help: "每用户当前持有的临时独占 IP 数",
+	}, []string{"user", "node"})
 )
+
