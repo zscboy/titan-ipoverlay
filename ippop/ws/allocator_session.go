@@ -22,6 +22,7 @@ type sessionKey struct {
 type SessionManager struct {
 	lock           sync.RWMutex
 	sessions       map[sessionKey]*UserSession
+	userIndex      map[string]map[string]*UserSession // username -> sessionID -> session
 	idleList       *list.List
 	expireDuration time.Duration
 	source         NodeSource
@@ -31,6 +32,7 @@ type SessionManager struct {
 func NewSessionManager(source NodeSource, expire time.Duration) *SessionManager {
 	sm := &SessionManager{
 		sessions:       make(map[sessionKey]*UserSession),
+		userIndex:      make(map[string]map[string]*UserSession),
 		idleList:       list.New(),
 		expireDuration: expire,
 		source:         source,
@@ -102,8 +104,40 @@ func (sm *SessionManager) Create(username, sessionID, deviceID, exitIP string, s
 
 	sm.lock.Lock()
 	sm.sessions[key] = sess
+	byUser, ok := sm.userIndex[username]
+	if !ok {
+		byUser = make(map[string]*UserSession)
+		sm.userIndex[username] = byUser
+	}
+	byUser[sessionID] = sess
 	sm.lock.Unlock()
+
 	return sess
+}
+
+// removeFromUserIndex 从二级索引删除会话，必须在持有 sm.lock 写锁时调用
+func (sm *SessionManager) removeFromUserIndex(sess *UserSession) {
+	byUser, ok := sm.userIndex[sess.username]
+	if !ok {
+		return
+	}
+	delete(byUser, sess.sessionID)
+	if len(byUser) == 0 {
+		delete(sm.userIndex, sess.username)
+	}
+}
+
+// UserSessionCounts 返回每用户当前持有的粘性会话数（=独占出口 IP 数）快照，
+// 供 Prometheus Collector 在抓取时使用，复杂度 O(用户数)
+func (sm *SessionManager) UserSessionCounts() map[string]int {
+	sm.lock.RLock()
+	defer sm.lock.RUnlock()
+
+	counts := make(map[string]int, len(sm.userIndex))
+	for username, byUser := range sm.userIndex {
+		counts[username] = len(byUser)
+	}
+	return counts
 }
 
 func (sm *SessionManager) Decrement(sess *UserSession) {
@@ -191,6 +225,7 @@ func (sm *SessionManager) checkAndClean() {
 			// Perform cleanup
 			logx.Infof("SessionManager: cleaning up expired session %s for user %s, device %s", sess.sessionID, sess.username, sess.deviceID)
 			delete(sm.sessions, sessionKey{sess.username, sess.sessionID})
+			sm.removeFromUserIndex(sess)
 			sm.idleList.Remove(element)
 			sess.idleElement = nil
 
