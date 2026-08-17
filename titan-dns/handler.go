@@ -263,7 +263,7 @@ func (h *DNSHandler) printStatsLoop() {
 		})
 		if hasData {
 			// Clear the map to keep memory usage low and remove old entries
-			h.stats = sync.Map{}
+			h.stats.Clear()
 		}
 
 		// Print currently offline IPs if any exist
