@@ -24,18 +24,20 @@ func main() {
 	router := NewRouter(cfg.Backends, cfg.TimeoutDuration)
 	defer router.Close()
 
+	limiter := NewLimiterManager(cfg.ReadLimitBytesPerSec, cfg.WriteLimitBytesPerSec, cfg.BurstBytes)
+
 	var socksServer *Socks5Server
 	var httpServer *HTTPServer
 
 	if cfg.Socks5Listen != "" {
-		socksServer = NewSocks5Server(cfg.Socks5Listen, router)
+		socksServer = NewSocks5Server(cfg.Socks5Listen, router, limiter)
 		if err := socksServer.Start(); err != nil {
 			logx.Must(err)
 		}
 	}
 
 	if cfg.HTTPListen != "" {
-		httpServer = NewHTTPServer(cfg.HTTPListen, router)
+		httpServer = NewHTTPServer(cfg.HTTPListen, router, limiter)
 		if err := httpServer.Start(); err != nil {
 			logx.Must(err)
 		}

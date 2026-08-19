@@ -6,5 +6,8 @@
     "http://127.0.0.1:80801",
     "socks5://127.0.0.1:10802"
   ],
-  "session_timeout": "12h"
+  "session_timeout": "12h",
+  "read_limit_bytes_per_sec": 0,
+  "write_limit_bytes_per_sec": 0,
+  "burst_bytes": 0
 }

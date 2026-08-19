@@ -14,13 +14,15 @@ import (
 type Socks5Server struct {
 	listenAddr string
 	router     *Router
+	limiter    *LimiterManager
 	listener   *net.TCPListener
 }
 
-func NewSocks5Server(listenAddr string, router *Router) *Socks5Server {
+func NewSocks5Server(listenAddr string, router *Router, limiter *LimiterManager) *Socks5Server {
 	return &Socks5Server{
 		listenAddr: listenAddr,
 		router:     router,
+		limiter:    limiter,
 	}
 }
 
@@ -247,6 +249,7 @@ func (s *Socks5Server) handleConn(conn net.Conn) {
 		conn.Write([]byte{0x05, 0x04, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
 		return
 	}
+	backendConn = s.limiter.WrapConn(backendConn)
 	defer backendConn.Close()
 
 	// 7. Reply Success to SOCKS5 client

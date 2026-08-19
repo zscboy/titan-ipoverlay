@@ -16,13 +16,15 @@ import (
 type HTTPServer struct {
 	listenAddr string
 	router     *Router
+	limiter    *LimiterManager
 	server     *http.Server
 }
 
-func NewHTTPServer(listenAddr string, router *Router) *HTTPServer {
+func NewHTTPServer(listenAddr string, router *Router, limiter *LimiterManager) *HTTPServer {
 	return &HTTPServer{
 		listenAddr: listenAddr,
 		router:     router,
+		limiter:    limiter,
 	}
 }
 
@@ -121,6 +123,7 @@ func (s *HTTPServer) handleConnect(w http.ResponseWriter, r *http.Request, sessi
 		conn.Write([]byte("HTTP/1.1 504 Gateway Timeout\r\n\r\n"))
 		return
 	}
+	backendConn = s.limiter.WrapConn(backendConn)
 	defer backendConn.Close()
 
 	// Write success to client
@@ -191,6 +194,7 @@ func (s *HTTPServer) handleHTTP(w http.ResponseWriter, r *http.Request, session,
 		conn.Write([]byte("HTTP/1.1 504 Gateway Timeout\r\n\r\n"))
 		return
 	}
+	backendConn = s.limiter.WrapConn(backendConn)
 	defer backendConn.Close()
 
 	// Write serialized request to backend

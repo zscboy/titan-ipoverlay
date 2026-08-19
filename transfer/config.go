@@ -14,12 +14,15 @@ type BackendInfo struct {
 }
 
 type Config struct {
-	Socks5Listen   string        `json:"socks5_listen"`   // "host:port", optional
-	HTTPListen     string        `json:"http_listen"`     // "host:port", optional
-	BackendsRaw    []string      `json:"backends"`        // list of "socks5://host:port" or "http://host:port"
-	SessionTimeout string        `json:"session_timeout"` // e.g. "12h"
-	TimeoutDuration time.Duration `json:"-"`
-	Backends       []BackendInfo `json:"-"`
+	Socks5Listen          string        `json:"socks5_listen"`   // "host:port", optional
+	HTTPListen            string        `json:"http_listen"`     // "host:port", optional
+	BackendsRaw           []string      `json:"backends"`        // list of "socks5://host:port" or "http://host:port"
+	SessionTimeout        string        `json:"session_timeout"` // e.g. "12h"
+	ReadLimitBytesPerSec  int64         `json:"read_limit_bytes_per_sec"`  // bytes per sec, 0 means unthrottled
+	WriteLimitBytesPerSec int64         `json:"write_limit_bytes_per_sec"` // bytes per sec, 0 means unthrottled
+	BurstBytes            int           `json:"burst_bytes"`               // burst size in bytes
+	TimeoutDuration       time.Duration `json:"-"`
+	Backends              []BackendInfo `json:"-"`
 }
 
 func LoadConfig(path string) (*Config, error) {
