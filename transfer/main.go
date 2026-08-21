@@ -14,12 +14,15 @@ func main() {
 	flag.StringVar(&cfgFile, "f", "config.json", "path to config file")
 	flag.Parse()
 
-	logx.Info("test8 starting...")
-
 	cfg, err := LoadConfig(cfgFile)
 	if err != nil {
 		logx.Must(err)
 	}
+
+	logx.MustSetup(cfg.Log)
+	defer logx.Close()
+
+	logx.Info("transfer starting...")
 
 	router := NewRouter(cfg.Backends, cfg.TimeoutDuration)
 	defer router.Close()

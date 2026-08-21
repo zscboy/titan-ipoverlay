@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"os"
 	"time"
+
+	"github.com/zeromicro/go-zero/core/logx"
 )
 
 type BackendInfo struct {
@@ -14,13 +16,14 @@ type BackendInfo struct {
 }
 
 type Config struct {
-	Socks5Listen          string        `json:"socks5_listen"`   // "host:port", optional
-	HTTPListen            string        `json:"http_listen"`     // "host:port", optional
-	BackendsRaw           []string      `json:"backends"`        // list of "socks5://host:port" or "http://host:port"
-	SessionTimeout        string        `json:"session_timeout"` // e.g. "12h"
+	Socks5Listen          string        `json:"socks5_listen"`             // "host:port", optional
+	HTTPListen            string        `json:"http_listen"`               // "host:port", optional
+	BackendsRaw           []string      `json:"backends"`                  // list of "socks5://host:port" or "http://host:port"
+	SessionTimeout        string        `json:"session_timeout"`           // e.g. "12h"
 	ReadLimitBytesPerSec  int64         `json:"read_limit_bytes_per_sec"`  // bytes per sec, 0 means unthrottled
 	WriteLimitBytesPerSec int64         `json:"write_limit_bytes_per_sec"` // bytes per sec, 0 means unthrottled
-	BurstBytes            int           `json:"burst_bytes"`               // burst size in bytes
+	BurstBytes            int           `json:"burst_bytes"`               // burst size in bytes，1/10 of ReadLimitBytesPerSec and WriteLimitBytesPerSec
+	Log                   logx.LogConf  `json:"log"`
 	TimeoutDuration       time.Duration `json:"-"`
 	Backends              []BackendInfo `json:"-"`
 }
