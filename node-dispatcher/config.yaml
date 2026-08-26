@@ -1,0 +1,32 @@
+ListenAddr: "0.0.0.0:8880"
+
+Redis:
+  Host: "127.0.0.1:6379"
+  Type: "node"
+
+L1Cache:
+  Enabled: true
+  TTLSeconds: 900
+  Capacity: 100000
+
+Security:
+  RateLimitPerIPSec: 20
+
+HTTPProxy:
+  MaxIdleConns: 50000
+  MaxIdleConnsPerHost: 10000
+  IdleConnTimeoutSec: 90
+  DialTimeoutSec: 5
+
+Log:
+  ServiceName: "node-dispatcher"
+  Mode: "console"
+  Level: "info"
+
+DefaultCellID: "cell-1"
+
+Cells:
+  cell-1:
+    id: "cell-1"
+    name: "Cell One (East Region)"
+    target_url: "http://127.0.0.1:41004"
