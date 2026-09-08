@@ -51,6 +51,11 @@ func (l *GetNodePopLogic) GetNodePop(req *types.GetNodePopReq) (resp *types.GetN
 		return nil, err
 	}
 
+	// Record 10-second window stats in ServiceContext (logged automatically every 10 seconds)
+	if popEntity != nil && popEntity.Config.Id != "" && l.svcCtx.PopStats != nil {
+		l.svcCtx.PopStats.RecordAccess(popEntity.Config.Id, req.NodeId)
+	}
+
 	lowerCountryCode := strings.ToLower(countryCode)
 	tokenBytes, err := l.generateJwtToken(popEntity.AccessSecret, popEntity.AccessExpire, req.NodeId, lowerCountryCode)
 	if err != nil {

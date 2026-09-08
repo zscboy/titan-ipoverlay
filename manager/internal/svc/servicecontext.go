@@ -16,6 +16,7 @@ import (
 	"github.com/zeromicro/go-zero/zrpc"
 )
 
+
 type Pop struct {
 	Config       config.Pop
 	API          serverapi.ServerAPI
@@ -35,6 +36,7 @@ type ServiceContext struct {
 	Redis          *redis.Redis
 	JwtMiddleware  rest.Middleware
 	Pops           map[string]*Pop
+	PopStats       *PopStatsCollector
 	IPGroup        *singleflight.Group
 	RegionStrategy map[string][]string
 	VendorStrategy map[string][]string
@@ -67,6 +69,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		Config:         c,
 		Redis:          redis,
 		Pops:           newPops(c),
+		PopStats:       NewPopStatsCollector(),
 		IPGroup:        &singleflight.Group{},
 		RegionStrategy: regionStrategy,
 		VendorStrategy: vendorStrategy,
