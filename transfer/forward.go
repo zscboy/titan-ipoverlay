@@ -213,20 +213,3 @@ func handshakeHTTP(conn net.Conn, clientUsername, clientPassword string, targetH
 
 	return nil
 }
-
-func Relay(conn1, conn2 net.Conn) {
-	errChan := make(chan error, 2)
-	go func() {
-		_, err := io.Copy(conn1, conn2)
-		conn1.Close()
-		conn2.Close()
-		errChan <- err
-	}()
-	go func() {
-		_, err := io.Copy(conn2, conn1)
-		conn2.Close()
-		conn1.Close()
-		errChan <- err
-	}()
-	<-errChan
-}
