@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -334,8 +335,18 @@ func (socks5Server *Socks5Server) handleSocks5Request(r *request) error {
 
 // NOTE: if error occurs, conn of the 'req' object must be closed in outer
 func (socks5Server *Socks5Server) handleSocks5Connect(req *request) error {
-	if ip := net.ParseIP(req.destAddr.fqdn); ip != nil {
-		if ip.IsLoopback() || ip.IsPrivate() || ip.IsMulticast() || ip.IsLinkLocalMulticast() {
+	host := strings.ToLower(strings.TrimSpace(req.destAddr.fqdn))
+	if host == "localhost" || host == "ip6-localhost" || host == "ip6-loopback" || strings.HasSuffix(host, ".localhost") {
+		return fmt.Errorf("Socks5Server.handleSocks5Connect not support localhost domain %s", host)
+	}
+
+	if ip := net.ParseIP(host); ip != nil {
+		if ip.IsLoopback() || // 127.0.0.0/8, ::1
+			ip.IsPrivate() || // 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, fd00::/8
+			ip.IsUnspecified() || // 0.0.0.0, ::
+			ip.IsMulticast() || // 224.0.0.0/4, ff00::/8
+			ip.IsLinkLocalUnicast() || // 169.254.0.0/16, fe80::/10
+			ip.IsLinkLocalMulticast() {
 			return fmt.Errorf("Socks5Server.handleSocks5Connect not support ip %s", ip.String())
 		}
 	}
