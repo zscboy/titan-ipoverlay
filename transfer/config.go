@@ -3,8 +3,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/zeromicro/go-zero/core/logx"
@@ -55,6 +57,14 @@ func LoadConfig(path string) (*Config, error) {
 		}
 		if u.Scheme != "socks5" && u.Scheme != "http" {
 			return nil, fmt.Errorf("unsupported backend protocol '%s' in '%s', must be 'socks5://' or 'http://'", u.Scheme, raw)
+		}
+		host, portStr, err := net.SplitHostPort(u.Host)
+		if err != nil || host == "" {
+			return nil, fmt.Errorf("invalid backend address %q: must include a host and port", raw)
+		}
+		port, err := strconv.Atoi(portStr)
+		if err != nil || port < 1 || port > 65535 {
+			return nil, fmt.Errorf("invalid backend port %q in %q: must be an integer between 1 and 65535", portStr, raw)
 		}
 		cfg.Backends = append(cfg.Backends, BackendInfo{
 			Type: u.Scheme,

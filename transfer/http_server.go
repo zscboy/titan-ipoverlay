@@ -29,14 +29,20 @@ func NewHTTPServer(listenAddr string, router *Router, limiter *LimiterManager) *
 }
 
 func (s *HTTPServer) Start() error {
-	s.server = &http.Server{
+	listener, err := net.Listen("tcp", s.listenAddr)
+	if err != nil {
+		return err
+	}
+
+	server := &http.Server{
 		Addr:    s.listenAddr,
 		Handler: s,
 	}
+	s.server = server
 
-	logx.Infof("HTTP Proxy Server listening on %s", s.listenAddr)
+	logx.Infof("HTTP Proxy Server listening on %s", listener.Addr())
 	go func() {
-		if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logx.Errorf("HTTP Server error: %v", err)
 		}
 	}()
@@ -119,7 +125,7 @@ func (s *HTTPServer) handleConnect(w http.ResponseWriter, r *http.Request, sessi
 	// Connect to Backend
 	backendConn, err := ConnectBackend(backend, host, port, clientUsername, clientPassword)
 	if err != nil {
-		logx.Errorf("HTTP CONNECT to backend %s://%s failed: %v, Username:%s, Password:%s, source:%s, target:%s", backend.Type, backend.Addr, err, clientUsername, clientPassword, r.RemoteAddr, r.Host)
+		logx.Errorf("HTTP CONNECT to backend %s://%s failed: %v, Username:%s, source:%s, target:%s", backend.Type, backend.Addr, err, clientUsername, r.RemoteAddr, r.Host)
 		conn.Write([]byte("HTTP/1.1 504 Gateway Timeout\r\n\r\n"))
 		return
 	}
