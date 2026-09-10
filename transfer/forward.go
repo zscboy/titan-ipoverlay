@@ -14,8 +14,13 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
+const (
+	backendDialTimeout      = 10 * time.Second
+	backendHandshakeTimeout = 10 * time.Second
+)
+
 func ConnectBackend(backend BackendInfo, targetHost string, targetPort int, clientUsername, clientPassword string) (net.Conn, error) {
-	dialer := net.Dialer{Timeout: 10 * time.Second}
+	dialer := net.Dialer{Timeout: backendDialTimeout}
 	conn, err := dialer.Dial("tcp", backend.Addr)
 	if err != nil {
 		errStr := err.Error()
@@ -24,7 +29,7 @@ func ConnectBackend(backend BackendInfo, targetHost string, targetPort int, clie
 		} else if strings.Contains(errStr, "cannot assign requested address") || strings.Contains(errStr, "EADDRNOTAVAIL") {
 			logx.Errorf("CRITICAL: Local port exhaustion (cannot assign requested address) on ConnectBackend Dial: %v", err)
 		}
-		return nil, fmt.Errorf("failed to dial backend %s: %v", backend.Addr, err)
+		return nil, fmt.Errorf("failed to dial backend %s: %w", backend.Addr, err)
 	}
 
 	success := false
@@ -34,16 +39,24 @@ func ConnectBackend(backend BackendInfo, targetHost string, targetPort int, clie
 		}
 	}()
 
+	if err := conn.SetDeadline(time.Now().Add(backendHandshakeTimeout)); err != nil {
+		return nil, fmt.Errorf("set backend handshake deadline: %w", err)
+	}
+
 	if backend.Type == "socks5" {
 		if err := handshakeSocks5(conn, clientUsername, clientPassword, targetHost, targetPort); err != nil {
-			return nil, fmt.Errorf("socks5 handshake with backend failed: %v", err)
+			return nil, fmt.Errorf("socks5 handshake with backend failed: %w", err)
 		}
 	} else if backend.Type == "http" {
 		if err := handshakeHTTP(conn, clientUsername, clientPassword, targetHost, targetPort); err != nil {
-			return nil, fmt.Errorf("http CONNECT handshake with backend failed: %v", err)
+			return nil, fmt.Errorf("http CONNECT handshake with backend failed: %w", err)
 		}
 	} else {
 		return nil, fmt.Errorf("unknown backend type: %s", backend.Type)
+	}
+
+	if err := conn.SetDeadline(time.Time{}); err != nil {
+		return nil, fmt.Errorf("clear backend handshake deadline: %w", err)
 	}
 
 	success = true

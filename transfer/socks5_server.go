@@ -7,8 +7,14 @@ import (
 	"io"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/zeromicro/go-zero/core/logx"
+)
+
+const (
+	clientHandshakeTimeout = 10 * time.Second
+	clientReplyTimeout     = 5 * time.Second
 )
 
 type Socks5Server struct {
@@ -83,6 +89,10 @@ func parseSession(username string) string {
 
 func (s *Socks5Server) handleConn(conn net.Conn) {
 	defer conn.Close()
+	if err := conn.SetDeadline(time.Now().Add(clientHandshakeTimeout)); err != nil {
+		logx.Errorf("SOCKS5 set client handshake deadline failed: %v", err)
+		return
+	}
 	reader := bufio.NewReader(conn)
 
 	// 1. Read version and auth methods
@@ -234,6 +244,12 @@ func (s *Socks5Server) handleConn(conn net.Conn) {
 	}
 	destPort = int(binary.BigEndian.Uint16(portBuf))
 
+	// Backend setup has its own timeout; do not charge it to the client handshake.
+	if err := conn.SetDeadline(time.Time{}); err != nil {
+		logx.Errorf("SOCKS5 clear client handshake deadline failed: %v", err)
+		return
+	}
+
 	// 5. Select Backend via Router
 	backend, err := s.router.SelectBackend(clientUsername, session)
 	if err != nil {
@@ -246,7 +262,13 @@ func (s *Socks5Server) handleConn(conn net.Conn) {
 	if err != nil {
 		logx.Errorf("SOCKS5 connect to backend %s://%s failed: %v", backend.Type, backend.Addr, err)
 		// Reply with failure code 0x04 (Host unreachable)
-		conn.Write([]byte{0x05, 0x04, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+		if err := conn.SetWriteDeadline(time.Now().Add(clientReplyTimeout)); err != nil {
+			logx.Errorf("SOCKS5 set failure reply deadline failed: %v", err)
+			return
+		}
+		if _, err := conn.Write([]byte{0x05, 0x04, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}); err != nil {
+			logx.Errorf("SOCKS5 reply failure to client failed: %v", err)
+		}
 		return
 	}
 	backendConn = s.limiter.WrapConn(backendConn)
@@ -254,8 +276,17 @@ func (s *Socks5Server) handleConn(conn net.Conn) {
 
 	// 7. Reply Success to SOCKS5 client
 	// Reply format: version | success (0x00) | reserved (0x00) | IPv4 | 0.0.0.0 | port 0
+	if err := conn.SetWriteDeadline(time.Now().Add(clientReplyTimeout)); err != nil {
+		logx.Errorf("SOCKS5 set success reply deadline failed: %v", err)
+		return
+	}
 	if _, err := conn.Write([]byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}); err != nil {
 		logx.Errorf("SOCKS5 reply success to client failed: %v", err)
+		return
+	}
+
+	if err := conn.SetDeadline(time.Time{}); err != nil {
+		logx.Errorf("SOCKS5 clear client reply deadline failed: %v", err)
 		return
 	}
 
