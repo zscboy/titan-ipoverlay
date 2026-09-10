@@ -7,6 +7,7 @@
     "socks5://127.0.0.1:10802"
   ],
   "session_timeout": "12h",
+  "router_cleanup_interval": "30m",
   "read_limit_bytes_per_sec": 62500000,
   "write_limit_bytes_per_sec": 62500000,
   "burst_bytes": 0,

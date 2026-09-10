@@ -24,7 +24,7 @@ func main() {
 
 	logx.Info("transfer starting...")
 
-	router := NewRouter(cfg.Backends, cfg.TimeoutDuration)
+	router := NewRouter(cfg.Backends, cfg.TimeoutDuration, cfg.CleanupIntervalDuration)
 	defer router.Close()
 
 	limiter := NewLimiterManager(cfg.ReadLimitBytesPerSec, cfg.WriteLimitBytesPerSec, cfg.BurstBytes)

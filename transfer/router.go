@@ -17,21 +17,42 @@ type SessionEntry struct {
 
 type Router struct {
 	mu          sync.RWMutex
-	backends    []BackendInfo
-	cache       map[string]*SessionEntry
-	rrIndex     uint64
+	pools       map[string]*backendPool
+	cache       map[sessionKey]*SessionEntry
 	timeout     time.Duration
 	stopJanitor chan struct{}
 }
 
-func NewRouter(backends []BackendInfo, timeout time.Duration) *Router {
+type sessionKey struct {
+	User     string
+	Session  string
+	Protocol string
+}
+
+type backendPool struct {
+	backends []BackendInfo
+	rrIndex  uint64
+}
+
+func NewRouter(backends []BackendInfo, timeout, cleanupInterval time.Duration) *Router {
+	if cleanupInterval <= 0 {
+		cleanupInterval = defaultRouterCleanupInterval
+	}
 	r := &Router{
-		backends:    backends,
-		cache:       make(map[string]*SessionEntry),
+		pools:       map[string]*backendPool{"": {backends: backends}},
+		cache:       make(map[sessionKey]*SessionEntry),
 		timeout:     timeout,
 		stopJanitor: make(chan struct{}),
 	}
-	go r.startJanitor(10 * time.Second)
+	for _, backend := range backends {
+		pool := r.pools[backend.Type]
+		if pool == nil {
+			pool = &backendPool{}
+			r.pools[backend.Type] = pool
+		}
+		pool.backends = append(pool.backends, backend)
+	}
+	go r.startJanitor(cleanupInterval)
 	return r
 }
 
@@ -40,14 +61,24 @@ func (r *Router) Close() {
 }
 
 func (r *Router) SelectBackend(username, session string) (BackendInfo, error) {
-	if len(r.backends) == 0 {
-		return BackendInfo{}, fmt.Errorf("no backends configured")
+	return r.SelectBackendForProtocol(username, session, "")
+}
+
+func (r *Router) HasBackendProtocol(protocol string) bool {
+	pool := r.pools[protocol]
+	return pool != nil && len(pool.backends) > 0
+}
+
+func (r *Router) SelectBackendForProtocol(username, session, protocol string) (BackendInfo, error) {
+	pool := r.pools[protocol]
+	if pool == nil || len(pool.backends) == 0 {
+		return BackendInfo{}, fmt.Errorf("no backends configured for protocol %q", protocol)
 	}
 
 	// Case 1: No session -> direct Round-Robin
 	if session == "" {
-		idx := atomic.AddUint64(&r.rrIndex, 1) - 1
-		backend := r.backends[idx%uint64(len(r.backends))]
+		idx := atomic.AddUint64(&pool.rrIndex, 1) - 1
+		backend := pool.backends[idx%uint64(len(pool.backends))]
 		logx.Debugf("Router: SelectBackend - empty session, round-robin selected: %s://%s", backend.Type, backend.Addr)
 		return backend, nil
 	}
@@ -58,7 +89,7 @@ func (r *Router) SelectBackend(username, session string) (BackendInfo, error) {
 	if len(parts) > 0 {
 		realUser = parts[0]
 	}
-	cacheKey := realUser + ":" + session
+	cacheKey := sessionKey{User: realUser, Session: session, Protocol: protocol}
 
 	// Case 2: Session exists -> check Cache (Read Lock only)
 	r.mu.RLock()
@@ -68,7 +99,7 @@ func (r *Router) SelectBackend(username, session string) (BackendInfo, error) {
 		atomic.StoreInt64(&entry.LastActive, time.Now().Unix())
 		backend := entry.Backend
 		r.mu.RUnlock()
-		logx.Debugf("Router: SelectBackend - cache hit for user session %s: %s://%s", cacheKey, backend.Type, backend.Addr)
+		logx.Debugf("Router: SelectBackend - cache hit for user session %v: %s://%s", cacheKey, backend.Type, backend.Addr)
 		return backend, nil
 	}
 	r.mu.RUnlock()
@@ -84,15 +115,15 @@ func (r *Router) SelectBackend(username, session string) (BackendInfo, error) {
 	}
 
 	// Round-Robin to select backend
-	idx := atomic.AddUint64(&r.rrIndex, 1) - 1
-	backend := r.backends[idx%uint64(len(r.backends))]
+	idx := atomic.AddUint64(&pool.rrIndex, 1) - 1
+	backend := pool.backends[idx%uint64(len(pool.backends))]
 
 	r.cache[cacheKey] = &SessionEntry{
 		Backend:    backend,
 		LastActive: time.Now().Unix(),
 	}
 
-	logx.Infof("Router: SelectBackend - cache miss for user session %s, assigned and cached: %s://%s", cacheKey, backend.Type, backend.Addr)
+	logx.Infof("Router: SelectBackend - cache miss for user session %v, assigned and cached: %s://%s", cacheKey, backend.Type, backend.Addr)
 	return backend, nil
 }
 
@@ -120,7 +151,7 @@ func (r *Router) cleanupExpired() {
 	for session, entry := range r.cache {
 		lastActive := atomic.LoadInt64(&entry.LastActive)
 		if nowSec-lastActive > timeoutSec {
-			logx.Infof("Router: Session %s expired (idle for %ds), releasing mapping to %s://%s", session, nowSec-lastActive, entry.Backend.Type, entry.Backend.Addr)
+			logx.Infof("Router: Session %v expired (idle for %ds), releasing mapping to %s://%s", session, nowSec-lastActive, entry.Backend.Type, entry.Backend.Addr)
 			delete(r.cache, session)
 		}
 	}
