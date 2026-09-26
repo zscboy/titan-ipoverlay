@@ -193,31 +193,5 @@ func (s *HTTPServer) handleConn(conn net.Conn) {
 
 	// The POP owns HTTP authentication, responses, and CONNECT negotiation.
 	// Keep the connection pinned to the POP selected from the first request.
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		_, err := io.Copy(throttled, io.MultiReader(bytes.NewReader(prefix), conn))
-		if err == nil {
-			err = backendConn.(*net.TCPConn).CloseWrite()
-		}
-		if err != nil {
-			if !errors.Is(err, net.ErrClosed) {
-				logx.Errorf("HTTP relay to POP %s failed: %v", backend.Addr, err)
-			}
-			conn.Close()
-			backendConn.Close()
-		}
-	}()
-	_, err = io.Copy(conn, throttled)
-	if err == nil {
-		err = conn.(*net.TCPConn).CloseWrite()
-	}
-	if err != nil {
-		if !errors.Is(err, net.ErrClosed) {
-			logx.Errorf("HTTP relay from POP %s failed: %v", backend.Addr, err)
-		}
-		conn.Close()
-		backendConn.Close()
-	}
-	<-done
+	relayTCP(conn, backendConn, io.MultiReader(bytes.NewReader(prefix), conn), throttled)
 }

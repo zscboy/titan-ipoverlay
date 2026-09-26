@@ -2,11 +2,14 @@ package main
 
 import (
 	"bufio"
-	"encoding/binary"
+	"bytes"
+	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/zeromicro/go-zero/core/logx"
@@ -22,53 +25,96 @@ type Socks5Server struct {
 	router     *Router
 	limiter    *LimiterManager
 	listener   *net.TCPListener
+	ctx        context.Context
+	cancel     context.CancelFunc
+	mu         sync.Mutex
+	conns      map[net.Conn]struct{}
+	stopped    bool
 }
 
 func NewSocks5Server(listenAddr string, router *Router, limiter *LimiterManager) *Socks5Server {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &Socks5Server{
 		listenAddr: listenAddr,
 		router:     router,
 		limiter:    limiter,
+		ctx:        ctx,
+		cancel:     cancel,
+		conns:      make(map[net.Conn]struct{}),
 	}
 }
 
 func (s *Socks5Server) Start() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.stopped || s.listener != nil {
+		return fmt.Errorf("SOCKS5 server has already been started or stopped")
+	}
+	if s.router == nil || !s.router.HasBackendProtocol("socks5") {
+		return fmt.Errorf("SOCKS5 listener requires at least one socks5:// backend")
+	}
 	addr, err := net.ResolveTCPAddr("tcp", s.listenAddr)
 	if err != nil {
 		return err
 	}
-
 	listener, err := net.ListenTCP("tcp", addr)
 	if err != nil {
 		return err
 	}
 	s.listener = listener
-
-	logx.Infof("SOCKS5 Server listening on %s", s.listenAddr)
-	go s.acceptLoop()
+	logx.Infof("SOCKS5 Server listening on %s", listener.Addr())
+	go s.acceptLoop(listener)
 	return nil
 }
 
 func (s *Socks5Server) Stop() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.stopped = true
+	s.cancel()
 	if s.listener != nil {
 		s.listener.Close()
 	}
+	for conn := range s.conns {
+		conn.Close()
+	}
 }
 
-func (s *Socks5Server) acceptLoop() {
+func (s *Socks5Server) trackConn(conn net.Conn) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.stopped {
+		conn.Close()
+		return false
+	}
+	s.conns[conn] = struct{}{}
+	return true
+}
+
+func (s *Socks5Server) releaseConn(conn net.Conn) {
+	conn.Close()
+	s.mu.Lock()
+	delete(s.conns, conn)
+	s.mu.Unlock()
+}
+
+func (s *Socks5Server) acceptLoop(listener *net.TCPListener) {
 	for {
-		conn, err := s.listener.Accept()
+		conn, err := listener.Accept()
 		if err != nil {
-			if strings.Contains(err.Error(), "use of closed network connection") {
+			if errors.Is(err, net.ErrClosed) {
 				return
 			}
-			errStr := err.Error()
-			if strings.Contains(errStr, "too many open files") {
-				logx.Errorf("CRITICAL: File descriptor limit reached (too many open files) on SOCKS5 Accept: %v", err)
-			} else {
-				logx.Errorf("SOCKS5 Accept error: %v", err)
+			logx.Errorf("SOCKS5 Accept error: %v", err)
+			select {
+			case <-s.ctx.Done():
+				return
+			case <-time.After(100 * time.Millisecond):
+				continue
 			}
-			continue
+		}
+		if !s.trackConn(conn) {
+			return
 		}
 		go s.handleConn(conn)
 	}
@@ -87,222 +133,219 @@ func parseSession(username string) string {
 	return sessionPart
 }
 
+func writeSocks5Reply(conn net.Conn, reply []byte) error {
+	if err := conn.SetWriteDeadline(time.Now().Add(clientReplyTimeout)); err != nil {
+		return err
+	}
+	_, err := conn.Write(reply)
+	return err
+}
+
+func readSocks5Auth(reader io.Reader) ([]byte, string, error) {
+	var auth bytes.Buffer
+	r := io.TeeReader(reader, &auth)
+	var header [2]byte
+	if _, err := io.ReadFull(r, header[:]); err != nil {
+		return nil, "", err
+	}
+	if header[0] != 1 || header[1] == 0 {
+		return nil, "", fmt.Errorf("invalid SOCKS5 authentication header")
+	}
+	username := make([]byte, int(header[1]))
+	if _, err := io.ReadFull(r, username); err != nil {
+		return nil, "", err
+	}
+	var passLen [1]byte
+	if _, err := io.ReadFull(r, passLen[:]); err != nil {
+		return nil, "", err
+	}
+	if passLen[0] == 0 {
+		return nil, "", fmt.Errorf("empty SOCKS5 password")
+	}
+	if _, err := io.CopyN(io.Discard, r, int64(passLen[0])); err != nil {
+		return nil, "", err
+	}
+	return auth.Bytes(), string(username), nil
+}
+
+// Requests and replies share the same address framing. Preserve the wire bytes.
+func readSocks5Packet(reader io.Reader) ([]byte, error) {
+	packet := make([]byte, 4)
+	if _, err := io.ReadFull(reader, packet); err != nil {
+		return nil, err
+	}
+	if packet[0] != 5 || packet[2] != 0 {
+		return nil, fmt.Errorf("invalid SOCKS5 packet header")
+	}
+	var addrLen int
+	switch packet[3] {
+	case 1:
+		addrLen = 4
+	case 4:
+		addrLen = 16
+	case 3:
+		var size [1]byte
+		if _, err := io.ReadFull(reader, size[:]); err != nil {
+			return nil, err
+		}
+		packet = append(packet, size[0])
+		addrLen = int(size[0])
+	default:
+		return nil, fmt.Errorf("unsupported SOCKS5 address type: %d", packet[3])
+	}
+	address := make([]byte, addrLen+2)
+	if _, err := io.ReadFull(reader, address); err != nil {
+		return nil, err
+	}
+	return append(packet, address...), nil
+}
+
 func (s *Socks5Server) handleConn(conn net.Conn) {
-	defer conn.Close()
-	if err := conn.SetDeadline(time.Now().Add(clientHandshakeTimeout)); err != nil {
-		logx.Errorf("SOCKS5 set client handshake deadline failed: %v", err)
+	defer s.releaseConn(conn)
+	if err := conn.SetReadDeadline(time.Now().Add(clientHandshakeTimeout)); err != nil {
 		return
 	}
 	reader := bufio.NewReader(conn)
-
-	// 1. Read version and auth methods
-	versionAndMethods := make([]byte, 2)
-	if _, err := io.ReadAtLeast(reader, versionAndMethods, 2); err != nil {
-		logx.Errorf("SOCKS5 read handshake version error: %v", err)
+	var header [2]byte
+	if _, err := io.ReadFull(reader, header[:]); err != nil || header[0] != 5 {
+		return
+	}
+	methods := make([]byte, int(header[1]))
+	if _, err := io.ReadFull(reader, methods); err != nil {
+		return
+	}
+	method := byte(0xff)
+	if bytes.Contains(methods, []byte{2}) {
+		method = 2
+	} else if bytes.Contains(methods, []byte{0}) {
+		method = 0
+	}
+	if method == 0xff {
+		writeSocks5Reply(conn, []byte{5, 0xff})
 		return
 	}
 
-	if versionAndMethods[0] != 0x05 {
-		logx.Errorf("SOCKS5 unsupported version: %d", versionAndMethods[0])
+	var auth []byte
+	username := ""
+	if method == 2 {
+		// Session routing requires the username before a POP can be selected.
+		if err := writeSocks5Reply(conn, []byte{5, 2}); err != nil {
+			return
+		}
+		var err error
+		auth, username, err = readSocks5Auth(reader)
+		if err != nil {
+			writeSocks5Reply(conn, []byte{1, 1})
+			return
+		}
+	}
+	failure := []byte{5, 0xff}
+	if method == 2 {
+		failure = []byte{1, 1}
+	}
+	if s.router == nil {
+		writeSocks5Reply(conn, failure)
 		return
 	}
-
-	numMethods := int(versionAndMethods[1])
-	methods := make([]byte, numMethods)
-	if _, err := io.ReadAtLeast(reader, methods, numMethods); err != nil {
-		logx.Errorf("SOCKS5 read auth methods error: %v", err)
-		return
-	}
-
-	// 2. Select auth method (Support Username/Password auth or No Auth)
-	hasUserPass := false
-	hasNoAuth := false
-	for _, m := range methods {
-		if m == 0x02 {
-			hasUserPass = true
-		} else if m == 0x00 {
-			hasNoAuth = true
-		}
-	}
-
-	selectedMethod := byte(0xff) // No acceptable methods
-	if hasUserPass {
-		selectedMethod = 0x02
-	} else if hasNoAuth {
-		selectedMethod = 0x00
-	}
-
-	if _, err := conn.Write([]byte{0x05, selectedMethod}); err != nil {
-		logx.Errorf("SOCKS5 write auth method response error: %v", err)
-		return
-	}
-
-	if selectedMethod == 0xff {
-		logx.Errorf("SOCKS5 no acceptable auth methods found")
-		return
-	}
-
-	session := ""
-	clientUsername := ""
-	clientPassword := ""
-
-	// 3. Perform Authentication if necessary
-	if selectedMethod == 0x02 {
-		// Read Username/Password auth request
-		authHeader := make([]byte, 2)
-		if _, err := io.ReadAtLeast(reader, authHeader, 2); err != nil {
-			logx.Errorf("SOCKS5 auth header read error: %v", err)
-			return
-		}
-		if authHeader[0] != 0x01 { // Auth version 1
-			logx.Errorf("SOCKS5 auth version mismatch: %d", authHeader[0])
-			return
-		}
-
-		userLen := int(authHeader[1])
-		userBuf := make([]byte, userLen)
-		if _, err := io.ReadAtLeast(reader, userBuf, userLen); err != nil {
-			logx.Errorf("SOCKS5 auth read username error: %v", err)
-			return
-		}
-		username := string(userBuf)
-		session = parseSession(username)
-		clientUsername = username
-
-		passLenBuf := []byte{0}
-		if _, err := reader.Read(passLenBuf); err != nil {
-			logx.Errorf("SOCKS5 auth read password len error: %v", err)
-			return
-		}
-		passLen := int(passLenBuf[0])
-		passBuf := make([]byte, passLen)
-		if _, err := io.ReadAtLeast(reader, passBuf, passLen); err != nil {
-			logx.Errorf("SOCKS5 auth read password error: %v", err)
-			return
-		}
-		clientPassword = string(passBuf)
-
-		// Accept credentials (always success, but extract session)
-		if _, err := conn.Write([]byte{0x01, 0x00}); err != nil {
-			logx.Errorf("SOCKS5 write auth success reply error: %v", err)
-			return
-		}
-	}
-
-	// 4. Read client CONNECT request
-	reqHeader := make([]byte, 4)
-	if _, err := io.ReadAtLeast(reader, reqHeader, 4); err != nil {
-		logx.Errorf("SOCKS5 read CONNECT header error: %v", err)
-		return
-	}
-
-	if reqHeader[0] != 0x05 || reqHeader[1] != 0x01 { // Only support SOCKS5 CONNECT
-		logx.Errorf("SOCKS5 unsupported command: version=%d cmd=%d", reqHeader[0], reqHeader[1])
-		return
-	}
-
-	var destHost string
-	var destPort int
-
-	switch reqHeader[3] {
-	case 0x01: // IPv4
-		ipBuf := make([]byte, 4)
-		if _, err := io.ReadAtLeast(reader, ipBuf, 4); err != nil {
-			logx.Errorf("SOCKS5 read IPv4 error: %v", err)
-			return
-		}
-		destHost = net.IP(ipBuf).String()
-	case 0x04: // IPv6
-		ipBuf := make([]byte, 16)
-		if _, err := io.ReadAtLeast(reader, ipBuf, 16); err != nil {
-			logx.Errorf("SOCKS5 read IPv6 error: %v", err)
-			return
-		}
-		destHost = net.IP(ipBuf).String()
-	case 0x03: // FQDN
-		lenBuf := []byte{0}
-		if _, err := reader.Read(lenBuf); err != nil {
-			logx.Errorf("SOCKS5 read FQDN len error: %v", err)
-			return
-		}
-		fqdnLen := int(lenBuf[0])
-		fqdnBuf := make([]byte, fqdnLen)
-		if _, err := io.ReadAtLeast(reader, fqdnBuf, fqdnLen); err != nil {
-			logx.Errorf("SOCKS5 read FQDN name error: %v", err)
-			return
-		}
-		destHost = string(fqdnBuf)
-	default:
-		logx.Errorf("SOCKS5 unsupported address type: %d", reqHeader[3])
-		return
-	}
-
-	portBuf := make([]byte, 2)
-	if _, err := io.ReadAtLeast(reader, portBuf, 2); err != nil {
-		logx.Errorf("SOCKS5 read port error: %v", err)
-		return
-	}
-	destPort = int(binary.BigEndian.Uint16(portBuf))
-
-	// Backend setup has its own timeout; do not charge it to the client handshake.
-	if err := conn.SetDeadline(time.Time{}); err != nil {
-		logx.Errorf("SOCKS5 clear client handshake deadline failed: %v", err)
-		return
-	}
-
-	// 5. Select Backend via Router
-	backend, err := s.router.SelectBackend(clientUsername, session)
+	backend, err := s.router.SelectBackendForProtocol(username, parseSession(username), "socks5")
 	if err != nil {
 		logx.Errorf("SOCKS5 select backend failed: %v", err)
+		writeSocks5Reply(conn, failure)
 		return
 	}
-
-	// 6. Connect to Backend
-	backendConn, err := ConnectBackend(backend, destHost, destPort, clientUsername, clientPassword)
+	dialer := net.Dialer{Timeout: backendDialTimeout}
+	backendConn, err := dialer.DialContext(s.ctx, "tcp", backend.Addr)
 	if err != nil {
-		logx.Errorf("SOCKS5 connect to backend %s://%s failed: %v", backend.Type, backend.Addr, err)
-		// Reply with failure code 0x04 (Host unreachable)
-		if err := conn.SetWriteDeadline(time.Now().Add(clientReplyTimeout)); err != nil {
-			logx.Errorf("SOCKS5 set failure reply deadline failed: %v", err)
-			return
-		}
-		if _, err := conn.Write([]byte{0x05, 0x04, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}); err != nil {
-			logx.Errorf("SOCKS5 reply failure to client failed: %v", err)
-		}
+		logx.Errorf("SOCKS5 dial POP %s failed: %v", backend.Addr, err)
+		writeSocks5Reply(conn, failure)
 		return
 	}
-	backendConn = s.limiter.WrapConn(backendConn)
-	defer backendConn.Close()
-
-	// 7. Reply Success to SOCKS5 client
-	// Reply format: version | success (0x00) | reserved (0x00) | IPv4 | 0.0.0.0 | port 0
-	if err := conn.SetWriteDeadline(time.Now().Add(clientReplyTimeout)); err != nil {
-		logx.Errorf("SOCKS5 set success reply deadline failed: %v", err)
+	if !s.trackConn(backendConn) {
 		return
 	}
-	if _, err := conn.Write([]byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}); err != nil {
-		logx.Errorf("SOCKS5 reply success to client failed: %v", err)
+	defer s.releaseConn(backendConn)
+	backendReader := bufio.NewReader(backendConn)
+	if err := backendConn.SetDeadline(time.Now().Add(backendHandshakeTimeout)); err != nil {
 		return
 	}
-
+	if err := negotiateSocks5POP(backendConn, backendReader, method, auth, conn); err != nil {
+		logx.Errorf("SOCKS5 negotiate POP %s failed: %v", backend.Addr, err)
+		return
+	}
+	if err := conn.SetReadDeadline(time.Now().Add(clientHandshakeTimeout)); err != nil {
+		return
+	}
+	request, err := readSocks5Packet(reader)
+	if err != nil {
+		return
+	}
+	if request[1] != 1 {
+		writeSocks5Reply(conn, []byte{5, 7, 0, 1, 0, 0, 0, 0, 0, 0})
+		return
+	}
+	if err := backendConn.SetDeadline(time.Now().Add(backendHandshakeTimeout)); err != nil {
+		return
+	}
+	if _, err := backendConn.Write(request); err != nil {
+		writeSocks5Reply(conn, []byte{5, 1, 0, 1, 0, 0, 0, 0, 0, 0})
+		return
+	}
+	reply, err := readSocks5Packet(backendReader)
+	if err != nil {
+		logx.Errorf("SOCKS5 CONNECT reply from POP %s failed: %v", backend.Addr, err)
+		writeSocks5Reply(conn, []byte{5, 1, 0, 1, 0, 0, 0, 0, 0, 0})
+		return
+	}
+	if err := writeSocks5Reply(conn, reply); err != nil || reply[1] != 0 {
+		return
+	}
 	if err := conn.SetDeadline(time.Time{}); err != nil {
-		logx.Errorf("SOCKS5 clear client reply deadline failed: %v", err)
 		return
 	}
-
-	// 8. Bidirectional copy
-	go func() {
-		_, relayErr := io.Copy(backendConn, reader)
-		if relayErr != nil && !errors.Is(relayErr, net.ErrClosed) {
-			logx.Errorf("[Downstream Connection Drop] SOCKS5 target %s:%d: %v", destHost, destPort, relayErr)
-		}
-		backendConn.Close()
-		conn.Close()
-	}()
-	_, relayErr := io.Copy(conn, backendConn)
-	if relayErr != nil && !errors.Is(relayErr, net.ErrClosed) {
-		logx.Errorf("[1007 Upstream Connection Drop] SOCKS5 target %s:%d: %v", destHost, destPort, relayErr)
+	if err := backendConn.SetDeadline(time.Time{}); err != nil {
+		return
 	}
-	conn.Close()
-	backendConn.Close()
+	stream := s.limiter.WrapConn(&bufferedConn{Conn: backendConn, reader: backendReader})
+	relayTCP(conn, backendConn, reader, stream)
+}
+
+func negotiateSocks5POP(backend net.Conn, reader io.Reader, method byte, auth []byte, client net.Conn) error {
+	failure := []byte{5, 0xff}
+	if method == 2 {
+		failure = []byte{1, 1}
+	}
+	fail := func(err error) error {
+		writeSocks5Reply(client, failure)
+		return err
+	}
+	// Offer only the method selected for this client; never downgrade authentication.
+	if _, err := backend.Write([]byte{5, 1, method}); err != nil {
+		return fail(err)
+	}
+	var reply [2]byte
+	if _, err := io.ReadFull(reader, reply[:]); err != nil {
+		return fail(err)
+	}
+	if reply != [2]byte{5, method} {
+		return fail(fmt.Errorf("POP rejected authentication method %d", method))
+	}
+	if method == 0 {
+		return writeSocks5Reply(client, reply[:])
+	}
+	if _, err := backend.Write(auth); err != nil {
+		return fail(err)
+	}
+	if _, err := io.ReadFull(reader, reply[:]); err != nil {
+		return fail(err)
+	}
+	if reply[0] != 1 {
+		return fail(fmt.Errorf("invalid POP authentication reply version"))
+	}
+	if err := writeSocks5Reply(client, reply[:]); err != nil {
+		return err
+	}
+	if reply[1] != 0 {
+		return fmt.Errorf("POP rejected credentials with status %d", reply[1])
+	}
+	return nil
 }

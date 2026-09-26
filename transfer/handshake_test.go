@@ -152,7 +152,7 @@ func acceptTestBackendHandshake(conn net.Conn, protocol string) error {
 
 func TestSocks5RelaySurvivesHandshakeDeadlines(t *testing.T) {
 	t.Parallel()
-	for _, protocol := range []string{"http", "socks5"} {
+	for _, protocol := range []string{"socks5"} {
 		t.Run(protocol, func(t *testing.T) {
 			t.Parallel()
 			backend := startHandshakeTestBackend(t, protocol, func(conn net.Conn) error {
@@ -204,18 +204,26 @@ func TestSocks5ClientReplyTimeout(t *testing.T) {
 	for _, success := range []bool{true, false} {
 		t.Run(fmt.Sprintf("backend_success=%t", success), func(t *testing.T) {
 			t.Parallel()
-			backend := startHandshakeTestBackend(t, "http", func(conn net.Conn) error {
+			backend := startHandshakeTestBackend(t, "socks5", func(conn net.Conn) error {
+				var greeting [3]byte
+				if _, err := io.ReadFull(conn, greeting[:]); err != nil {
+					return err
+				}
+				if _, err := conn.Write([]byte{5, 0}); err != nil {
+					return err
+				}
+				var request [10]byte
+				if _, err := io.ReadFull(conn, request[:]); err != nil {
+					return err
+				}
+				status := byte(5)
 				if success {
-					if err := acceptTestBackendHandshake(conn, "http"); err != nil {
-						return err
-					}
-					_, err := io.Copy(io.Discard, conn)
+					status = 0
+				}
+				if _, err := conn.Write([]byte{5, status, 0, 1, 0, 0, 0, 0, 0, 0}); err != nil {
 					return err
 				}
-				if _, err := http.ReadRequest(bufio.NewReader(conn)); err != nil {
-					return err
-				}
-				_, err := io.WriteString(conn, "HTTP/1.1 502 Bad Gateway\r\n\r\n")
+				_, err := io.Copy(io.Discard, conn)
 				return err
 			})
 			router := NewRouter([]BackendInfo{backend}, time.Hour, defaultRouterCleanupInterval)
