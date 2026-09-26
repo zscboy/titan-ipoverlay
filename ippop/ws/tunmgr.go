@@ -90,7 +90,6 @@ func NewTunnelManager(config config.Config, redis *redis.Redis) *TunnelManager {
 	tm.sessionManager = NewSessionManager(tm, userSessionExpireDuration)
 	tm.perfCollector = NewSessionPerfCollector(config.ClickHouse, config.GetNodeID(), tm.ipPool, tm.sessionManager)
 
-
 	tm.allocatorRegistry = NewAllocatorRegistry()
 	tm.allocatorRegistry.Register(model.RouteModeAuto, NewStaticAllocator(tm))
 	tm.allocatorRegistry.Register(model.RouteModeManual, NewStaticAllocator(tm))
@@ -351,7 +350,10 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, n
 		UploadRateLimit:   config.WS.UploadRateLimit,
 		IsBlacklisted:     node.IsBlacklisted,
 		LocalIP:           localIP,
-		Region:            countryCode,
+	}
+
+	if tm.config.EnableCountryCode {
+		opts.CountryCode = countryCode
 	}
 
 	tun := newTunnel(conn, tm, opts, ctx)

@@ -32,7 +32,14 @@ func NewNodeWS(tunMgr *TunnelManager) *NodeWS {
 }
 
 func (ws *NodeWS) ServeWS(w http.ResponseWriter, r *http.Request) {
-	logx.Infof("NodeWS.ServeWS %s %s, remote:%s, countryCode:%s", r.URL.Path, r.URL.RawQuery, r.RemoteAddr, r.Context().Value("country_code").(string))
+	countryCode := ""
+	if val := r.Context().Value("country_code"); val != nil {
+		if code, ok := val.(string); ok {
+			countryCode = code
+		}
+	}
+
+	logx.Infof("NodeWS.ServeWS %s %s, remote:%s, countryCode:%s", r.URL.Path, r.URL.RawQuery, r.RemoteAddr, countryCode)
 
 	var req NodeWSReq
 	if err := httpx.Parse(r, &req); err != nil {
@@ -46,14 +53,14 @@ func (ws *NodeWS) ServeWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	countryCode := ""
-	if ws.tunMgr.config.EnableCountryCode {
-		if val := r.Context().Value("country_code"); val != nil {
-			if code, ok := val.(string); ok {
-				countryCode = code
-			}
-		}
-	}
+	// countryCode := ""
+	// if ws.tunMgr.config.EnableCountryCode {
+	// 	if val := r.Context().Value("country_code"); val != nil {
+	// 		if code, ok := val.(string); ok {
+	// 			countryCode = code
+	// 		}
+	// 	}
+	// }
 
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
