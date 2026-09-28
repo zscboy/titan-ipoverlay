@@ -581,7 +581,7 @@ func (tm *TunnelManager) reportAuthFailure(userName string) {
 }
 
 func (tm *TunnelManager) HandleUserAuth(userName, password string) error {
-	logx.Debugf("HandleUserAuth username %s", userName)
+	// logx.Debugf("HandleUserAuth username %s", userName)
 	user, err := tm.getUserFromCache(userName)
 	if err != nil {
 		return fmt.Errorf("get user from redis error %v", err)
@@ -601,7 +601,7 @@ func (tm *TunnelManager) HandleUserAuth(userName, password string) error {
 	passwordMD5 := hex.EncodeToString(hash[:])
 	if user.PasswordMD5 != passwordMD5 {
 		tm.reportAuthFailure(userName)
-		return fmt.Errorf("password not match")
+		return fmt.Errorf("%s password not match", userName)
 	}
 
 	now := time.Now().Unix()

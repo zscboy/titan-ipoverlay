@@ -194,7 +194,7 @@ func (socks5Server *Socks5Server) serveSocks5Conn(conn net.Conn) {
 
 	var user, err = socks5Server.authenticate(conn, bufConn)
 	if err != nil {
-		logx.Errorf("Socks5Server.serveSocks5Conn auth failed: %v", err)
+		logx.Errorf("Socks5Server.serveSocks5Conn auth failed: %v, remote:%s", err, conn.RemoteAddr().String())
 		return
 	}
 
