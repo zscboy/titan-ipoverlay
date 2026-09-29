@@ -68,6 +68,7 @@ type Socks5Server struct {
 	listener       *net.TCPListener
 	userIPCount    *userIPCount
 	userUDPCount   *userUDPCount
+	ipBlacklist    *IPBlacklist
 }
 
 func New(opts *Socks5ServerOptions) (*Socks5Server, error) {
@@ -82,12 +83,25 @@ func New(opts *Socks5ServerOptions) (*Socks5Server, error) {
 	socks5Server := &Socks5Server{
 		opts:        opts,
 		userIPCount: newUserIPCount(),
+		ipBlacklist: newIPBlacklist(),
 	}
 
 	userUDPCount := newUserUDPCount(socks5Server)
 	socks5Server.userUDPCount = userUDPCount
 
 	return socks5Server, nil
+}
+
+func (socks5Server *Socks5Server) AddIPBlacklist(ips []net.IP) {
+	socks5Server.ipBlacklist.Add(ips)
+}
+
+func (socks5Server *Socks5Server) RemoveIPBlacklist(ips []net.IP) {
+	socks5Server.ipBlacklist.Remove(ips)
+}
+
+func (socks5Server *Socks5Server) IPBlacklist() []string {
+	return socks5Server.ipBlacklist.List()
 }
 
 func (socks5Server *Socks5Server) Start() {
@@ -176,6 +190,11 @@ func (socks5Server *Socks5Server) serveSocks5Conn(conn net.Conn) {
 			conn.Close()
 		}
 	}()
+
+	if socks5Server.isClientIPBlacklisted(conn) {
+		logx.Infof("Socks5Server rejected blacklisted client %s", conn.RemoteAddr().String())
+		return
+	}
 
 	bufConn := bufio.NewReader(conn)
 
@@ -331,6 +350,14 @@ func (socks5Server *Socks5Server) handleSocks5Request(r *request) error {
 		}
 		return fmt.Errorf("unsupported command: %v", r.command)
 	}
+}
+
+func (socks5Server *Socks5Server) isClientIPBlacklisted(conn net.Conn) bool {
+	host, _, err := net.SplitHostPort(conn.RemoteAddr().String())
+	if err != nil {
+		return false
+	}
+	return socks5Server.ipBlacklist.Contains(net.ParseIP(host))
 }
 
 // NOTE: if error occurs, conn of the 'req' object must be closed in outer

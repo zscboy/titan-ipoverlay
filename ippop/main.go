@@ -19,7 +19,7 @@ import (
 
 var configFile = flag.String("f", "etc/server.yaml", "the config file")
 
-func newWS(config config.Config, tunMgr *ws.TunnelManager) *rest.Server {
+func newWS(config config.Config, tunMgr *ws.TunnelManager, socks5Server *socks5.Socks5Server) *rest.Server {
 	server := rest.MustNewServer(config.WS.RestConf)
 
 	jwtMiddleware := rest.WithJwt(config.JwtAuth.AccessSecret)
@@ -33,6 +33,7 @@ func newWS(config config.Config, tunMgr *ws.TunnelManager) *rest.Server {
 	nodeList := ws.NewNodeListQuery(tunMgr)
 	qosHandler := ws.NewQoSHandler(tunMgr)
 	kickHandler := ws.NewKickHandler(tunMgr)
+	socks5BlacklistHandler := ws.NewSocks5ClientBlacklistHandler(socks5Server)
 
 	// ws routes
 	server.AddRoute(rest.Route{
@@ -87,6 +88,23 @@ func newWS(config config.Config, tunMgr *ws.TunnelManager) *rest.Server {
 		Path:    "/api/qos/blacklist/add",
 		Handler: qosHandler.ServeBlacklistAdd,
 	})
+
+	server.AddRoute(rest.Route{
+		Method:  "POST",
+		Path:    "/api/socks5/blacklist/add",
+		Handler: socks5BlacklistHandler.ServeAdd,
+	})
+	server.AddRoute(rest.Route{
+		Method:  "POST",
+		Path:    "/api/socks5/blacklist/remove",
+		Handler: socks5BlacklistHandler.ServeRemove,
+	})
+	server.AddRoute(rest.Route{
+		Method:  "GET",
+		Path:    "/api/socks5/blacklist/list",
+		Handler: socks5BlacklistHandler.ServeList,
+	})
+
 	server.AddRoute(rest.Route{
 		Method:  "POST",
 		Path:    "/api/qos/blacklist/remove",
@@ -164,8 +182,8 @@ func main() {
 	var rdb = redis.MustNewRedis(c.Redis)
 	var tunMgr = ws.NewTunnelManager(c, rdb)
 
-	var ws = newWS(c, tunMgr)
 	var socks5 = newSocks5(c, tunMgr)
+	var ws = newWS(c, tunMgr, socks5)
 
 	c.RPCServer.Redis = redis.RedisKeyConf{RedisConf: c.Redis}
 
