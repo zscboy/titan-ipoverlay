@@ -192,7 +192,7 @@ func (socks5Server *Socks5Server) serveSocks5Conn(conn net.Conn) {
 	}()
 
 	if socks5Server.isClientIPBlacklisted(conn) {
-		logx.Infof("Socks5Server rejected blacklisted client %s", conn.RemoteAddr().String())
+		logx.Errorf("Socks5Server rejected blacklisted client %s", conn.RemoteAddr().String())
 		return
 	}
 
