@@ -370,8 +370,6 @@ func (tm *TunnelManager) acceptWebsocket(conn *websocket.Conn, req *NodeWSReq, n
 	tm.acceptLocks[lockIdx].Unlock()
 	unlocked = true
 
-	// tm.HealthStatsMap.LoadOrStore(node.Id, &HealthStats{})
-
 	defer tm.removeTunnel(tun)
 
 	if err := model.HandleNodeOnline(context.Background(), tm.redis, node); err != nil {

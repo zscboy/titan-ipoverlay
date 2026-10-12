@@ -53,15 +53,6 @@ func (ws *NodeWS) ServeWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// countryCode := ""
-	// if ws.tunMgr.config.EnableCountryCode {
-	// 	if val := r.Context().Value("country_code"); val != nil {
-	// 		if code, ok := val.(string); ok {
-	// 			countryCode = code
-	// 		}
-	// 	}
-	// }
-
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		httpx.ErrorCtx(r.Context(), w, err)
